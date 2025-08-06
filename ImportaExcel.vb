@@ -15,7 +15,7 @@ Public Class ImportaExcel
         If dlg.ShowDialog() = DialogResult.OK Then
             excelPath = dlg.FileName
             lblNomeFileExcel.Text = System.IO.Path.GetFileName(excelPath)
-            connStringExcel = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={excelPath};Extended Properties='Excel 12.0 Macro;HDR=NO;'"
+            connStringExcel = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={excelPath};Extended Properties='Excel 12.0 Macro;HDR=NO;IMEX=1;'"
             lstFogli.DataSource = CaricaFogliExcel()
             lstTabelle.DataSource = CaricaTabelleSQL()
         Else
@@ -42,7 +42,7 @@ Public Class ImportaExcel
         Dim tabelle As New List(Of String)
         Using conn As New SqlConnection(connStringSQL)
             conn.Open()
-            Dim cmd = New SqlCommand("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME LIKE 'Tab_%'", conn)
+            Dim cmd = New SqlCommand("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME LIKE '%'", conn)
             Using reader = cmd.ExecuteReader()
                 While reader.Read()
                     tabelle.Add(reader("TABLE_NAME").ToString())
@@ -55,6 +55,7 @@ Public Class ImportaExcel
     Private Sub lstFogli_SelectedIndexChanged(sender As Object, e As EventArgs) Handles lstFogli.SelectedIndexChanged
         If lstFogli.SelectedItem IsNot Nothing Then
             campoSelezionato = ""
+            lstCollegamenti.Items.Clear() ' Azzera i collegamenti qui!
             lstColonne.DataSource = OttieniColonneDaRiga2(lstFogli.SelectedItem.ToString())
         End If
     End Sub
@@ -86,6 +87,7 @@ Public Class ImportaExcel
     ' Importa dati
     Private Sub btnImporta_Click(sender As Object, e As EventArgs) Handles btnImporta.Click
         Try
+            ' Validazioni iniziali
             If lstFogli.SelectedItem Is Nothing OrElse lstTabelle.SelectedItem Is Nothing Then
                 MDIMessageBox.Show("Seleziona foglio Excel e tabella SQL.", Me.MdiParent, MessageBoxButtons.OK, "Avviso")
                 Return
@@ -96,8 +98,11 @@ Public Class ImportaExcel
                 Return
             End If
 
+            ' Preparazione parametri
             Dim nomeFoglio As String = lstFogli.SelectedItem.ToString() + "$"
             Dim tabellaDestinazione As String = lstTabelle.SelectedItem.ToString()
+
+            ' Costruzione mappature Excel → SQL
             Dim mappature As New Dictionary(Of String, String)
             For Each voce As String In lstCollegamenti.Items
                 Dim parti = voce.Split("⇆"c)
@@ -106,10 +111,11 @@ Public Class ImportaExcel
                 If Not mappature.ContainsKey(campoSQL) Then mappature.Add(campoSQL, colonnaExcel)
             Next
 
-            ' Definizione campi BIT (aggiorna questa lista!)
+            ' Campi speciali
             Dim campiBit As List(Of String) = RicavaCampiBit(tabellaDestinazione)
+            Dim campiMoney As List(Of String) = RicavaCampiMoney(tabellaDestinazione)
 
-            ' Lettura Excel
+            ' Lettura dati da Excel
             Dim intestazioni As New List(Of String)
             Dim excelData As New List(Of Dictionary(Of String, String))
 
@@ -147,7 +153,7 @@ Public Class ImportaExcel
                 End Using
             End Using
 
-            ' Costruzione DataTable con conversione BIT
+            ' Costruzione DataTable
             Dim dt As New DataTable()
             For Each campoSQL In mappature.Keys
                 dt.Columns.Add(campoSQL)
@@ -158,15 +164,15 @@ Public Class ImportaExcel
                 For Each campoSQL In mappature.Keys
                     Dim colExcel = mappature(campoSQL)
                     If riga.ContainsKey(colExcel) Then
-                        Dim valore = riga(colExcel).ToString().Trim()
-                        valore = PulisciTesto(valore)
+                        Dim valore = PulisciTesto(riga(colExcel).ToString().Trim())
+
                         If campiBit.Contains(campoSQL) Then
                             nuovaRiga(campoSQL) = ConvertiSNtoBit(valore)
+                        ElseIf campiMoney.Contains(campoSQL) Then
+                            nuovaRiga(campoSQL) = ConvertiMoney(valore)
                         Else
-                            ' Pulizia di eventuali caratteri indesiderati
-                            nuovaRiga(campoSQL) = valore.Trim().Replace("'", "")
+                            nuovaRiga(campoSQL) = valore.Replace("'", "")
                         End If
-
                     Else
                         nuovaRiga(campoSQL) = DBNull.Value
                     End If
@@ -210,6 +216,47 @@ Public Class ImportaExcel
         End Try
     End Sub
 
+    Private Function RicavaCampiMoney(nomeTabella As String) As List(Of String)
+        Dim campiMoney As New List(Of String)
+
+        Try
+            Using conn As New SqlConnection(connStringSQL)
+                conn.Open()
+                Dim query As String = "
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = @Tabella AND DATA_TYPE = 'money'"
+
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@Tabella", nomeTabella)
+
+                    Using reader = cmd.ExecuteReader()
+                        While reader.Read()
+                            campiMoney.Add(reader("COLUMN_NAME").ToString())
+                        End While
+                    End Using
+                End Using
+            End Using
+        Catch ex As Exception
+            MDIMessageBox.Show("Errore nel recupero dei campi MONEY:" & vbCrLf & ex.Message, Me.MdiParent, MessageBoxButtons.OK, "Errore SQL")
+        End Try
+
+        Return campiMoney
+    End Function
+
+    Private Function ConvertiMoney(valore As String) As Object
+        valore = valore.Trim()
+        If String.IsNullOrEmpty(valore) OrElse valore = "-" Then
+            Return DBNull.Value
+        End If
+
+        Dim risultato As Decimal
+        If Decimal.TryParse(valore, risultato) Then
+            Return risultato
+        Else
+            Return DBNull.Value
+        End If
+    End Function
 
     Private Function OttieniColonneDaRiga2(nomeFoglio As String) As List(Of String)
         Dim colonne As New List(Of String)
@@ -220,7 +267,7 @@ Public Class ImportaExcel
                 If reader.Read() AndAlso reader.Read() Then
                     For i = 0 To reader.FieldCount - 1
                         Dim intestazione = reader(i).ToString().Trim()
-                        colonne.Add(If(String.IsNullOrEmpty(intestazione), $"Col{i + 1}", intestazione))
+                        colonne.Add(If(String.IsNullOrEmpty(intestazione), $"Intest. Col{i + 1} vuota", intestazione))
                     Next
                 End If
             End Using
@@ -284,9 +331,9 @@ Public Class ImportaExcel
         If String.IsNullOrWhiteSpace(valore) Then Return DBNull.Value
 
         Select Case valore.Trim().ToUpper()
-            Case "1", "S", "TRUE"
+            Case "1", "S", "Si", "SI", "TRUE"
                 Return True
-            Case "0", "N", "FALSE"
+            Case "0", "N", "No", "NO", "FALSE"
                 Return False
             Case Else
                 Return DBNull.Value ' oppure False, se preferisci default rigido
@@ -312,6 +359,7 @@ Public Class ImportaExcel
         ' Salva stato Form nel modulo condiviso
         GestioneStatoForm.SalvaStato(Me)
     End Sub
+
 End Class
 
 
