@@ -22,7 +22,7 @@ Public Class DynamicDataForm
     Private isModifica As Boolean
     Private pannelloSinistro As TableLayoutPanel
     Private nomeTabellaCorrente As String
-    Private ModalitaCorrente As String = "nessuna"
+    Private ModalitaCorrente As String = "Nessuna"
     Private lblModalita As Label
     Private lampeggioAttivo As Boolean = False
     Private Shared visualFormsAttivi As New Dictionary(Of String, VisualMediaForm)
@@ -591,11 +591,11 @@ Public Class DynamicDataForm
 
         If Not String.IsNullOrEmpty(campo.TabellaCollegata) Then
             Dim combo As New ComboBox With {
-        .DropDownStyle = ComboBoxStyle.DropDownList,
-        .Width = 250,
-        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-        .Tag = campo,
-        .Margin = New Padding(5)
+            .DropDownStyle = ComboBoxStyle.DropDownList,
+            .Width = 250,
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .Tag = campo,
+            .Margin = New Padding(5)
     }
 
             Try
@@ -672,13 +672,25 @@ Public Class DynamicDataForm
                 .Anchor = AnchorStyles.Left
             }
 
-            Case "int"
-                ctrl = New NumericUpDown() With {
-                .Width = larghezzaStandard,
-                .Maximum = Integer.MaxValue,
-                .Minimum = 0,
-                .Anchor = AnchorStyles.Left Or AnchorStyles.Right
+            Case "int", "money", "decimal"
+                ctrl = New TextBox() With {
+                .Width = larghezzaStandard / 2, ' metà larghezza
+                .MaximumSize = New Size(CInt(larghezzaStandard / 2), 0),
+                .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+                .TextAlign = HorizontalAlignment.Right
             }
+
+            Case "decimal"
+                ctrl = New NumericUpDown() With {
+                .Width = larghezzaStandard \ 2,
+                .Maximum = 1000000,
+                .Minimum = 0,
+                .DecimalPlaces = 2,
+                .Increment = 0.01D,
+                .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+                .TextAlign = HorizontalAlignment.Right
+    }
+
 
             Case "imgvid"
                 Dim pannelloMultimediale As New FlowLayoutPanel With {
@@ -691,26 +703,6 @@ Public Class DynamicDataForm
                 .Text = ""
             }
                 pannelloMultimediale.Controls.Add(txtFileName)
-
-                Dim btnSfoglia As New Button() With {
-                .Text = "Sfoglia...",
-                .AutoSize = True
-            }
-                AddHandler btnSfoglia.Click, Sub()
-                                                 Using dlg As New OpenFileDialog()
-                                                     Dim percorso = OttieniPercorsoImgVid()
-                                                     If String.IsNullOrWhiteSpace(percorso) Then
-                                                         MDIMessageBox.Show("Percorso multimediale non configurato.", Me.MdiParent, MessageBoxButtons.OK)
-                                                         Return
-                                                     End If
-                                                     dlg.InitialDirectory = percorso
-                                                     dlg.Filter = "File multimediali|*.jpg;*.png;*.mp4;*.avi"
-                                                     If dlg.ShowDialog() = DialogResult.OK Then
-                                                         txtFileName.Text = Path.GetFileName(dlg.FileName)
-                                                     End If
-                                                 End Using
-                                             End Sub
-                pannelloMultimediale.Controls.Add(btnSfoglia)
 
                 Dim btnView As New Button() With {
                 .Text = "Visualizza",
@@ -932,16 +924,17 @@ Public Class DynamicDataForm
         End Try
 
     End Sub
-
     Private Function MappaTipoVisuale(tipoSql As String) As String
         Select Case tipoSql.ToLower()
             Case "bit" : Return "boolean"
             Case "date", "datetime" : Return "date"
             Case "varchar", "nvarchar", "text" : Return "string"
             Case "int", "bigint", "smallint" : Return "int"
+            Case "money", "decimal", "numeric" : Return "decimal"
             Case Else : Return "string"
         End Select
     End Function
+
 
     Private Sub BottoneDinamico_Click(sender As Object, e As EventArgs)
         Dim btn As Button = CType(sender, Button)
@@ -1160,15 +1153,14 @@ Public Class DynamicDataForm
                     End If
 
                 Case TypeOf ctrl Is FlowLayoutPanel
-                    Dim combo As ComboBox = Nothing
-
                     For Each innerCtrl As Control In ctrl.Controls
-                        If TypeOf innerCtrl Is ComboBox Then combo = CType(innerCtrl, ComboBox)
+                        If TypeOf innerCtrl Is TextBox Then
+                            CType(innerCtrl, TextBox).Text = valore
+                        ElseIf TypeOf innerCtrl Is ComboBox Then
+                            ImpostaValoreCombo(CType(innerCtrl, ComboBox), valore)
+                        End If
                     Next
 
-                    If combo IsNot Nothing Then
-                        ImpostaValoreCombo(combo, valore)
-                    End If
             End Select
         Next
     End Sub

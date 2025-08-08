@@ -13,6 +13,8 @@ Module ModuloCampiDinamici
                 Return "Date"
             Case "varchar", "nvarchar", "text"
                 Return "String"
+            Case "money"
+                Return "money"
             Case Else
                 Return "String"
         End Select
