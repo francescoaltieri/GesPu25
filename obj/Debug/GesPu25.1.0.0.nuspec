@@ -5,7 +5,7 @@
     <version>1.0.0</version>
     <authors>GesPu25</authors>
     <description>Package Description</description>
-    <repository type="git" commit="6649b7fb2fa43797e98ef59f6d0edfbc7f70d216" />
+    <repository type="git" commit="f4b25b1379e25e1c9fa356f0abf28d46da8537a6" />
     <dependencies>
       <group targetFramework="net8.0-windows7.0">
         <dependency id="LibVLCSharp.WinForms" version="3.9.4" exclude="Build,Analyzers" />

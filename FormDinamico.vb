@@ -903,20 +903,8 @@ Public Class DynamicDataForm
                     'Next
 
                     For Each col As DataGridViewColumn In dgvDati.Columns
-                        col.HeaderText = IntestazioneMultilinea(col.Name)
+                        col.HeaderText = GetEtichetta(Me.Name, col.Name)
                     Next
-
-
-                    ' Aggiungi colonna manuale dopo il DataSource
-                    If dgvDati.Columns("Miniatura") Is Nothing Then
-                        Dim colImage As New DataGridViewImageColumn() With {
-                        .Name = "Miniatura",
-                        .HeaderText = "Preview",
-                        .ImageLayout = DataGridViewImageCellLayout.Zoom
-                    }
-                        dgvDati.Columns.Insert(0, colImage)
-                        dgvDati.RowTemplate.Height = 22
-                    End If
                 End Using
             End Using
         Catch ex As Exception

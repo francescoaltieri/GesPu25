@@ -4,6 +4,7 @@
     Public ReadOnly ConnString As String = CostruisciConnString()
 
     Private Function CostruisciConnString() As String
+
         Dim ip = ConfigReader.LeggiValoreIni("SQLServer", "IP", percorsoIni)
         Dim port = ConfigReader.LeggiValoreIni("SQLServer", "Port", percorsoIni)
         Dim db = ConfigReader.LeggiValoreIni("SQLServer", "Database", percorsoIni)

@@ -3,12 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\costantivariabilipubbliche.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:costantivariabilipubbliche.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\configreader.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:configreader.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
     }
   ],
   "DocumentGroupContainers": [
@@ -21,30 +25,45 @@
           "SelectedChildIndex": 1,
           "Children": [
             {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "ConfigReader.vb",
-              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\ConfigReader.vb",
-              "RelativeDocumentMoniker": "ConfigReader.vb",
-              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\ConfigReader.vb",
-              "RelativeToolTip": "ConfigReader.vb",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAEAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-02T14:44:48.918Z",
-              "EditorCaption": ""
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "CostantiVariabiliPubbliche.vb",
-              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\CostantiVariabiliPubbliche.vb",
-              "RelativeDocumentMoniker": "CostantiVariabiliPubbliche.vb",
-              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\CostantiVariabiliPubbliche.vb",
-              "RelativeToolTip": "CostantiVariabiliPubbliche.vb",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAVAAAAAAAAAA==",
+              "Title": "FormDinamico.vb",
+              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
+              "RelativeDocumentMoniker": "FormDinamico.vb",
+              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
+              "RelativeToolTip": "FormDinamico.vb",
+              "ViewState": "AgIAAFkDAAAAAAAAAAAlwIoDAAAYAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-02T14:42:52.824Z",
+              "WhenOpened": "2025-09-04T14:47:02.102Z",
               "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "FormDinamico.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
+              "RelativeDocumentMoniker": "FormDinamico.vb",
+              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\FormDinamico.vb [Progettazione]",
+              "RelativeToolTip": "FormDinamico.vb [Progettazione]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2025-09-04T14:46:46.229Z",
+              "EditorCaption": " [Progettazione]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "GesPu25.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
+              "RelativeDocumentMoniker": "GesPu25.vb",
+              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GesPu25.vb [Progettazione]",
+              "RelativeToolTip": "GesPu25.vb [Progettazione]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2025-09-03T15:28:54.481Z",
+              "EditorCaption": " [Progettazione]"
             }
           ]
         }

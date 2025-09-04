@@ -22,6 +22,7 @@ Partial Class GesPu25
     'Do not modify it using the code editor.
     <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
+        Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(GesPu25))
         MenuStrip1 = New MenuStrip()
         FileToolStripMenuItem = New ToolStripMenuItem()
         TabelleToolStripMenuItem = New ToolStripMenuItem()
@@ -122,25 +123,25 @@ Partial Class GesPu25
         ' BackgroundToolStripMenuItem1
         ' 
         BackgroundToolStripMenuItem1.Name = "BackgroundToolStripMenuItem1"
-        BackgroundToolStripMenuItem1.Size = New Size(180, 22)
+        BackgroundToolStripMenuItem1.Size = New Size(138, 22)
         BackgroundToolStripMenuItem1.Text = "Background"
         ' 
         ' CharactersToolStripMenuItem
         ' 
         CharactersToolStripMenuItem.Name = "CharactersToolStripMenuItem"
-        CharactersToolStripMenuItem.Size = New Size(180, 22)
+        CharactersToolStripMenuItem.Size = New Size(138, 22)
         CharactersToolStripMenuItem.Text = "Characters"
         ' 
         ' PropsToolStripMenuItem
         ' 
         PropsToolStripMenuItem.Name = "PropsToolStripMenuItem"
-        PropsToolStripMenuItem.Size = New Size(180, 22)
+        PropsToolStripMenuItem.Size = New Size(138, 22)
         PropsToolStripMenuItem.Text = "Props"
         ' 
         ' EffettiToolStripMenuItem
         ' 
         EffettiToolStripMenuItem.Name = "EffettiToolStripMenuItem"
-        EffettiToolStripMenuItem.Size = New Size(180, 22)
+        EffettiToolStripMenuItem.Size = New Size(138, 22)
         EffettiToolStripMenuItem.Text = "Effetti"
         ' 
         ' LavorazioniToolStripMenuItem
@@ -271,6 +272,7 @@ Partial Class GesPu25
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(1656, 1095)
         Controls.Add(MenuStrip1)
+        Icon = CType(resources.GetObject("$this.Icon"), Icon)
         IsMdiContainer = True
         MainMenuStrip = MenuStrip1
         Name = "GesPu25"
