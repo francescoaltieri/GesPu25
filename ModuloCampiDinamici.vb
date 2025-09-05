@@ -5,18 +5,16 @@ Imports Microsoft.Data.SqlClient
 Module ModuloCampiDinamici
 
     ' Conversione tipo SQL → tipo visuale
-    Public Function MappaTipoVisuale(sqlType As String) As String
-        Select Case sqlType.ToLower()
-            Case "bit"
-                Return "Boolean"
-            Case "date", "datetime"
-                Return "Date"
-            Case "varchar", "nvarchar", "text"
-                Return "String"
-            Case "money"
-                Return "money"
-            Case Else
-                Return "String"
+    Private Function MappaTipoVisuale(tipoSql As String) As String
+        Select Case tipoSql.ToLower()
+            Case "bit" : Return "boolean"
+            Case "int", "bigint", "smallint", "tinyint" : Return "int"
+            Case "decimal", "numeric", "money", "float", "real" : Return "decimal"
+            Case "date", "datetime", "smalldatetime", "datetime2" : Return "date"
+            Case "varchar", "nvarchar", "char", "nchar", "text", "ntext" : Return "string"
+            Case "varchar(max)", "nvarchar(max)", "char(max)", "nchar(max)", "text(max)", "ntext(max)" : Return "string_max"
+            Case "uniqueidentifier" : Return "guid"
+            Case Else : Return "string000" ' campo non riconosciuto
         End Select
     End Function
 
@@ -88,11 +86,12 @@ Module ModuloCampiDinamici
             Using conn As New SqlConnection(ConnString)
                 conn.Open()
 
-                ' Recupera tutti i campi con info su tipo e identity
+                ' Recupera tutti i campi con info su tipo, lunghezza massima e identity
                 Dim queryCampi As String = "
                 SELECT 
                     c.COLUMN_NAME, 
                     c.DATA_TYPE,
+                    c.CHARACTER_MAXIMUM_LENGTH,
                     COLUMNPROPERTY(OBJECT_ID(c.TABLE_NAME), c.COLUMN_NAME, 'IsIdentity') AS IsIdentity
                 FROM INFORMATION_SCHEMA.COLUMNS c
                 WHERE c.TABLE_NAME = @nomeTabella
@@ -106,10 +105,19 @@ Module ModuloCampiDinamici
                             Dim nomeCampo As String = reader("COLUMN_NAME").ToString()
                             Dim tipoCampo As String = reader("DATA_TYPE").ToString()
                             Dim isIdentity As Boolean = Convert.ToInt32(reader("IsIdentity")) = 1
+                            Dim maxLen As Integer = If(IsDBNull(reader("CHARACTER_MAXIMUM_LENGTH")), -1, Convert.ToInt32(reader("CHARACTER_MAXIMUM_LENGTH")))
+                            Dim CampoLungo As String
+
+                            If maxLen = -1 Then
+                                CampoLungo = "(max)"
+                            Else
+                                CampoLungo = ""
+                            End If
 
                             campi.Add(New CampoDatabase With {
                             .Nome = nomeCampo,
-                            .Tipo = MappaTipoVisuale(tipoCampo),
+                            .Tipo = MappaTipoVisuale(tipoCampo & CampoLungo),
+                            .MaxLen = maxLen,
                             .IsChiave = False,
                             .IsIdentity = isIdentity
                         })

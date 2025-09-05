@@ -566,209 +566,241 @@ Public Class DynamicDataForm
     End Function
 
     Private Function CreaControllo(campo As CampoDatabase) As Control
-        If campo Is Nothing Then
-            Return New Label() With {
-            .Text = "Campo non valido.",
-            .ForeColor = Color.Red,
-            .AutoSize = True
-        }
-        End If
+        If campo Is Nothing Then Return CreaLabelErrore("Campo non valido.")
 
-        Dim ctrl As Control = Nothing
-        Dim tipoCampo = campo.Tipo.ToLower()
-        Dim larghezzaStandard As Integer = 250
-
-        If campo.IsIdentity Then
-            Return New TextBox() With {
-            .Width = 200,
-            .ReadOnly = True,
-            .ForeColor = Color.Gray,
-            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-            .TextAlign = HorizontalAlignment.Left,
-            .Margin = New Padding(5)
-        }
-        End If
+        If campo.IsIdentity Then Return CreaTextBoxIdentity()
 
         If Not String.IsNullOrEmpty(campo.TabellaCollegata) Then
-            Dim combo As New ComboBox With {
-            .DropDownStyle = ComboBoxStyle.DropDownList,
-            .Width = 250,
-            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-            .Tag = campo,
-            .Margin = New Padding(5)
-    }
-
-            Try
-                Using conn As New SqlConnection(ConnString)
-                    conn.Open()
-                    Dim query = $"SELECT {campo.CampoValore}, {campo.CampoVisuale} FROM {campo.TabellaCollegata}"
-                    Using cmd As New SqlCommand(query, conn)
-                        Using reader = cmd.ExecuteReader()
-                            Dim dt As New DataTable()
-                            dt.Load(reader)
-
-                            ' 🔧 Aggiungi colonna combinata codice + descrizione
-                            dt.Columns.Add("VisualeCombo", GetType(String))
-                            For Each row As DataRow In dt.Rows
-                                row("VisualeCombo") = $"{row(campo.CampoValore)} - {row(campo.CampoVisuale)}"
-                            Next
-
-                            combo.DataSource = dt
-                            combo.DisplayMember = "VisualeCombo"
-                            combo.ValueMember = campo.CampoValore
-                        End Using
-                    End Using
-                End Using
-            Catch ex As Exception
-                combo.Items.Clear()
-                combo.Items.Add("Errore nel caricamento")
-                combo.Enabled = False
-            End Try
-
-            Return combo
+            Return CreaComboDaTabella(campo)
         End If
+
+        Dim tipoCampo = campo.Tipo.ToLower()
 
         Select Case tipoCampo
-            Case "string"
-                If campo.Nome.ToLower().Contains("password") Then
-                    ctrl = New TextBox() With {
-                    .Width = larghezzaStandard,
-                    .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-                    .UseSystemPasswordChar = True
-                }
-                    AddHandler CType(ctrl, TextBox).KeyDown, AddressOf TextBoxPassword_KeyDown
-                    AddHandler CType(ctrl, TextBox).MouseDown, AddressOf TextBoxPassword_MouseDown
-                Else
-                    ctrl = New TextBox() With {
-                    .Width = larghezzaStandard,
-                    .Anchor = AnchorStyles.Left Or AnchorStyles.Right
-                }
-                End If
+            Case "string", "string_max", "nvarchar", "varchar", "text"
+                Return CreaTextBoxConGestioneTesto(campo)
 
-            Case "date"
-                ctrl = New DateTimePicker() With {
-                .Width = larghezzaStandard,
-                .Format = DateTimePickerFormat.Short,
-                .Anchor = AnchorStyles.Left Or AnchorStyles.Right
-            }
-
-            Case "textbox", "text"
-                ctrl = New TextBox() With {
-                .Width = larghezzaStandard,
-                .Anchor = AnchorStyles.Left Or AnchorStyles.Right
-            }
+            Case "date", "datetime"
+                Return CreaDatePicker()
 
             Case "combobox"
-                ctrl = New ComboBox() With {
-                .DropDownStyle = ComboBoxStyle.DropDownList,
-                .Width = larghezzaStandard,
-                .Anchor = AnchorStyles.Left Or AnchorStyles.Right
-            }
+                Return CreaComboBox()
 
-            Case "checkbox", "boolean"
-                ctrl = New CheckBox() With {
-                .Text = "",
-                .AutoSize = True,
-                .Anchor = AnchorStyles.Left
-            }
+            Case "checkbox", "boolean", "bit"
+                Return CreaCheckBox()
 
-            Case "int", "money", "decimal"
-                ctrl = New TextBox() With {
-                .Width = larghezzaStandard / 2, ' metà larghezza
-                .MaximumSize = New Size(CInt(larghezzaStandard / 2), 0),
-                .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-                .TextAlign = HorizontalAlignment.Right
-            }
+            Case "int", "money"
+                Return CreaTextBoxNumerico()
 
             Case "decimal"
-                ctrl = New NumericUpDown() With {
-                .Width = larghezzaStandard \ 2,
-                .Maximum = 1000000,
-                .Minimum = 0,
-                .DecimalPlaces = 2,
-                .Increment = 0.01D,
-                .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-                .TextAlign = HorizontalAlignment.Right
-    }
-
+                Return CreaNumericUpDown()
 
             Case "imgvid"
-                Dim pannelloMultimediale As New FlowLayoutPanel With {
-                .AutoSize = True,
-                .FlowDirection = FlowDirection.LeftToRight
-            }
-
-                Dim txtFileName As New TextBox() With {
-                .Width = larghezzaStandard,
-                .Text = ""
-            }
-                pannelloMultimediale.Controls.Add(txtFileName)
-
-                Dim btnView As New Button() With {
-                .Text = "Visualizza",
-                .AutoSize = True,
-                .Enabled = True
-            }
-                AddHandler btnView.Click, Sub(sender, e)
-                                              If dgvDati Is Nothing OrElse dgvDati.SelectedRows.Count = 0 Then
-                                                  Dim parent = If(Me.MdiParent, Me)
-                                                  MDIMessageBox.Show("Seleziona prima una riga nella griglia.", parent, MessageBoxButtons.OK)
-                                                  Return
-                                              End If
-
-                                              Dim nomeFile = txtFileName.Text.Trim()
-                                              Dim percorso = OttieniPercorsoImgVid()
-                                              If String.IsNullOrWhiteSpace(percorso) Then
-                                                  MDIMessageBox.Show("Percorso multimediale non configurato.", Me.MdiParent, MessageBoxButtons.OK)
-                                                  Return
-                                              End If
-
-                                              Dim fullPath = Path.Combine(percorso, nomeFile)
-                                              If Not File.Exists(fullPath) Then
-                                                  MDIMessageBox.Show("File non trovato: " & fullPath, Me.MdiParent, MessageBoxButtons.OK)
-                                                  Return
-                                              End If
-
-                                              If visualFormsAttivi.ContainsKey(fullPath) Then
-                                                  Dim formEsistente = visualFormsAttivi(fullPath)
-                                                  If Not formEsistente.IsDisposed Then
-                                                      formEsistente.BringToFront()
-                                                      formEsistente.Focus()
-                                                      Return
-                                                  Else
-                                                      visualFormsAttivi.Remove(fullPath)
-                                                  End If
-                                              End If
-
-                                              Dim viewer As New VisualMediaForm(fullPath)
-                                              visualFormsAttivi(fullPath) = viewer
-
-                                              AddHandler viewer.FormClosed, Sub(senderClosed, args)
-                                                                                If visualFormsAttivi.ContainsKey(fullPath) Then
-                                                                                    visualFormsAttivi.Remove(fullPath)
-                                                                                End If
-                                                                            End Sub
-
-                                              viewer.Show()
-                                          End Sub
-                pannelloMultimediale.Controls.Add(btnView)
-
-                ctrl = pannelloMultimediale
+                Return CreaPannelloMultimediale()
 
             Case Else
-                ctrl = New Label() With {
-                .Text = $"Tipo campo '{tipoCampo}' non gestito.",
-                .ForeColor = Color.Red,
-                .AutoSize = True
-            }
+                Return CreaLabelErrore($"Tipo campo '{tipoCampo}' non gestito.")
         End Select
+    End Function
 
-        If ctrl IsNot Nothing Then
-            ctrl.Margin = New Padding(5)
+    Private Function CreaTextBoxConGestioneTesto(campo As CampoDatabase) As Control
+        Dim larghezzaStandard As Integer = 250
+        Dim tipoCampo = campo.Tipo.ToLower()
+        Dim isCampoLungo = tipoCampo.Contains("max") OrElse tipoCampo = "text" OrElse tipoCampo.Contains("varchar(max)")
+
+        If campo.Nome.ToLower().Contains("password") Then
+            Dim txt = New TextBox() With {
+            .Width = larghezzaStandard,
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .UseSystemPasswordChar = True,
+            .Margin = New Padding(5)
+        }
+            AddHandler txt.KeyDown, AddressOf TextBoxPassword_KeyDown
+            AddHandler txt.MouseDown, AddressOf TextBoxPassword_MouseDown
+            Return txt
         End If
 
-        Return ctrl
+        If isCampoLungo Then
+            Return New TextBox() With {
+            .Width = larghezzaStandard,
+            .Height = 100,
+            .Multiline = True,
+            .ScrollBars = ScrollBars.Vertical,
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .Margin = New Padding(5)
+        }
+        End If
+
+        Return New TextBox() With {
+        .Width = larghezzaStandard,
+        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+        .Margin = New Padding(5)
+    }
     End Function
+
+    Private Function CreaLabelErrore(testo As String) As Control
+        Return New Label() With {
+        .Text = testo,
+        .ForeColor = Color.Red,
+        .AutoSize = True,
+        .Margin = New Padding(5)
+    }
+    End Function
+
+    Private Function CreaTextBoxIdentity() As Control
+        Return New TextBox() With {
+        .Width = 200,
+        .ReadOnly = True,
+        .ForeColor = Color.Gray,
+        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+        .TextAlign = HorizontalAlignment.Left,
+        .Margin = New Padding(5)
+    }
+    End Function
+
+    Private Function CreaComboDaTabella(campo As CampoDatabase) As Control
+        Dim combo As New ComboBox With {
+        .DropDownStyle = ComboBoxStyle.DropDownList,
+        .Width = 250,
+        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+        .Tag = campo,
+        .Margin = New Padding(5)
+    }
+
+        Try
+            Using conn As New SqlConnection(ConnString)
+                conn.Open()
+                Dim query = $"SELECT {campo.CampoValore}, {campo.CampoVisuale} FROM {campo.TabellaCollegata}"
+                Using cmd As New SqlCommand(query, conn)
+                    Using reader = cmd.ExecuteReader()
+                        Dim dt As New DataTable()
+                        dt.Load(reader)
+                        dt.Columns.Add("VisualeCombo", GetType(String))
+                        For Each row As DataRow In dt.Rows
+                            row("VisualeCombo") = $"{row(campo.CampoValore)} - {row(campo.CampoVisuale)}"
+                        Next
+                        combo.DataSource = dt
+                        combo.DisplayMember = "VisualeCombo"
+                        combo.ValueMember = campo.CampoValore
+                    End Using
+                End Using
+            End Using
+        Catch ex As Exception
+            combo.Items.Clear()
+            combo.Items.Add("Errore nel caricamento")
+            combo.Enabled = False
+        End Try
+
+        Return combo
+    End Function
+
+    Private Function CreaDatePicker() As Control
+        Return New DateTimePicker() With {
+        .Width = 250,
+        .Format = DateTimePickerFormat.Short,
+        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+        .Margin = New Padding(5)
+    }
+    End Function
+
+    Private Function CreaComboBox() As Control
+        Return New ComboBox() With {
+        .DropDownStyle = ComboBoxStyle.DropDownList,
+        .Width = 250,
+        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+        .Margin = New Padding(5)
+    }
+    End Function
+
+    Private Function CreaCheckBox() As Control
+        Return New CheckBox() With {
+        .Text = "",
+        .AutoSize = True,
+        .Anchor = AnchorStyles.Left,
+        .Margin = New Padding(5)
+    }
+    End Function
+
+    Private Function CreaTextBoxNumerico() As Control
+        Return New TextBox() With {
+        .Width = 125,
+        .MaximumSize = New Size(125, 0),
+        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+        .TextAlign = HorizontalAlignment.Right,
+        .Margin = New Padding(5)
+    }
+    End Function
+
+    Private Function CreaNumericUpDown() As Control
+        Return New NumericUpDown() With {
+        .Width = 125,
+        .Maximum = 1000000,
+        .Minimum = 0,
+        .DecimalPlaces = 2,
+        .Increment = 0.01D,
+        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+        .TextAlign = HorizontalAlignment.Right,
+        .Margin = New Padding(5)
+    }
+    End Function
+
+    Private Function CreaPannelloMultimediale() As Control
+        Dim pannello As New FlowLayoutPanel With {
+        .AutoSize = True,
+        .FlowDirection = FlowDirection.LeftToRight
+    }
+
+        Dim txtFileName As New TextBox() With {.Width = 250, .Text = ""}
+        pannello.Controls.Add(txtFileName)
+
+        Dim btnView As New Button() With {.Text = "Visualizza", .AutoSize = True, .Enabled = True}
+        AddHandler btnView.Click, Sub(sender, e)
+                                      If dgvDati Is Nothing OrElse dgvDati.SelectedRows.Count = 0 Then
+                                          Dim parent = If(Me.MdiParent, Me)
+                                          MDIMessageBox.Show("Seleziona prima una riga nella griglia.", parent, MessageBoxButtons.OK)
+                                          Return
+                                      End If
+
+                                      Dim nomeFile = txtFileName.Text.Trim()
+                                      Dim percorso = OttieniPercorsoImgVid()
+                                      If String.IsNullOrWhiteSpace(percorso) Then
+                                          MDIMessageBox.Show("Percorso multimediale non configurato.", Me.MdiParent, MessageBoxButtons.OK)
+                                          Return
+                                      End If
+
+                                      Dim fullPath = Path.Combine(percorso, nomeFile)
+                                      If Not File.Exists(fullPath) Then
+                                          MDIMessageBox.Show("File non trovato: " & fullPath, Me.MdiParent, MessageBoxButtons.OK)
+                                          Return
+                                      End If
+
+                                      If visualFormsAttivi.ContainsKey(fullPath) Then
+                                          Dim formEsistente = visualFormsAttivi(fullPath)
+                                          If Not formEsistente.IsDisposed Then
+                                              formEsistente.BringToFront()
+                                              formEsistente.Focus()
+                                              Return
+                                          Else
+                                              visualFormsAttivi.Remove(fullPath)
+                                          End If
+                                      End If
+
+                                      Dim viewer As New VisualMediaForm(fullPath)
+                                      visualFormsAttivi(fullPath) = viewer
+
+                                      AddHandler viewer.FormClosed, Sub(senderClosed, args)
+                                                                        If visualFormsAttivi.ContainsKey(fullPath) Then
+                                                                            visualFormsAttivi.Remove(fullPath)
+                                                                        End If
+                                                                    End Sub
+
+                                      viewer.Show()
+                                  End Sub
+
+        pannello.Controls.Add(btnView)
+        Return pannello
+    End Function
+
 
     Private Sub PulisciCampi()
         For Each ctrl As Control In Me.Controls
