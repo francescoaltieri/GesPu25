@@ -89,6 +89,27 @@ Public Class GesPu25
         nuovoForm.Show()
     End Sub
 
+    Public Sub ApriModulo2ConPermessi(nomeTabella As String, pForm As Form)
+        Dim permessi = SessioneUtente.Autorizzazioni.GetPermessi(nomeTabella)
+        Dim isAdmin = IsUtenteAdmin(SessioneUtente.NomeUtenteCorrente) ' ← uso della funzione helper
+
+        If Not permessi.CanView AndAlso Not isAdmin Then
+            MDIMessageBox.Show($"Accesso negato al modulo {nomeTabella}.", MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        For Each f As Form In Me.MdiChildren
+            If TypeOf f Is DynamicDataForm AndAlso f.Text.Contains(nomeTabella) Then
+                f.Activate()
+                Return
+            End If
+        Next
+
+        pForm.MdiParent = Me
+        pForm.Show()
+
+    End Sub
+
     Public Function IsUtenteAdmin(nomeUtente As String) As Boolean
         Try
             Using conn As New SqlConnection(ConnString)
@@ -183,6 +204,11 @@ Public Class GesPu25
 
     Private Sub LavorazioniNonIdentificateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles LavorazioniNonIdentificateToolStripMenuItem.Click
         ApriModuloConPermessi("Tab_LavNonIdentificate", Me)
+    End Sub
+
+    Private Sub VideoFbFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles VideoFbFToolStripMenuItem.Click
+        Dim modulo As New VideoFBF() ' Form vuoto
+        ApriModulo2ConPermessi("VideoFBF", modulo)
     End Sub
 End Class
 

@@ -939,3 +939,7 @@ C:\Users\franc\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\refint\GesPu25.
 C:\Users\franc\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.pdb
 C:\Users\franc\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.genruntimeconfig.cache
 C:\Users\franc\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\ref\GesPu25.dll
+C:\Users\franc\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.VideoFBF.resources
+C:\Users\franc\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.SceltaVideo.resources
+C:\Users\franc\Documents\GitHub\GesPu25\bin\Debug\net8.0-windows\GesPu25.dll.config
+C:\Users\franc\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.Resources.resources

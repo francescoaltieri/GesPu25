@@ -4,6 +4,12 @@
     <_LastSelectedProfileId>C:\Users\franc\Documents\GitHub\GesPu25\My Project\PublishProfiles\FolderProfile.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Update="SceltaVideo.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="VideoFBF.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="FormDinamico.vb">
       <SubType>Form</SubType>
     </Compile>

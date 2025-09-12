@@ -55,13 +55,14 @@ Partial Class GesPu25
         ToolStripMenuItem2 = New ToolStripSeparator()
         LogoutToolStripMenuItem = New ToolStripMenuItem()
         EsciToolStripMenuItem = New ToolStripMenuItem()
+        VideoFbFToolStripMenuItem = New ToolStripMenuItem()
         ToolStripMenuItem1 = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
         ' MenuStrip1
         ' 
-        MenuStrip1.Items.AddRange(New ToolStripItem() {FileToolStripMenuItem, ToolStripMenuItem1})
+        MenuStrip1.Items.AddRange(New ToolStripItem() {FileToolStripMenuItem, VideoFbFToolStripMenuItem, ToolStripMenuItem1})
         MenuStrip1.Location = New Point(0, 0)
         MenuStrip1.Name = "MenuStrip1"
         MenuStrip1.Size = New Size(1656, 24)
@@ -260,6 +261,12 @@ Partial Class GesPu25
         EsciToolStripMenuItem.Size = New Size(115, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
+        ' VideoFbFToolStripMenuItem
+        ' 
+        VideoFbFToolStripMenuItem.Name = "VideoFbFToolStripMenuItem"
+        VideoFbFToolStripMenuItem.Size = New Size(68, 20)
+        VideoFbFToolStripMenuItem.Text = "VideoFbF"
+        ' 
         ' ToolStripMenuItem1
         ' 
         ToolStripMenuItem1.Name = "ToolStripMenuItem1"
@@ -317,5 +324,6 @@ Partial Class GesPu25
     Friend WithEvents GestioneGriglieToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripMenuItem3 As ToolStripSeparator
     Friend WithEvents GestioneFormCollegatiToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents VideoFbFToolStripMenuItem As ToolStripMenuItem
 
 End Class
