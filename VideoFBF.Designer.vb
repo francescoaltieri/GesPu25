@@ -51,6 +51,8 @@ Partial Class VideoFBF
         lblAutore = New Label()
         btnNuovaRevisione = New Button()
         lblRevAttiva = New Label()
+        btnApprova = New Button()
+        Label2 = New Label()
         CType(picFrame, ComponentModel.ISupportInitialize).BeginInit()
         CType(TrackFrame, ComponentModel.ISupportInitialize).BeginInit()
         GroupBox1.SuspendLayout()
@@ -61,20 +63,20 @@ Partial Class VideoFBF
         ' 
         ' btnCaricaVideo
         ' 
-        btnCaricaVideo.Location = New Point(1425, 12)
+        btnCaricaVideo.Location = New Point(864, 11)
         btnCaricaVideo.Name = "btnCaricaVideo"
         btnCaricaVideo.Size = New Size(145, 23)
         btnCaricaVideo.TabIndex = 0
-        btnCaricaVideo.Text = "Carica Nuovo Video"
+        btnCaricaVideo.Text = "Carica Lavorazione"
         btnCaricaVideo.UseVisualStyleBackColor = True
         ' 
         ' btnSalvaVideo
         ' 
-        btnSalvaVideo.Location = New Point(1450, 792)
+        btnSalvaVideo.Location = New Point(1456, 792)
         btnSalvaVideo.Name = "btnSalvaVideo"
         btnSalvaVideo.Size = New Size(120, 42)
         btnSalvaVideo.TabIndex = 2
-        btnSalvaVideo.Text = "Salva Video"
+        btnSalvaVideo.Text = "Esporta Video"
         btnSalvaVideo.UseVisualStyleBackColor = True
         ' 
         ' picFrame
@@ -110,7 +112,7 @@ Partial Class VideoFBF
         ' 
         ' btnAnnulla
         ' 
-        btnAnnulla.Location = New Point(1323, 792)
+        btnAnnulla.Location = New Point(1065, 790)
         btnAnnulla.Name = "btnAnnulla"
         btnAnnulla.Size = New Size(120, 42)
         btnAnnulla.TabIndex = 10
@@ -119,7 +121,7 @@ Partial Class VideoFBF
         ' 
         ' btnSalvaFrame
         ' 
-        btnSalvaFrame.Location = New Point(1197, 792)
+        btnSalvaFrame.Location = New Point(1191, 791)
         btnSalvaFrame.Name = "btnSalvaFrame"
         btnSalvaFrame.Size = New Size(120, 42)
         btnSalvaFrame.TabIndex = 11
@@ -250,11 +252,11 @@ Partial Class VideoFBF
         ' btnCaricaRevisione
         ' 
         btnCaricaRevisione.BackgroundImageLayout = ImageLayout.Stretch
-        btnCaricaRevisione.Location = New Point(1015, 12)
+        btnCaricaRevisione.Location = New Point(1431, 11)
         btnCaricaRevisione.Name = "btnCaricaRevisione"
         btnCaricaRevisione.Size = New Size(145, 23)
         btnCaricaRevisione.TabIndex = 23
-        btnCaricaRevisione.Text = "Lista Revisione"
+        btnCaricaRevisione.Text = "Lista Retake"
         btnCaricaRevisione.UseVisualStyleBackColor = True
         ' 
         ' lstNoteFrame
@@ -300,11 +302,11 @@ Partial Class VideoFBF
         ' btnNuovaRevisione
         ' 
         btnNuovaRevisione.BackgroundImageLayout = ImageLayout.Stretch
-        btnNuovaRevisione.Location = New Point(1166, 12)
+        btnNuovaRevisione.Location = New Point(1015, 10)
         btnNuovaRevisione.Name = "btnNuovaRevisione"
         btnNuovaRevisione.Size = New Size(145, 23)
         btnNuovaRevisione.TabIndex = 26
-        btnNuovaRevisione.Text = "Aggiungi Revisione"
+        btnNuovaRevisione.Text = "Aggiungi Retake"
         btnNuovaRevisione.UseVisualStyleBackColor = True
         ' 
         ' lblRevAttiva
@@ -312,17 +314,40 @@ Partial Class VideoFBF
         lblRevAttiva.AutoSize = True
         lblRevAttiva.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblRevAttiva.ForeColor = SystemColors.HotTrack
-        lblRevAttiva.Location = New Point(12, 12)
+        lblRevAttiva.Location = New Point(104, 13)
         lblRevAttiva.Name = "lblRevAttiva"
-        lblRevAttiva.Size = New Size(108, 17)
+        lblRevAttiva.Size = New Size(74, 17)
         lblRevAttiva.TabIndex = 27
-        lblRevAttiva.Text = "Revisione Attiva"
+        lblRevAttiva.Text = "Rev. Attiva"
+        ' 
+        ' btnApprova
+        ' 
+        btnApprova.BackgroundImageLayout = ImageLayout.Stretch
+        btnApprova.Location = New Point(1166, 11)
+        btnApprova.Name = "btnApprova"
+        btnApprova.Size = New Size(145, 23)
+        btnApprova.TabIndex = 28
+        btnApprova.Text = "Approva"
+        btnApprova.UseVisualStyleBackColor = True
+        ' 
+        ' Label2
+        ' 
+        Label2.AutoSize = True
+        Label2.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label2.ForeColor = SystemColors.HotTrack
+        Label2.Location = New Point(12, 13)
+        Label2.Name = "Label2"
+        Label2.Size = New Size(86, 17)
+        Label2.TabIndex = 29
+        Label2.Text = "Lavorazione:"
         ' 
         ' VideoFBF
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(1584, 845)
+        Controls.Add(Label2)
+        Controls.Add(btnApprova)
         Controls.Add(lblRevAttiva)
         Controls.Add(btnNuovaRevisione)
         Controls.Add(GroupBox3)
@@ -389,5 +414,7 @@ Partial Class VideoFBF
     Friend WithEvents lblAutore As Label
     Friend WithEvents btnNuovaRevisione As Button
     Friend WithEvents lblRevAttiva As Label
+    Friend WithEvents btnApprova As Button
+    Friend WithEvents Label2 As Label
 
 End Class

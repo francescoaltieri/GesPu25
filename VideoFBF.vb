@@ -14,6 +14,7 @@ Public Class VideoFBF
     Dim colorePennino As Color = Color.Red
     Dim spessorePennino As Integer = 5
     Dim disegnoAttivo As Boolean = False
+    Private FrameConNote As New List(Of Integer)
 
     Public Property Parametri As RevisioneParametri
 
@@ -27,6 +28,24 @@ Public Class VideoFBF
         Me.Parametri = Nothing ' oppure crea un RevisioneParametri vuoto se vuoi
     End Sub
 
+    Private Sub VideoFBF_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+        If Parametri IsNot Nothing Then
+            lblRevAttiva.Text = Parametri.RevisioneID
+            ' Altrimenti, carica la revisione 
+            If Parametri.RevisioneID = 0 Then
+                DisabilitaControlliModifica()
+                MessageBox.Show("Questa revisione non è modificabile.", "Modalità sola lettura", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+            lblRevAttiva.Text = Parametri.RevisioneID
+            ' Aggiorna la lista delle Note
+            CaricaNoteDaDatabase(Int(lblRevAttiva.Text))
+        Else
+            lblRevAttiva.Text = "Nessuna revisione attiva"
+        End If
+
+    End Sub
+
     Private Sub btnCaricaVideo_Click(sender As Object, e As EventArgs) Handles btnCaricaVideo.Click
 
 
@@ -34,7 +53,7 @@ Public Class VideoFBF
         If OpenFileDialog1.ShowDialog() = DialogResult.OK Then
             Dim videoPath = OpenFileDialog1.FileName
             Dim nomeVideo = Path.GetFileNameWithoutExtension(videoPath)
-            Dim baseDir = Path.Combine("C:\VideoEditor\Frames", nomeVideo)
+            Dim baseDir = Path.Combine(OttieniPercorsoFrames(), nomeVideo)
             Dim revisioneZeroDir = Path.Combine(baseDir, "Revisione_000")
             Dim revisioneID As Integer
             Dim videoID = OttieniVideoID(nomeVideo)
@@ -69,6 +88,8 @@ Public Class VideoFBF
                 MessageBox.Show("Il video è già stato caricato. Frame e revisione 0 già presenti.", "Informazione", MessageBoxButtons.OK, MessageBoxIcon.Information)
             End If
 
+            lblRevAttiva.Text = revisioneID.ToString()
+
             ' Crea i parametri corretti ora che hai gli ID
             Dim parametri = New RevisioneParametri(
             videoID,
@@ -91,6 +112,15 @@ Public Class VideoFBF
             Me.AggiornaRevisioneAttiva()
         End If
     End Sub
+
+    Private Function OttieniPercorsoFrames() As String
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim cmd As New SqlCommand("SELECT TOP 1 PercorsoFramesRevisioni FROM Sys_Parametri", conn)
+            Dim result = cmd.ExecuteScalar()
+            Return If(result IsNot Nothing, result.ToString(), "")
+        End Using
+    End Function
 
     Private Function OttieniVideoID(nomeVideo As String) As Integer
         Using conn As New SqlConnection(ConnString)
@@ -462,7 +492,7 @@ Public Class VideoFBF
         Dim frameIndex = editor.CurrentIndex
         Dim nota = txtNote.Text.Trim
         Dim nomeUtente = NomeUtenteCorrente
-        Dim revisioneID = CType(Me.Tag, Object).RevisioneID
+        Dim revisioneID = Int(Me.lblRevAttiva.Text)
 
         If editor IsNot Nothing AndAlso txtNote.Text.Trim <> "" Then
 
@@ -491,9 +521,11 @@ Public Class VideoFBF
             MessageBox.Show("Inserisci una nota prima di salvare.")
         End If
 
+        ' Salva Nuova Nota nel database
         RicaricaNoteDaDatabase(revisioneID)
-        ' Aggiorna la lista
-        CaricaListaNote()
+
+        ' Aggiorna la lista delle Note
+        CaricaNoteDaDatabase(revisioneID)
 
     End Sub
 
@@ -505,22 +537,6 @@ Public Class VideoFBF
             MessageBox.Show("Form principale non disponibile.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End If
     End Sub
-
-    Private Sub VideoFBF_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-
-        If Parametri IsNot Nothing Then
-            lblRevAttiva.Text = $"Revisione attiva: {Parametri.RevisioneID}"
-            ' Altrimenti, carica la revisione 
-            If Parametri.RevisioneID = 0 Then
-                DisabilitaControlliModifica()
-                MessageBox.Show("Questa revisione non è modificabile.", "Modalità sola lettura", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            End If
-        Else
-            lblRevAttiva.Text = "Nessuna revisione attiva"
-        End If
-
-    End Sub
-
 
     Private Sub CaricaListaNote()
         lstNoteFrame.Items.Clear()
@@ -582,6 +598,9 @@ Public Class VideoFBF
         ' Carica Annotazioni
         CaricaNoteDaDatabase(revisioneID)
 
+        Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
+        overlay?.Invalidate()
+
         ' Carica il primo frame
         TrackFrame.Minimum = 0
         TrackFrame.Maximum = editor.FrameList.Count - 1
@@ -607,7 +626,7 @@ Public Class VideoFBF
         End Using
     End Function
 
-    Private Sub CaricaNoteDaDatabase(revisioneID As Integer)
+    Public Sub CaricaNoteDaDatabase(revisioneID As Integer)
         Using conn As New SqlConnection(ConnString)
             Dim query As String = "
             SELECT FrameIndex, TestoNota, NomeUtente, DataNota 
@@ -618,17 +637,56 @@ Public Class VideoFBF
                 cmd.Parameters.AddWithValue("@RevID", revisioneID)
                 conn.Open()
                 Using reader As SqlDataReader = cmd.ExecuteReader()
+                    FrameConNote.Clear()
                     While reader.Read()
                         Dim index = Convert.ToInt32(reader("FrameIndex"))
                         Dim nota = reader("TestoNota").ToString()
                         Dim autore = reader("NomeUtente").ToString()
                         Dim data = Convert.ToDateTime(reader("DataNota"))
-
+                        FrameConNote.Add(index)
                         editor.SalvaNotaCompleta(index, nota, autore, data)
                     End While
+
+                    Dim overlayPanel As New Panel With {
+                        .Width = TrackFrame.Width,
+                        .Height = 10,
+                        .Location = New Point(TrackFrame.Left, TrackFrame.Top - 10),
+                        .BackColor = Color.Transparent
+}
+                    overlayPanel.Name = "OverlayNotePanel"
+                    Me.Controls.Add(overlayPanel)
+                    AddHandler overlayPanel.Paint, AddressOf DisegnaSegnaliniNote
+
                 End Using
             End Using
         End Using
+        CaricaListaNote()
+
+        Using conn As New SqlConnection(ConnString)
+            Dim query As String = "
+        SELECT DISTINCT FrameIndex 
+        FROM Mov_FrameNote 
+        WHERE RevisioneID = @RevID"
+
+        End Using
+
+    End Sub
+
+    Private Sub DisegnaSegnaliniNote(sender As Object, e As PaintEventArgs)
+        If FrameConNote Is Nothing OrElse FrameConNote.Count = 0 Then Exit Sub
+
+        Dim totale = TrackFrame.Maximum - TrackFrame.Minimum
+        Dim larghezza = TrackFrame.Width - 28
+
+        For Each index In FrameConNote
+            If index < TrackFrame.Minimum OrElse index > TrackFrame.Maximum Then Continue For
+
+            Dim percentuale = (index - TrackFrame.Minimum) / totale
+            Dim x = CInt(percentuale * larghezza)
+
+            ' Disegna un pallino arancione sopra il punto
+            e.Graphics.FillEllipse(Brushes.Red, x + 11, 0, 5, 9)
+        Next
     End Sub
 
     Private Sub AggiornaFrameCorrente(index As Integer)
@@ -674,7 +732,7 @@ Public Class VideoFBF
 
             ' Carica revisione e imposta modalità
             CaricaRevisione(videoID, revisioneID)
-            CaricaListaNote()
+            CaricaNoteDaDatabase(revisioneID)
         End If
     End Sub
 
@@ -853,12 +911,11 @@ Public Class VideoFBF
     Public Sub AggiornaRevisioneAttiva()
         If Parametri Is Nothing Then
             lblRevAttiva.Text = "Nessuna revisione attiva"
-            lblRevAttiva.ForeColor = Color.DarkRed
             Return
         End If
 
-        lblRevAttiva.Text = $"Revisione {Parametri.RevisioneID}"
-        lblRevAttiva.ForeColor = If(Parametri.Permesso.ToLower() = "modifica", Color.Green, Color.Gray)
+        lblRevAttiva.Text = Parametri.RevisioneID
+
     End Sub
 
     Private Function VerificaCreazioneRevisione(videoID As Integer, revisioneCorrente As Integer) As Boolean

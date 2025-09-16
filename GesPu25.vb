@@ -1,5 +1,5 @@
 ﻿Imports Microsoft.Data.SqlClient
-Imports ModuloCampiDinamici
+'Imports ModuloCampiDinamici
 Imports PdfSharp.Pdf
 Imports PdfSharp.Drawing
 Imports PdfSharp.Fonts

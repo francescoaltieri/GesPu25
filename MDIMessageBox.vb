@@ -10,9 +10,18 @@
             .TopMost = True
         }
 
-        ' Posizionamento al centro del MDI form
-        Dim x = mdiForm.Left + (mdiForm.Width - box.Width) / 2
-        Dim y = mdiForm.Top + (mdiForm.Height - box.Height) / 2
+        ' Posizionamento al centro del MDI form o dello schermo
+        Dim x As Integer
+        Dim y As Integer
+
+        If mdiForm IsNot Nothing Then
+            x = mdiForm.Left + (mdiForm.Width - box.Width) \ 2
+            y = mdiForm.Top + (mdiForm.Height - box.Height) \ 2
+        Else
+            x = (Screen.PrimaryScreen.WorkingArea.Width - box.Width) \ 2
+            y = (Screen.PrimaryScreen.WorkingArea.Height - box.Height) \ 2
+        End If
+
         box.Location = New Point(x, y)
 
         ' Messaggio
@@ -51,13 +60,22 @@
             Case MessageBoxButtons.OKCancel
                 creaBottone("Annulla", DialogResult.Cancel)
                 creaBottone("OK", DialogResult.OK)
-                ' Puoi aggiungere altri casi qui
+            Case MessageBoxButtons.YesNoCancel
+                creaBottone("Annulla", DialogResult.Cancel)
+                creaBottone("No", DialogResult.No)
+                creaBottone("Sì", DialogResult.Yes)
         End Select
 
         box.Controls.Add(lbl)
         box.Controls.Add(pnlBottoni)
 
-        box.ShowDialog(mdiForm)
+        If mdiForm IsNot Nothing Then
+            box.ShowDialog(mdiForm)
+        Else
+            box.ShowDialog()
+        End If
+
         Return result
     End Function
+
 End Class

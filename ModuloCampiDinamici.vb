@@ -7,7 +7,7 @@ Module ModuloCampiDinamici
     ' Conversione tipo SQL → tipo visuale
     Private Function MappaTipoVisuale(tipoSql As String) As String
         Select Case tipoSql.ToLower()
-            Case "bit" : Return "boolean"
+            Case "bit", "bit(max)" : Return "boolean"
             Case "int", "bigint", "smallint", "tinyint" : Return "int"
             Case "decimal", "numeric", "money", "float", "real" : Return "decimal"
             Case "date", "datetime", "smalldatetime", "datetime2" : Return "date"

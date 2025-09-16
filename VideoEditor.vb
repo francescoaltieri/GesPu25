@@ -177,12 +177,6 @@ Public Class VideoEditor
         Return 30.0 ' fallback
     End Function
 
-    Public Class FrameNota
-        Public Property Testo As String
-        Public Property Autore As String
-        Public Property Data As DateTime
-    End Class
-
     Public Sub SalvaNotaCompleta(index As Integer, nota As String, autore As String, data As DateTime)
         FrameNote(index) = New FrameNota With {
         .Testo = nota,

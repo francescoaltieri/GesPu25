@@ -3,20 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\sceltavideo.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:sceltavideo.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
     },
     {
       "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
       "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\sceltavideo.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:sceltavideo.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\videoeditor.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
@@ -29,18 +25,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
       "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\revisioneparametri.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:revisioneparametri.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\gestionefile.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gestionefile.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\franc\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
     }
   ],
   "DocumentGroupContainers": [
@@ -50,7 +34,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -58,55 +42,39 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "GestioneFile.vb",
-              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GestioneFile.vb",
-              "RelativeDocumentMoniker": "GestioneFile.vb",
-              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GestioneFile.vb",
-              "RelativeToolTip": "GestioneFile.vb",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAKAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-11T07:57:08.767Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 3,
               "Title": "VideoEditor.vb",
               "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\VideoEditor.vb",
               "RelativeDocumentMoniker": "VideoEditor.vb",
               "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\VideoEditor.vb",
               "RelativeToolTip": "VideoEditor.vb",
-              "ViewState": "AgIAAGYAAAAAAAAAAAAAACMAAAAMAAAAAAAAAA==",
+              "ViewState": "AgIAAGwAAAAAAAAAAAAAALkAAAAEAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-10T13:25:34.88Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-15T13:49:02.495Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "SceltaVideo.vb",
               "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\SceltaVideo.vb",
               "RelativeDocumentMoniker": "SceltaVideo.vb",
               "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\SceltaVideo.vb",
               "RelativeToolTip": "SceltaVideo.vb",
-              "ViewState": "AgIAAEMAAAAAAAAAAAAAwEwAAAASAAAAAAAAAA==",
+              "ViewState": "AgIAAOQAAAAAAAAAAAAAABIBAAAdAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-10T12:54:10.468Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-15T13:44:11.822Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "GesPu25.vb",
-              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
-              "RelativeDocumentMoniker": "GesPu25.vb",
-              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
-              "RelativeToolTip": "GesPu25.vb",
-              "ViewState": "AgIAADIAAAAAAAAAAAAAwG4AAAAEAAAAAAAAAA==",
+              "DocumentIndex": 4,
+              "Title": "SceltaVideo.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\SceltaVideo.vb",
+              "RelativeDocumentMoniker": "SceltaVideo.vb",
+              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\SceltaVideo.vb [Progettazione]",
+              "RelativeToolTip": "SceltaVideo.vb [Progettazione]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-10T12:45:20.056Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-15T13:44:08.838Z",
+              "EditorCaption": " [Progettazione]"
             },
             {
               "$type": "Document",
@@ -116,71 +84,34 @@
               "RelativeDocumentMoniker": "VideoFBF.vb",
               "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\VideoFBF.vb",
               "RelativeToolTip": "VideoFBF.vb",
-              "ViewState": "AgIAAEgDAAAAAAAAAAAAAH8DAAAQAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAJADAAA6AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-10T12:45:02.978Z",
+              "WhenOpened": "2025-09-15T13:02:27.145Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "SceltaVideo.vb [Progettazione]",
-              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\SceltaVideo.vb",
-              "RelativeDocumentMoniker": "SceltaVideo.vb",
-              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\SceltaVideo.vb [Progettazione]",
-              "RelativeToolTip": "SceltaVideo.vb [Progettazione]",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-10T12:42:12.084Z",
-              "EditorCaption": " [Progettazione]"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 0,
               "Title": "VideoFBF.vb [Progettazione]",
               "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\VideoFBF.vb",
               "RelativeDocumentMoniker": "VideoFBF.vb",
               "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\VideoFBF.vb [Progettazione]",
               "RelativeToolTip": "VideoFBF.vb [Progettazione]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-10T12:33:07.952Z",
+              "WhenOpened": "2025-09-15T12:44:56.392Z",
               "EditorCaption": " [Progettazione]"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "FormDinamico.vb [Progettazione]",
-              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
-              "RelativeDocumentMoniker": "FormDinamico.vb",
-              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\FormDinamico.vb [Progettazione]",
-              "RelativeToolTip": "FormDinamico.vb [Progettazione]",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-05T14:14:04.806Z",
-              "EditorCaption": " [Progettazione]"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "RevisioneParametri.vb",
-              "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\RevisioneParametri.vb",
-              "RelativeDocumentMoniker": "RevisioneParametri.vb",
-              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\RevisioneParametri.vb",
-              "RelativeToolTip": "RevisioneParametri.vb",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAAOAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-11T08:36:11.681Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 9,
-              "Title": "GesPu25.vb [Progettazione]",
+              "DocumentIndex": 5,
+              "Title": "GesPu25.vb",
               "DocumentMoniker": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
               "RelativeDocumentMoniker": "GesPu25.vb",
-              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GesPu25.vb [Progettazione]",
-              "RelativeToolTip": "GesPu25.vb [Progettazione]",
+              "ToolTip": "C:\\Users\\franc\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
+              "RelativeToolTip": "GesPu25.vb",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-09-10T09:34:04.693Z",
-              "EditorCaption": " [Progettazione]"
+              "WhenOpened": "2025-09-15T12:44:39.298Z"
             }
           ]
         }

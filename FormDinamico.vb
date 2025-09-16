@@ -944,17 +944,6 @@ Public Class DynamicDataForm
         End Try
 
     End Sub
-    Private Function MappaTipoVisuale(tipoSql As String) As String
-        Select Case tipoSql.ToLower()
-            Case "bit" : Return "boolean"
-            Case "date", "datetime" : Return "date"
-            Case "varchar", "nvarchar", "text" : Return "string"
-            Case "int", "bigint", "smallint" : Return "int"
-            Case "money", "decimal", "numeric" : Return "decimal"
-            Case Else : Return "string"
-        End Select
-    End Function
-
 
     Private Sub BottoneDinamico_Click(sender As Object, e As EventArgs)
         Dim btn As Button = CType(sender, Button)
