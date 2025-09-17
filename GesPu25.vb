@@ -127,6 +127,11 @@ Public Class GesPu25
         End Try
     End Function
 
+    Private Sub VideoFbFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles VideoFbFToolStripMenuItem.Click
+        Dim modulo As New VideoFBF() ' Form vuoto
+        ApriModulo2ConPermessi("VideoFBF", modulo)
+    End Sub
+
     Private Sub ParametriToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles ParametriToolStripMenuItem1.Click
         ApriModuloConPermessi("Sys_Parametri", Me)
     End Sub
@@ -206,9 +211,24 @@ Public Class GesPu25
         ApriModuloConPermessi("Tab_LavNonIdentificate", Me)
     End Sub
 
-    Private Sub VideoFbFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles VideoFbFToolStripMenuItem.Click
-        Dim modulo As New VideoFBF() ' Form vuoto
-        ApriModulo2ConPermessi("VideoFBF", modulo)
+    Private Sub SceneAssegnateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SceneAssegnateToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_Scene", Me)
+    End Sub
+
+    Private Sub AutorizzazioniScenaToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AutorizzazioniScenaToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_SceneUtente", Me)
+    End Sub
+
+    Private Sub ListaRevisioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ListaRevisioniToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_Revisione", Me)
+    End Sub
+
+    Private Sub AutorizzazioniRevisioneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AutorizzazioniRevisioneToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_UtenteRevisione", Me)
+    End Sub
+
+    Private Sub AnnotazioniSuiFramesToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AnnotazioniSuiFramesToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_FrameNote", Me)
     End Sub
 End Class
 

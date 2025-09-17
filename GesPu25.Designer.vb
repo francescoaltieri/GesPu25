@@ -41,6 +41,12 @@ Partial Class GesPu25
         StatoLavorazioniToolStripMenuItem = New ToolStripMenuItem()
         StatoAssegnazioniToolStripMenuItem = New ToolStripMenuItem()
         LavorazioniNonIdentificateToolStripMenuItem = New ToolStripMenuItem()
+        MovSceneToolStripMenuItem = New ToolStripMenuItem()
+        SceneAssegnateToolStripMenuItem = New ToolStripMenuItem()
+        AutorizzazioniScenaToolStripMenuItem = New ToolStripMenuItem()
+        ListaRevisioniToolStripMenuItem = New ToolStripMenuItem()
+        AutorizzazioniRevisioneToolStripMenuItem = New ToolStripMenuItem()
+        AnnotazioniSuiFramesToolStripMenuItem = New ToolStripMenuItem()
         OpzioniToolStripMenuItem = New ToolStripMenuItem()
         StrumentiToolStripMenuItem = New ToolStripMenuItem()
         GestioneUtentiToolStripMenuItem = New ToolStripMenuItem()
@@ -78,9 +84,9 @@ Partial Class GesPu25
         ' 
         ' TabelleToolStripMenuItem
         ' 
-        TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem})
+        TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem, MovSceneToolStripMenuItem})
         TabelleToolStripMenuItem.Name = "TabelleToolStripMenuItem"
-        TabelleToolStripMenuItem.Size = New Size(115, 22)
+        TabelleToolStripMenuItem.Size = New Size(180, 22)
         TabelleToolStripMenuItem.Text = "Tabelle"
         ' 
         ' EpisodiToolStripMenuItem
@@ -176,11 +182,48 @@ Partial Class GesPu25
         LavorazioniNonIdentificateToolStripMenuItem.Size = New Size(220, 22)
         LavorazioniNonIdentificateToolStripMenuItem.Text = "Lavorazioni non identificate"
         ' 
+        ' MovSceneToolStripMenuItem
+        ' 
+        MovSceneToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {SceneAssegnateToolStripMenuItem, AutorizzazioniScenaToolStripMenuItem, ListaRevisioniToolStripMenuItem, AutorizzazioniRevisioneToolStripMenuItem, AnnotazioniSuiFramesToolStripMenuItem})
+        MovSceneToolStripMenuItem.Name = "MovSceneToolStripMenuItem"
+        MovSceneToolStripMenuItem.Size = New Size(190, 22)
+        MovSceneToolStripMenuItem.Text = "Mov. Scene"
+        ' 
+        ' SceneAssegnateToolStripMenuItem
+        ' 
+        SceneAssegnateToolStripMenuItem.Name = "SceneAssegnateToolStripMenuItem"
+        SceneAssegnateToolStripMenuItem.Size = New Size(201, 22)
+        SceneAssegnateToolStripMenuItem.Text = "Lista Scene"
+        ' 
+        ' AutorizzazioniScenaToolStripMenuItem
+        ' 
+        AutorizzazioniScenaToolStripMenuItem.Name = "AutorizzazioniScenaToolStripMenuItem"
+        AutorizzazioniScenaToolStripMenuItem.Size = New Size(201, 22)
+        AutorizzazioniScenaToolStripMenuItem.Text = "Autorizzazioni Scena"
+        ' 
+        ' ListaRevisioniToolStripMenuItem
+        ' 
+        ListaRevisioniToolStripMenuItem.Name = "ListaRevisioniToolStripMenuItem"
+        ListaRevisioniToolStripMenuItem.Size = New Size(201, 22)
+        ListaRevisioniToolStripMenuItem.Text = "Lista Revisioni"
+        ' 
+        ' AutorizzazioniRevisioneToolStripMenuItem
+        ' 
+        AutorizzazioniRevisioneToolStripMenuItem.Name = "AutorizzazioniRevisioneToolStripMenuItem"
+        AutorizzazioniRevisioneToolStripMenuItem.Size = New Size(201, 22)
+        AutorizzazioniRevisioneToolStripMenuItem.Text = "Autorizzazioni Revisione"
+        ' 
+        ' AnnotazioniSuiFramesToolStripMenuItem
+        ' 
+        AnnotazioniSuiFramesToolStripMenuItem.Name = "AnnotazioniSuiFramesToolStripMenuItem"
+        AnnotazioniSuiFramesToolStripMenuItem.Size = New Size(201, 22)
+        AnnotazioniSuiFramesToolStripMenuItem.Text = "Annotazioni sui Frames"
+        ' 
         ' OpzioniToolStripMenuItem
         ' 
         OpzioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StrumentiToolStripMenuItem, ParametriToolStripMenuItem})
         OpzioniToolStripMenuItem.Name = "OpzioniToolStripMenuItem"
-        OpzioniToolStripMenuItem.Size = New Size(115, 22)
+        OpzioniToolStripMenuItem.Size = New Size(180, 22)
         OpzioniToolStripMenuItem.Text = "Opzioni"
         ' 
         ' StrumentiToolStripMenuItem
@@ -247,18 +290,18 @@ Partial Class GesPu25
         ' ToolStripMenuItem2
         ' 
         ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-        ToolStripMenuItem2.Size = New Size(112, 6)
+        ToolStripMenuItem2.Size = New Size(177, 6)
         ' 
         ' LogoutToolStripMenuItem
         ' 
         LogoutToolStripMenuItem.Name = "LogoutToolStripMenuItem"
-        LogoutToolStripMenuItem.Size = New Size(115, 22)
+        LogoutToolStripMenuItem.Size = New Size(180, 22)
         LogoutToolStripMenuItem.Text = "Logout"
         ' 
         ' EsciToolStripMenuItem
         ' 
         EsciToolStripMenuItem.Name = "EsciToolStripMenuItem"
-        EsciToolStripMenuItem.Size = New Size(115, 22)
+        EsciToolStripMenuItem.Size = New Size(180, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
         ' VideoFbFToolStripMenuItem
@@ -325,5 +368,11 @@ Partial Class GesPu25
     Friend WithEvents ToolStripMenuItem3 As ToolStripSeparator
     Friend WithEvents GestioneFormCollegatiToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents VideoFbFToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents MovSceneToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents SceneAssegnateToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AutorizzazioniScenaToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ListaRevisioniToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AutorizzazioniRevisioneToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AnnotazioniSuiFramesToolStripMenuItem As ToolStripMenuItem
 
 End Class

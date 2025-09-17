@@ -8,9 +8,9 @@ Module ModuloCampiDinamici
     Private Function MappaTipoVisuale(tipoSql As String) As String
         Select Case tipoSql.ToLower()
             Case "bit", "bit(max)" : Return "boolean"
-            Case "int", "bigint", "smallint", "tinyint" : Return "int"
+            Case "int", "bigint", "smallint", "tinyint", "int(max)" : Return "int"
             Case "decimal", "numeric", "money", "float", "real" : Return "decimal"
-            Case "date", "datetime", "smalldatetime", "datetime2" : Return "date"
+            Case "date", "date(max)", "datetime", "datetime(max)", "smalldatetime", "datetime2" : Return "date"
             Case "varchar", "nvarchar", "char", "nchar", "text", "ntext" : Return "string"
             Case "varchar(max)", "nvarchar(max)", "char(max)", "nchar(max)", "text(max)", "ntext(max)" : Return "string_max"
             Case "uniqueidentifier" : Return "guid"

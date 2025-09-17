@@ -1,6 +1,7 @@
 ﻿Imports System.IO
 Imports System.Text.RegularExpressions
 Imports Microsoft.Data.SqlClient
+Imports Microsoft.VisualBasic.Devices
 
 Public Class VideoFBF
     Dim editor As VideoEditor
@@ -25,10 +26,11 @@ Public Class VideoFBF
 
     Public Sub New()
         InitializeComponent()
-        Me.Parametri = Nothing ' oppure crea un RevisioneParametri vuoto se vuoi
+        Me.Parametri = Nothing
     End Sub
 
     Private Sub VideoFBF_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        RipristinaPosizioneForm()
 
         If Parametri IsNot Nothing Then
             lblRevAttiva.Text = Parametri.RevisioneID
@@ -46,63 +48,107 @@ Public Class VideoFBF
 
     End Sub
 
+    Private Sub RipristinaPosizioneForm()
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query = "SELECT X, Y, Width, Height, WindowsState FROM Sys_Form WHERE FormName = @FormName"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@FormName", Me.Name)
+                Using reader = cmd.ExecuteReader()
+                    If reader.Read() Then
+                        Me.StartPosition = FormStartPosition.Manual
+                        Me.Location = New Point(reader("X"), reader("Y"))
+                        Me.Size = New Size(reader("Width"), reader("Height"))
+                        Me.WindowState = If(reader("WindowsState").ToString = "Maximized", FormWindowState.Maximized, FormWindowState.Normal)
+                    Else
+                        Me.StartPosition = FormStartPosition.CenterParent
+                    End If
+                End Using
+            End Using
+        End Using
+    End Sub
+
+    Private Sub VideoFBF_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
+        SalvaPosizioneForm()
+    End Sub
+
+    Private Sub SalvaPosizioneForm()
+        Dim stato = If(Me.WindowState = FormWindowState.Maximized, "Maximized", "Normal")
+        Dim x = If(Me.WindowState = FormWindowState.Normal, Me.Location.X, RestoreBounds.X)
+        Dim y = If(Me.WindowState = FormWindowState.Normal, Me.Location.Y, RestoreBounds.Y)
+        Dim w = If(Me.WindowState = FormWindowState.Normal, Me.Size.Width, RestoreBounds.Width)
+        Dim h = If(Me.WindowState = FormWindowState.Normal, Me.Size.Height, RestoreBounds.Height)
+
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query = "
+            IF EXISTS (SELECT 1 FROM Sys_Form WHERE FormName = @FormName)
+                UPDATE Sys_Form SET X = @X, Y = @Y, Width = @Width, Height = @Height, WindowsState = @WindowsState WHERE FormName = @FormName
+            ELSE
+                INSERT INTO Sys_Form (FormName, X, Y, Width, Height, WindowsState) VALUES (@FormName, @X, @Y, @Width, @Height, @WindowsState)"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@FormName", Me.Name)
+                cmd.Parameters.AddWithValue("@X", x)
+                cmd.Parameters.AddWithValue("@Y", y)
+                cmd.Parameters.AddWithValue("@Width", w)
+                cmd.Parameters.AddWithValue("@Height", h)
+                cmd.Parameters.AddWithValue("@WindowsState", stato)
+                cmd.ExecuteNonQuery()
+            End Using
+        End Using
+    End Sub
+
+
     Private Sub btnCaricaVideo_Click(sender As Object, e As EventArgs) Handles btnCaricaVideo.Click
 
-
         OpenFileDialog1.Filter = "Video Files|*.mp4;*.mov"
+
         If OpenFileDialog1.ShowDialog() = DialogResult.OK Then
             Dim videoPath = OpenFileDialog1.FileName
             Dim nomeVideo = Path.GetFileNameWithoutExtension(videoPath)
             Dim baseDir = Path.Combine(OttieniPercorsoFrames(), nomeVideo)
-            Dim revisioneZeroDir = Path.Combine(baseDir, "Revisione_000")
-            Dim revisioneID As Integer
             Dim videoID = OttieniVideoID(nomeVideo)
+            Dim revisioneID As Integer
+            Dim Approvato As Boolean = False
 
-            If videoID > 0 Then
-                MessageBox.Show("Il video è già presente nel database. Verranno aggiornate le cartelle relative.", "Video già registrato", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            End If
-
-            ' Crea struttura se mancante
-            If Not Directory.Exists(revisioneZeroDir) OrElse Directory.GetFiles(revisioneZeroDir).Length = 0 Then
-                If Not Directory.Exists(baseDir) Then Directory.CreateDirectory(baseDir)
-                If Not Directory.Exists(revisioneZeroDir) Then Directory.CreateDirectory(revisioneZeroDir)
-
-                ' Estrai i frame
-                Dim tempEditor = New VideoEditor(videoPath, revisioneZeroDir)
-                tempEditor.ExtractFrames()
-
-                ' Inserisci revisione 0 nel database
+            ' Se il video non esiste nel database
+            If videoID = -1 Then
                 videoID = InserisciVideo(nomeVideo, videoPath)
-
-                If Not RevisioneZeroEsiste(videoID) Then
-                    revisioneID = InserisciRevisioneZero(videoID, nomeVideo)
-                    InserisciPermessoUtente(revisioneID, SessioneUtente.NomeUtenteCorrente)
-                Else
-                    revisioneID = OttieniRevisioneZeroID(videoID)
-                End If
-
-                MessageBox.Show("Video caricato, frame estratti e Revisione_000 registrata.", "Operazione completata", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                revisioneID = 1
             Else
-                videoID = OttieniVideoID(nomeVideo)
-                revisioneID = OttieniRevisioneZeroID(videoID)
-                MessageBox.Show("Il video è già stato caricato. Frame e revisione 0 già presenti.", "Informazione", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                revisioneID = OttieniProssimoRevisioneID()
             End If
+
+            ' Crea directory revisione
+            Dim revisioneDir = Path.Combine(baseDir, $"Revisione_{revisioneID:D4}")
+            If Not Directory.Exists(baseDir) Then Directory.CreateDirectory(baseDir)
+            If Not Directory.Exists(revisioneDir) Then Directory.CreateDirectory(revisioneDir)
+
+            ' Estrai i frame
+            Dim tempEditor = New VideoEditor(videoPath, revisioneDir)
+            tempEditor.ExtractFrames()
+
+            ' Inserisci revisione nel database
+            InserisciRevisione(videoID, revisioneID, SessioneUtente.NomeUtenteCorrente, "Supervisione")
+            InserisciPermessoUtente(revisioneID, SessioneUtente.NomeUtenteCorrente)
+
+            MessageBox.Show($"Video caricato, frame estratti e Revisione_{revisioneID:D4} registrata.", "Operazione completata", MessageBoxButtons.OK, MessageBoxIcon.Information)
 
             lblRevAttiva.Text = revisioneID.ToString()
 
-            ' Crea i parametri corretti ora che hai gli ID
+            ' Parametri revisione
             Dim parametri = New RevisioneParametri(
             videoID,
             revisioneID,
-            "visualizza",
             SessioneUtente.NomeUtenteCorrente,
-            "Revisione 0",
+            $"Revisione {revisioneID}",
             "visualizza",
-            DateTime.Now
+            DateTime.Now,
+            Approvato
         )
 
             ' Carica editor
-            editor = New VideoEditor(videoPath, revisioneZeroDir)
+            editor = New VideoEditor(videoPath, revisioneDir)
             picFrame.Image = editor.LoadFrame(0)
             TrackFrame.Minimum = 0
             TrackFrame.Maximum = editor.FrameList.Count - 1
@@ -111,7 +157,9 @@ Public Class VideoFBF
             Me.Parametri = parametri
             Me.AggiornaRevisioneAttiva()
         End If
+
     End Sub
+
 
     Private Function OttieniPercorsoFrames() As String
         Using conn As New SqlConnection(ConnString)
@@ -125,7 +173,7 @@ Public Class VideoFBF
     Private Function OttieniVideoID(nomeVideo As String) As Integer
         Using conn As New SqlConnection(ConnString)
             conn.Open()
-            Dim query = "SELECT VideoID FROM Mov_Video WHERE Titolo = @Titolo"
+            Dim query = "SELECT VideoID FROM Mov_Scene WHERE Titolo = @Titolo"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@Titolo", nomeVideo)
                 Dim result = cmd.ExecuteScalar()
@@ -151,7 +199,7 @@ Public Class VideoFBF
             conn.Open()
 
             ' Verifica se il video esiste già
-            Dim checkQuery = "SELECT VideoID FROM Mov_Video WHERE Titolo = @Titolo"
+            Dim checkQuery = "SELECT VideoID FROM Mov_Scene WHERE Titolo = @Titolo"
             Using checkCmd As New SqlCommand(checkQuery, conn)
                 checkCmd.Parameters.AddWithValue("@Titolo", nomeVideo)
                 Dim result = checkCmd.ExecuteScalar()
@@ -162,13 +210,14 @@ Public Class VideoFBF
 
             ' Inserisce il video con percorso
             Dim insertQuery = "
-        INSERT INTO Mov_Video (Titolo, CreatoDa, PercorsoFile)
-        OUTPUT INSERTED.VideoID
-        VALUES (@Titolo, @CreatoDa, @PercorsoFile)"
+                                INSERT INTO Mov_Scene (Titolo, CreatoDa, PercorsoFile, DataCreazione)
+                                OUTPUT INSERTED.VideoID
+                                VALUES (@Titolo, @CreatoDa, @PercorsoFile, @DataCreazione)"
             Using insertCmd As New SqlCommand(insertQuery, conn)
                 insertCmd.Parameters.AddWithValue("@Titolo", nomeVideo)
                 insertCmd.Parameters.AddWithValue("@CreatoDa", SessioneUtente.NomeUtenteCorrente)
                 insertCmd.Parameters.AddWithValue("@PercorsoFile", percorsoFile)
+                insertCmd.Parameters.AddWithValue("@DataCreazione", DateTime.Now)
                 Return CInt(insertCmd.ExecuteScalar())
             End Using
         End Using
@@ -258,9 +307,9 @@ Public Class VideoFBF
     End Sub
 
     Private Sub picFrame_MouseDown(sender As Object, e As MouseEventArgs) Handles picFrame.MouseDown
-        If Not RevisioneModificabile() Then
-            MessageBox.Show("Non è possibile modificare i frame della Revisione 0.", "Operazione non consentita", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Exit Sub
+        If picFrame.Image Is Nothing Then
+            ' Ignora il click se non ci sono frame
+            Return
         End If
         isDrawing = True
         lastPoint = e.Location
@@ -268,6 +317,10 @@ Public Class VideoFBF
     End Sub
 
     Private Sub picFrame_MouseMove(sender As Object, e As MouseEventArgs) Handles picFrame.MouseMove
+        If picFrame.Image Is Nothing Then
+            ' Ignora il click se non ci sono frame
+            Return
+        End If
         If isDrawing Then
             Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
                 Using penna As New Pen(colorePennino, spessorePennino)
@@ -281,6 +334,10 @@ Public Class VideoFBF
     End Sub
 
     Private Sub picFrame_MouseUp(sender As Object, e As MouseEventArgs) Handles picFrame.MouseUp
+        If picFrame.Image Is Nothing Then
+            ' Ignora il click se non ci sono frame
+            Return
+        End If
         isDrawing = False
     End Sub
 
@@ -290,26 +347,25 @@ Public Class VideoFBF
 
 
     Private Sub btnAnnulla_Click(sender As Object, e As EventArgs) Handles btnAnnulla.Click
-        If Not RevisioneModificabile() Then
-            MessageBox.Show("La Revisione 0 non può essere modificata.", "Operazione non consentita", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        If picFrame.Image Is Nothing Then
+            ' Ignora il click se non ci sono frame
             Return
         End If
-
         editor.Undo()
         picFrame.Image = editor.DrawingBitmap
         txtNote.Text = editor.GetNotaPerFrame(editor.CurrentIndex)
     End Sub
 
-    Private Sub btnSalvaFrame_Click(sender As Object, e As EventArgs) Handles btnSalvaFrame.Click
-        If Not RevisioneModificabile() Then
-            MessageBox.Show("La Revisione 0 non può essere modificata.", "Operazione non consentita", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Return
-        End If
-
+    Private Sub SalvaFrame()
         editor.SaveFrame()
     End Sub
 
     Private Sub btnSalvaVideo_Click(sender As Object, e As EventArgs) Handles btnSalvaVideo.Click
+        If picFrame.Image Is Nothing Then
+            MessageBox.Show("Caricare prima i Frames", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' Ignora il click se non ci sono frame
+            Return
+        End If
         Dim outputPath = "C:\VideoEditor\output.mp4"
         editor.RebuildVideo(outputPath)
         MessageBox.Show("Video salvato in: " & outputPath)
@@ -408,10 +464,6 @@ Public Class VideoFBF
     End Function
 
     Private Sub picFrame_MouseClick(sender As Object, e As MouseEventArgs) Handles picFrame.MouseClick
-        If Not RevisioneModificabile() Then
-            MessageBox.Show("Non è possibile modificare i frame della Revisione 0.", "Operazione non consentita", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Exit Sub
-        End If
         notaPosizione = e.Location
     End Sub
 
@@ -426,12 +478,7 @@ Public Class VideoFBF
         spessorePennino = CInt(numSpessorePennino.Value)
     End Sub
 
-    Private Sub btnAggiungiNote_Click_1(sender As Object, e As EventArgs) Handles btnAggiungiNote.Click
-        If Not RevisioneModificabile() Then
-            MessageBox.Show("La Revisione 0 non può essere modificata.", "Operazione non consentita", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Return
-        End If
-
+    Private Sub btnAggiungiNote_Click_1(sender As Object, e As EventArgs)
         If notaPosizione = Point.Empty Then
             MessageBox.Show("Clicca sul frame per scegliere la posizione della nota.")
             Return
@@ -470,7 +517,7 @@ Public Class VideoFBF
             g.FillRectangle(New SolidBrush(Color.FromArgb(180, Color.Black)), rect)
 
             ' Testo multilinea con layout automatico
-            Dim format As New StringFormat()
+            Dim format As New StringFormat
             format.Alignment = StringAlignment.Near
             format.LineAlignment = StringAlignment.Near
             format.FormatFlags = StringFormatFlags.LineLimit
@@ -484,11 +531,10 @@ Public Class VideoFBF
     End Sub
 
     Private Sub btnSalvaNote_Click(sender As Object, e As EventArgs) Handles btnSalvaNote.Click
-        If Not RevisioneModificabile() Then
-            MessageBox.Show("La Revisione 0 non può essere modificata.", "Operazione non consentita", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        If picFrame.Image Is Nothing Then
+            ' Ignora il click se non ci sono frame
             Return
         End If
-
         Dim frameIndex = editor.CurrentIndex
         Dim nota = txtNote.Text.Trim
         Dim nomeUtente = NomeUtenteCorrente
@@ -526,6 +572,9 @@ Public Class VideoFBF
 
         ' Aggiorna la lista delle Note
         CaricaNoteDaDatabase(revisioneID)
+
+        ' Salva modifiche grafiche sul frame
+        SalvaFrame()
 
     End Sub
 
@@ -570,10 +619,11 @@ Public Class VideoFBF
         ' Recupera il percorso del video dal database
         Dim videoPath As String = ""
         Dim nomeVideo = OttieniNomeVideo(videoID)
-        Dim frameDir As String = $"C:\VideoEditor\Frames\{nomeVideo}\Revisione_{revisioneID:000}"
+        Dim basePath = OttieniPercorsoFramesBase()
+        Dim frameDir = Path.Combine(basePath, nomeVideo, $"Revisione_{revisioneID:0000}")
 
         Using conn As New SqlConnection(ConnString)
-            Dim query As String = "SELECT PercorsoFile FROM Mov_Video WHERE VideoID = @VideoID"
+            Dim query As String = "SELECT PercorsoFile FROM Mov_Scene WHERE VideoID = @VideoID"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@VideoID", videoID)
                 conn.Open()
@@ -610,10 +660,25 @@ Public Class VideoFBF
 
     End Sub
 
+    Private Function OttieniPercorsoFramesBase() As String
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query = "SELECT TOP 1 PercorsoFramesRevisioni FROM Sys_Parametri"
+            Using cmd As New SqlCommand(query, conn)
+                Dim result = cmd.ExecuteScalar()
+                If result IsNot Nothing Then
+                    Return result.ToString().TrimEnd("\"c)
+                Else
+                    Throw New Exception("PercorsoFramesRevisioni non configurato in Sys_Parametri.")
+                End If
+            End Using
+        End Using
+    End Function
+
     Private Function OttieniNomeVideo(videoID As Integer) As String
         Using conn As New SqlConnection(ConnString)
             conn.Open()
-            Dim query = "SELECT Titolo FROM Mov_Video WHERE VideoID = @ID"
+            Dim query = "SELECT Titolo FROM Mov_Scene WHERE VideoID = @ID"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@ID", videoID)
                 Dim result = cmd.ExecuteScalar()
@@ -685,7 +750,8 @@ Public Class VideoFBF
             Dim x = CInt(percentuale * larghezza)
 
             ' Disegna un pallino arancione sopra il punto
-            e.Graphics.FillEllipse(Brushes.Red, x + 11, 0, 5, 9)
+            'e.Graphics.FillEllipse(Brushes.Red, x + 11, 0, 5, 9)
+            e.Graphics.FillRectangle(Brushes.Red, x + 11, 0, 5, 10)
         Next
     End Sub
 
@@ -736,87 +802,97 @@ Public Class VideoFBF
         End If
     End Sub
 
-    Private Sub btnNuovaRevisione_Click(sender As Object, e As EventArgs) Handles btnNuovaRevisione.Click
-        If Not VerificaCreazioneRevisione(Parametri.VideoID, Parametri.RevisioneID) Then
-            MDIMessageBox.Show("Impossibile creare la Revisione sarebbe incoerente rispetto alla catena delle revisioni successive", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Exit Sub
-        End If
-
-        If Parametri Is Nothing Then
-            MDIMessageBox.Show("Parametri revisione non disponibili.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+    Private Sub btnRetake_Click(sender As Object, e As EventArgs) Handles btnRetake.Click
+        If picFrame.Image Is Nothing Then
+            MessageBox.Show("Caricare prima i Frames", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' Ignora il click se non ci sono frame
             Return
         End If
-        Dim risposta = MDIMessageBox.Show("Vuoi creare una nuova revisione ?", Me.MdiParent, MessageBoxButtons.YesNo, MessageBoxIcon.Question)
-        If risposta <> vbYes Then
+        Dim revisioneID As Integer = Int(Me.lblRevAttiva.Text)
+
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query As String = "
+            UPDATE Mov_Revisione
+            SET Stato = 'Non Conforme', Approvato = 0
+            WHERE RevisioneID = @RevisioneID"
+
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
+                cmd.ExecuteNonQuery()
+            End Using
+        End Using
+
+    End Sub
+
+    Private Sub btnApprovazione_Click(sender As Object, e As EventArgs) Handles btnApprovazione.Click
+        If picFrame.Image Is Nothing Then
+            MessageBox.Show("Caricare prima i Frames", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' Ignora il click se non ci sono frame
             Return
         End If
+        Dim revisioneID As Integer = Int(Me.lblRevAttiva.Text)
 
-        Dim videoID = Parametri.VideoID
-        Dim revisioneCorrenteID = Parametri.RevisioneID
-        Dim Titolo = OttieniNomeVideo(videoID)
-        Dim nomeUtente = Parametri.NomeUtente
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query As String = "
+            UPDATE Mov_Revisione
+            SET Stato = 'Conforme', Approvato = 1
+            WHERE RevisioneID = @RevisioneID"
+
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
+                cmd.ExecuteNonQuery()
+            End Using
+        End Using
+
+    End Sub
+
+
+    Private Sub InserisciRevisione(videoId, RevisioneID, nomeUtente, stato)
+
+        Dim Titolo = OttieniNomeVideo(videoId)
         Dim dataRevisione = DateTime.Now
-        Dim stato = ""
-
-        If Not EsistonoRevisioniAttive(videoID) Then
-            MDIMessageBox.Show("Non ci sono revisioni attive nella tabella Mov_Revisioni.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return
-        End If
 
         ' Genera nome revisione
-        Dim numero = OttieniNumeroRevisione(videoID)
-        Dim nuovaRevisioneID = numero + 1
+        'Dim numero = OttieniProssimoRevisioneID()
+        'Dim nuovaRevisioneID = numero
 
-        Dim nomeRevisione = $"Revisione {nuovaRevisioneID} - {dataRevisione:dd/MM/yyyy}"
+        Dim NumRetake = CalcolaRetake(videoId)
+
+        Dim nomeRevisione = $"Revisione {RevisioneID} - {dataRevisione:dd/MM/yyyy}"
         Using conn As New SqlConnection(ConnString)
             conn.Open()
             Dim query = "
-                        INSERT INTO Mov_Revisione (RevisioneID, VideoID, AutoreNomeUtente, DataRevisione, Note, Stato)
-                        VALUES (@RevisioneID, @VideoID, @Autore, @Data, @Note, @Stato)"
+                        INSERT INTO Mov_Revisione (RevisioneID, VideoID, Autore, DataRevisione, NumRetake, Note, Stato)
+                        VALUES (@RevisioneID, @VideoID, @Autore, @Data, @NumRetake, @Note, @Stato)"
 
             Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@RevisioneID", nuovaRevisioneID)
-                cmd.Parameters.AddWithValue("@VideoID", videoID)
+                cmd.Parameters.AddWithValue("@RevisioneID", RevisioneID)
+                cmd.Parameters.AddWithValue("@VideoID", videoId)
                 cmd.Parameters.AddWithValue("@Autore", nomeUtente)
                 cmd.Parameters.AddWithValue("@Data", dataRevisione)
                 cmd.Parameters.AddWithValue("@Note", nomeRevisione)
+                cmd.Parameters.AddWithValue("@NumRetake", NumRetake)
                 cmd.Parameters.AddWithValue("@Stato", stato)
                 cmd.ExecuteNonQuery()
             End Using
         End Using
 
-        ' Assegna permesso di modifica
+    End Sub
+
+    Public Function CalcolaRetake(videoID As Integer) As Integer
         Using conn As New SqlConnection(ConnString)
             conn.Open()
-            Dim cmd As New SqlCommand("
-        INSERT INTO Mov_UtenteRevisione (RevisioneID, NomeUtente, Permesso)
-        VALUES (@RevID, @NomeUtente, 'modifica')", conn)
-            cmd.Parameters.AddWithValue("@RevID", nuovaRevisioneID)
-            cmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
-            cmd.ExecuteNonQuery()
+
+            Dim query As String = "SELECT COUNT(*) FROM Mov_Revisione WHERE VideoID = @VideoID"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@VideoID", videoID)
+                Return CInt(cmd.ExecuteScalar())
+            End Using
         End Using
+    End Function
 
-        ' Crea cartella nuova revisione
-        Dim baseDir = $"C:\VideoEditor\Frames\{Titolo}"
-        Dim nuovaFrameDir = Path.Combine(baseDir, $"Revisione_{nuovaRevisioneID:000}")
-        If Not Directory.Exists(nuovaFrameDir) Then Directory.CreateDirectory(nuovaFrameDir)
-
-        ' Copia frame dalla revisione corrente
-        Dim origineFrameDir = Path.Combine(baseDir, $"Revisione_{revisioneCorrenteID:000}")
-        If Directory.Exists(origineFrameDir) Then
-            For Each filePath In Directory.GetFiles(origineFrameDir)
-                Dim fileName = Path.GetFileName(filePath)
-                Dim destinazione = Path.Combine(nuovaFrameDir, fileName)
-                File.Copy(filePath, destinazione, overwrite:=True)
-            Next
-        End If
-
-        ' Crea parametri e apri nuova revisione
-        'Dim nuoviParametri = New RevisioneParametri(videoID, nuovaRevisioneID, "modifica", nomeUtente, nomeRevisione, stato, dataRevisione)
-        'Dim videoForm As New VideoFBF(nuoviParametri)
-        'videoForm.MdiParent = Me.MdiParent
-        'videoForm.Show()
-    End Sub
 
     Private Function OttieniProssimoRevisioneID() As Integer
         Using conn As New SqlConnection(ConnString)
@@ -828,18 +904,16 @@ Public Class VideoFBF
         End Using
     End Function
 
-    Public Function OttieniNumeroRevisione(videoID As Integer) As Integer
+    Public Function OttieniNumeroRevisione() As Integer
         Dim numero As Integer = 0
 
         Using conn As New SqlConnection(ConnString)
             conn.Open()
             Dim query As String = "
-            SELECT ISNULL(MAX(RevisioneID), -1)
-            FROM Mov_Revisione 
-            WHERE VideoID = @VideoID"
+        SELECT ISNULL(MAX(RevisioneID), -1)
+        FROM Mov_Revisione"
 
             Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@VideoID", videoID)
                 numero = CInt(cmd.ExecuteScalar())
             End Using
         End Using
@@ -847,6 +921,7 @@ Public Class VideoFBF
         ' Se non ci sono revisioni, restituisce -1
         Return numero
     End Function
+
 
     Public Function IsRevisioneModificabile(revisioneID As Integer) As Boolean
         Dim modificabile As Boolean = False
@@ -869,11 +944,8 @@ Public Class VideoFBF
     End Function
 
     Private Sub DisabilitaControlliModifica()
-        btnSalvaFrame.Enabled = False
-        btnAggiungiNote.Enabled = False
         btnAnnulla.Enabled = False
         btnColorePennino.Enabled = False
-        btnSalvaFrame.Enabled = False
         btnSalvaNote.Enabled = False
         btnSalvaVideo.Enabled = False
         numSpessorePennino.Enabled = False
@@ -881,11 +953,8 @@ Public Class VideoFBF
     End Sub
 
     Private Sub AbilitaControlliModifica()
-        btnSalvaFrame.Enabled = True
-        btnAggiungiNote.Enabled = True
         btnAnnulla.Enabled = True
         btnColorePennino.Enabled = True
-        btnSalvaFrame.Enabled = True
         btnSalvaNote.Enabled = True
         btnSalvaVideo.Enabled = True
         numSpessorePennino.Enabled = True
@@ -915,7 +984,6 @@ Public Class VideoFBF
         End If
 
         lblRevAttiva.Text = Parametri.RevisioneID
-
     End Sub
 
     Private Function VerificaCreazioneRevisione(videoID As Integer, revisioneCorrente As Integer) As Boolean

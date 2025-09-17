@@ -32,10 +32,6 @@ Public Class VideoEditor
         End If
     End Sub
 
-
-    ''' <summary>
-    ''' Estrae i frame dal video senza testo sovrapposto
-    ''' </summary>
     Public Sub ExtractFrames()
         If Not Directory.Exists(FrameDirectory) Then
             Directory.CreateDirectory(FrameDirectory)
@@ -53,9 +49,6 @@ Public Class VideoEditor
         FrameList = Directory.GetFiles(FrameDirectory, "frame_*.png").OrderBy(Function(f) f).ToList()
     End Sub
 
-    ''' <summary>
-    ''' Carica il frame e sovrappone numero + timestamp
-    ''' </summary>
     Public Function LoadFrame(index As Integer) As Bitmap
         If index >= 0 AndAlso index < FrameList.Count Then
             CurrentIndex = index
@@ -94,9 +87,6 @@ Public Class VideoEditor
         Return Nothing
     End Function
 
-    ''' <summary>
-    ''' Salva il frame modificato
-    ''' </summary>
     Public Sub SaveFrame()
         Try
             Dim path = FrameList(CurrentIndex)
@@ -122,27 +112,18 @@ Public Class VideoEditor
         End Try
     End Sub
 
-    ''' <summary>
-    ''' Annulla l'ultima modifica
-    ''' </summary>
     Public Sub Undo()
         If UndoStack.Count > 0 Then
             DrawingBitmap = UndoStack.Pop()
         End If
     End Sub
 
-    ''' <summary>
-    ''' Salva lo stato corrente per undo
-    ''' </summary>
     Public Sub SaveState()
         If DrawingBitmap IsNot Nothing Then
             UndoStack.Push(CType(DrawingBitmap.Clone(), Bitmap))
         End If
     End Sub
 
-    ''' <summary>
-    ''' Ricompone il video dai frame modificati
-    ''' </summary>
     Public Sub RebuildVideo(outputPath As String)
         Dim ffmpegArgs As String = $"-framerate {framerate.ToString(CultureInfo.InvariantCulture)} -i ""{FrameDirectory}\frame_%04d.png"" -c:v libx264 -pix_fmt yuv420p ""{outputPath}"""
         Dim proc As New Process()
@@ -154,9 +135,6 @@ Public Class VideoEditor
         proc.WaitForExit()
     End Sub
 
-    ''' <summary>
-    ''' Estrae il framerate reale dal video
-    ''' </summary>
     Private Function GetFramerate() As Double
         Dim output As String = ""
         Dim proc As New Process()

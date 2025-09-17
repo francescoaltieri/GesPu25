@@ -1,4 +1,5 @@
-﻿Imports System.IO
+﻿Imports System.ComponentModel
+Imports System.IO
 Imports System.Net.Mail
 Imports Microsoft.Data.SqlClient
 
@@ -23,16 +24,17 @@ Public Class SceltaVideo
         Using conn As New SqlConnection(ConnString)
             Dim query As String = "
         SELECT 
-            V.VideoID,
-            V.Titolo AS TitoloVideo,
             R.RevisioneID,
             R.DataRevisione,
+            V.VideoID,
+            V.Titolo AS TitoloVideo,
+            R.Autore,
+            R.NumRetake,
             R.Stato,
-            R.Note,
-            R.AutoreNomeUtente,
-            UR.Permesso
+            R.Approvato,
+            R.Note
         FROM Mov_Revisione R
-        INNER JOIN Mov_Video V ON R.VideoID = V.VideoID
+        INNER JOIN Mov_Scene V ON R.VideoID = V.VideoID
         INNER JOIN Mov_UtenteRevisione UR ON R.RevisioneID = UR.RevisioneID
         WHERE UR.NomeUtente = @NomeUtente
         ORDER BY V.Titolo, R.DataRevisione ASC;"
@@ -48,8 +50,9 @@ Public Class SceltaVideo
 
         ' Aggiungi colonna calcolata: NumeroRevisione
         dt.Columns.Add("NumeroRevisione", GetType(String))
-        For i As Integer = 0 To dt.Rows.Count - 1
-            dt.Rows(i)("NumeroRevisione") = $"Revisione_{i:000}"
+        For Each row As DataRow In dt.Rows
+            Dim revisioneID As Integer = CInt(row("RevisioneID"))
+            row("NumeroRevisione") = $"Revisione_{revisioneID:000}"
         Next
 
         dgvRevisioni.DataSource = dt
@@ -62,6 +65,9 @@ Public Class SceltaVideo
                 col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
             End If
         Next
+
+        dgvRevisioni.ReadOnly = True
+
     End Sub
 
     Private Sub dgvRevisioni_KeyDown(sender As Object, e As KeyEventArgs) Handles dgvRevisioni.KeyDown
@@ -104,7 +110,7 @@ Public Class SceltaVideo
             Dim queryInfo As String = "
             SELECT V.Titolo
             FROM Mov_Revisione R
-            INNER JOIN Mov_Video V ON R.VideoID = V.VideoID
+            INNER JOIN Mov_Scene V ON R.VideoID = V.VideoID
             WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(queryInfo, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
@@ -154,6 +160,17 @@ Public Class SceltaVideo
             End If
         End If
 
+        ' Chiudi VideoFBF se la revisione cancellata è quella attiva
+        For Each f As Form In Application.OpenForms
+            If TypeOf f Is VideoFBF Then
+                Dim videoForm = DirectCast(f, VideoFBF)
+                If videoForm.lblRevAttiva.Text = revisioneID.ToString() Then
+                    VideoFBF.picFrame.Image = Nothing
+                    Exit For
+                End If
+            End If
+        Next
+
         MDIMessageBox.Show("Revisione eliminata correttamente.", Me.MdiParent, MessageBoxButtons.OK, "Operazione completata")
     End Sub
 
@@ -167,7 +184,7 @@ Public Class SceltaVideo
             Dim queryInfo As String = "
             SELECT V.VideoID, V.Titolo
             FROM Mov_Revisione R
-            INNER JOIN Mov_Video V ON R.VideoID = V.VideoID
+            INNER JOIN Mov_Scene V ON R.VideoID = V.VideoID
             WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(queryInfo, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
@@ -203,7 +220,7 @@ Public Class SceltaVideo
             Dim query As String = "
             SELECT V.Titolo, R.RevisioneID
             FROM Mov_Revisione R
-            INNER JOIN Mov_Video V ON R.VideoID = V.VideoID
+            INNER JOIN Mov_Scene V ON R.VideoID = V.VideoID
             WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
@@ -219,7 +236,7 @@ Public Class SceltaVideo
         Return ""
     End Function
 
-    Private Function CalcolaNumeroRevisione(revisioneID As Integer) As Integer
+    Private Function CalcolaNumeroRevisionexxxxx(revisioneID As Integer) As Integer
         Using conn As New SqlConnection(ConnString)
             conn.Open()
             Dim query As String = "
@@ -239,18 +256,13 @@ Public Class SceltaVideo
         Dim row = dgvRevisioni.Rows(e.RowIndex)
         Dim videoID = CInt(row.Cells("VideoID").Value)
         Dim revisioneID = CInt(row.Cells("RevisioneID").Value)
-        Dim permesso = row.Cells("Permesso").Value.ToString().ToLower()
-        Dim autore = row.Cells("AutoreNomeUtente").Value.ToString()
+        Dim autore = row.Cells("Autore").Value.ToString()
         Dim note = row.Cells("Note").Value.ToString()
         Dim stato = row.Cells("Stato").Value.ToString()
         Dim dataRevisione = Convert.ToDateTime(row.Cells("DataRevisione").Value)
+        Dim approvato = If(Convert.IsDBNull(row.Cells("Approvato").Value), False, Convert.ToBoolean(row.Cells("Approvato").Value))
 
-        If revisioneID = 0 AndAlso permesso = "modifica" Then
-            MDIMessageBox.Show("La Revisione 0 non può essere modificata.", Me.MdiParent, MessageBoxButtons.OK, "Attenzione")
-            Exit Sub
-        End If
-
-        Dim parametri = New RevisioneParametri(videoID, revisioneID, permesso, autore, note, stato, dataRevisione)
+        Dim parametri = New RevisioneParametri(videoID, revisioneID, autore, note, stato, dataRevisione, approvato)
 
         Dim videoForm As VideoFBF = Nothing
         For Each f As Form In Application.OpenForms

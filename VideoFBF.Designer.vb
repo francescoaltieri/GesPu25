@@ -29,7 +29,6 @@ Partial Class VideoFBF
         btnSuccessivo = New Button()
         OpenFileDialog1 = New OpenFileDialog()
         btnAnnulla = New Button()
-        btnSalvaFrame = New Button()
         btnPrimoFrame = New Button()
         btnUltimoFrame = New Button()
         btnAvantiVeloce = New Button()
@@ -38,7 +37,6 @@ Partial Class VideoFBF
         txtNote = New TextBox()
         GroupBox1 = New GroupBox()
         btnSalvaNote = New Button()
-        btnAggiungiNote = New Button()
         numSpessorePennino = New NumericUpDown()
         colorDialogPennino = New ColorDialog()
         Label1 = New Label()
@@ -49,9 +47,9 @@ Partial Class VideoFBF
         GroupBox3 = New GroupBox()
         lblDataNota = New Label()
         lblAutore = New Label()
-        btnNuovaRevisione = New Button()
+        btnRetake = New Button()
         lblRevAttiva = New Label()
-        btnApprova = New Button()
+        btnApprovazione = New Button()
         Label2 = New Label()
         CType(picFrame, ComponentModel.ISupportInitialize).BeginInit()
         CType(TrackFrame, ComponentModel.ISupportInitialize).BeginInit()
@@ -63,16 +61,16 @@ Partial Class VideoFBF
         ' 
         ' btnCaricaVideo
         ' 
-        btnCaricaVideo.Location = New Point(864, 11)
+        btnCaricaVideo.Location = New Point(1089, 5)
         btnCaricaVideo.Name = "btnCaricaVideo"
-        btnCaricaVideo.Size = New Size(145, 23)
+        btnCaricaVideo.Size = New Size(145, 34)
         btnCaricaVideo.TabIndex = 0
-        btnCaricaVideo.Text = "Carica Lavorazione"
+        btnCaricaVideo.Text = "Carica Nuovo Lavoro"
         btnCaricaVideo.UseVisualStyleBackColor = True
         ' 
         ' btnSalvaVideo
         ' 
-        btnSalvaVideo.Location = New Point(1456, 792)
+        btnSalvaVideo.Location = New Point(1456, 787)
         btnSalvaVideo.Name = "btnSalvaVideo"
         btnSalvaVideo.Size = New Size(120, 42)
         btnSalvaVideo.TabIndex = 2
@@ -90,7 +88,7 @@ Partial Class VideoFBF
         ' 
         ' btnPrecedente
         ' 
-        btnPrecedente.Location = New Point(12, 792)
+        btnPrecedente.Location = New Point(12, 788)
         btnPrecedente.Name = "btnPrecedente"
         btnPrecedente.Size = New Size(120, 41)
         btnPrecedente.TabIndex = 4
@@ -99,7 +97,7 @@ Partial Class VideoFBF
         ' 
         ' btnSuccessivo
         ' 
-        btnSuccessivo.Location = New Point(138, 792)
+        btnSuccessivo.Location = New Point(138, 788)
         btnSuccessivo.Name = "btnSuccessivo"
         btnSuccessivo.Size = New Size(120, 41)
         btnSuccessivo.TabIndex = 5
@@ -112,25 +110,16 @@ Partial Class VideoFBF
         ' 
         ' btnAnnulla
         ' 
-        btnAnnulla.Location = New Point(1065, 790)
+        btnAnnulla.Location = New Point(1191, 786)
         btnAnnulla.Name = "btnAnnulla"
         btnAnnulla.Size = New Size(120, 42)
         btnAnnulla.TabIndex = 10
         btnAnnulla.Text = "Annulla Ultima Modifica"
         btnAnnulla.UseVisualStyleBackColor = True
         ' 
-        ' btnSalvaFrame
-        ' 
-        btnSalvaFrame.Location = New Point(1191, 791)
-        btnSalvaFrame.Name = "btnSalvaFrame"
-        btnSalvaFrame.Size = New Size(120, 42)
-        btnSalvaFrame.TabIndex = 11
-        btnSalvaFrame.Text = "Salva Frame"
-        btnSalvaFrame.UseVisualStyleBackColor = True
-        ' 
         ' btnPrimoFrame
         ' 
-        btnPrimoFrame.Location = New Point(273, 793)
+        btnPrimoFrame.Location = New Point(273, 789)
         btnPrimoFrame.Name = "btnPrimoFrame"
         btnPrimoFrame.Size = New Size(120, 41)
         btnPrimoFrame.TabIndex = 12
@@ -139,7 +128,7 @@ Partial Class VideoFBF
         ' 
         ' btnUltimoFrame
         ' 
-        btnUltimoFrame.Location = New Point(399, 793)
+        btnUltimoFrame.Location = New Point(399, 789)
         btnUltimoFrame.Name = "btnUltimoFrame"
         btnUltimoFrame.Size = New Size(120, 41)
         btnUltimoFrame.TabIndex = 13
@@ -148,7 +137,7 @@ Partial Class VideoFBF
         ' 
         ' btnAvantiVeloce
         ' 
-        btnAvantiVeloce.Location = New Point(538, 793)
+        btnAvantiVeloce.Location = New Point(538, 789)
         btnAvantiVeloce.Name = "btnAvantiVeloce"
         btnAvantiVeloce.Size = New Size(120, 41)
         btnAvantiVeloce.TabIndex = 14
@@ -157,7 +146,7 @@ Partial Class VideoFBF
         ' 
         ' btnIndietroVeloce
         ' 
-        btnIndietroVeloce.Location = New Point(664, 793)
+        btnIndietroVeloce.Location = New Point(664, 789)
         btnIndietroVeloce.Name = "btnIndietroVeloce"
         btnIndietroVeloce.Size = New Size(120, 41)
         btnIndietroVeloce.TabIndex = 15
@@ -182,7 +171,6 @@ Partial Class VideoFBF
         ' GroupBox1
         ' 
         GroupBox1.Controls.Add(btnSalvaNote)
-        GroupBox1.Controls.Add(btnAggiungiNote)
         GroupBox1.Controls.Add(txtNote)
         GroupBox1.Location = New Point(1317, 433)
         GroupBox1.Name = "GroupBox1"
@@ -193,21 +181,12 @@ Partial Class VideoFBF
         ' 
         ' btnSalvaNote
         ' 
-        btnSalvaNote.Location = New Point(133, 194)
+        btnSalvaNote.Location = New Point(8, 194)
         btnSalvaNote.Name = "btnSalvaNote"
-        btnSalvaNote.Size = New Size(120, 42)
+        btnSalvaNote.Size = New Size(245, 42)
         btnSalvaNote.TabIndex = 19
         btnSalvaNote.Text = "Salva Note"
         btnSalvaNote.UseVisualStyleBackColor = True
-        ' 
-        ' btnAggiungiNote
-        ' 
-        btnAggiungiNote.Location = New Point(8, 194)
-        btnAggiungiNote.Name = "btnAggiungiNote"
-        btnAggiungiNote.Size = New Size(120, 42)
-        btnAggiungiNote.TabIndex = 18
-        btnAggiungiNote.Text = "Scrivi Note su Frame"
-        btnAggiungiNote.UseVisualStyleBackColor = True
         ' 
         ' numSpessorePennino
         ' 
@@ -252,11 +231,11 @@ Partial Class VideoFBF
         ' btnCaricaRevisione
         ' 
         btnCaricaRevisione.BackgroundImageLayout = ImageLayout.Stretch
-        btnCaricaRevisione.Location = New Point(1431, 11)
+        btnCaricaRevisione.Location = New Point(938, 5)
         btnCaricaRevisione.Name = "btnCaricaRevisione"
-        btnCaricaRevisione.Size = New Size(145, 23)
+        btnCaricaRevisione.Size = New Size(145, 34)
         btnCaricaRevisione.TabIndex = 23
-        btnCaricaRevisione.Text = "Lista Retake"
+        btnCaricaRevisione.Text = "Lavori in corso"
         btnCaricaRevisione.UseVisualStyleBackColor = True
         ' 
         ' lstNoteFrame
@@ -267,7 +246,7 @@ Partial Class VideoFBF
         lstNoteFrame.ItemHeight = 15
         lstNoteFrame.Location = New Point(1317, 40)
         lstNoteFrame.Name = "lstNoteFrame"
-        lstNoteFrame.Size = New Size(255, 270)
+        lstNoteFrame.Size = New Size(255, 255)
         lstNoteFrame.TabIndex = 24
         ' 
         ' GroupBox3
@@ -299,15 +278,15 @@ Partial Class VideoFBF
         lblAutore.TabIndex = 0
         lblAutore.Text = "Autore"
         ' 
-        ' btnNuovaRevisione
+        ' btnRetake
         ' 
-        btnNuovaRevisione.BackgroundImageLayout = ImageLayout.Stretch
-        btnNuovaRevisione.Location = New Point(1015, 10)
-        btnNuovaRevisione.Name = "btnNuovaRevisione"
-        btnNuovaRevisione.Size = New Size(145, 23)
-        btnNuovaRevisione.TabIndex = 26
-        btnNuovaRevisione.Text = "Aggiungi Retake"
-        btnNuovaRevisione.UseVisualStyleBackColor = True
+        btnRetake.BackgroundImageLayout = ImageLayout.Stretch
+        btnRetake.Location = New Point(1317, 5)
+        btnRetake.Name = "btnRetake"
+        btnRetake.Size = New Size(122, 34)
+        btnRetake.TabIndex = 26
+        btnRetake.Text = "Retake"
+        btnRetake.UseVisualStyleBackColor = True
         ' 
         ' lblRevAttiva
         ' 
@@ -320,15 +299,15 @@ Partial Class VideoFBF
         lblRevAttiva.TabIndex = 27
         lblRevAttiva.Text = "Rev. Attiva"
         ' 
-        ' btnApprova
+        ' btnApprovazione
         ' 
-        btnApprova.BackgroundImageLayout = ImageLayout.Stretch
-        btnApprova.Location = New Point(1166, 11)
-        btnApprova.Name = "btnApprova"
-        btnApprova.Size = New Size(145, 23)
-        btnApprova.TabIndex = 28
-        btnApprova.Text = "Approva"
-        btnApprova.UseVisualStyleBackColor = True
+        btnApprovazione.BackgroundImageLayout = ImageLayout.Stretch
+        btnApprovazione.Location = New Point(1448, 5)
+        btnApprovazione.Name = "btnApprovazione"
+        btnApprovazione.Size = New Size(122, 34)
+        btnApprovazione.TabIndex = 28
+        btnApprovazione.Text = "Approvazione"
+        btnApprovazione.UseVisualStyleBackColor = True
         ' 
         ' Label2
         ' 
@@ -345,11 +324,11 @@ Partial Class VideoFBF
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(1584, 845)
+        ClientSize = New Size(1584, 833)
         Controls.Add(Label2)
-        Controls.Add(btnApprova)
+        Controls.Add(btnApprovazione)
         Controls.Add(lblRevAttiva)
-        Controls.Add(btnNuovaRevisione)
+        Controls.Add(btnRetake)
         Controls.Add(GroupBox3)
         Controls.Add(lstNoteFrame)
         Controls.Add(btnCaricaRevisione)
@@ -360,7 +339,6 @@ Partial Class VideoFBF
         Controls.Add(btnAvantiVeloce)
         Controls.Add(btnUltimoFrame)
         Controls.Add(btnPrimoFrame)
-        Controls.Add(btnSalvaFrame)
         Controls.Add(btnAnnulla)
         Controls.Add(btnSuccessivo)
         Controls.Add(btnPrecedente)
@@ -392,7 +370,6 @@ Partial Class VideoFBF
     Friend WithEvents btnSuccessivo As Button
     Friend WithEvents OpenFileDialog1 As OpenFileDialog
     Friend WithEvents btnAnnulla As Button
-    Friend WithEvents btnSalvaFrame As Button
     Friend WithEvents btnPrimoFrame As Button
     Friend WithEvents btnUltimoFrame As Button
     Friend WithEvents btnAvantiVeloce As Button
@@ -400,7 +377,6 @@ Partial Class VideoFBF
     Friend WithEvents TrackFrame As TrackBar
     Friend WithEvents txtNote As TextBox
     Friend WithEvents GroupBox1 As GroupBox
-    Friend WithEvents btnAggiungiNote As Button
     Friend WithEvents numSpessorePennino As NumericUpDown
     Friend WithEvents colorDialogPennino As ColorDialog
     Friend WithEvents Label1 As Label
@@ -412,9 +388,9 @@ Partial Class VideoFBF
     Friend WithEvents GroupBox3 As GroupBox
     Friend WithEvents lblDataNota As Label
     Friend WithEvents lblAutore As Label
-    Friend WithEvents btnNuovaRevisione As Button
+    Friend WithEvents btnRetake As Button
     Friend WithEvents lblRevAttiva As Label
-    Friend WithEvents btnApprova As Button
+    Friend WithEvents btnApprovazione As Button
     Friend WithEvents Label2 As Label
 
 End Class

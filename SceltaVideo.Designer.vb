@@ -38,7 +38,7 @@ Partial Class SceltaVideo
         dgvRevisioni.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         dgvRevisioni.Location = New Point(12, 40)
         dgvRevisioni.Name = "dgvRevisioni"
-        dgvRevisioni.Size = New Size(870, 424)
+        dgvRevisioni.Size = New Size(1048, 424)
         dgvRevisioni.TabIndex = 0
         ' 
         ' txtFiltro
@@ -61,7 +61,7 @@ Partial Class SceltaVideo
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(894, 474)
+        ClientSize = New Size(1072, 474)
         Controls.Add(Label1)
         Controls.Add(txtFiltro)
         Controls.Add(dgvRevisioni)
