@@ -281,7 +281,9 @@ Public Class SceltaVideo
         videoForm.Parametri = parametri
         videoForm.AggiornaRevisioneAttiva()
         videoForm.CaricaRevisione(videoID, revisioneID)
-        videoForm.CaricaNoteDaDatabase(revisioneID)
+        videoForm.AggiornaNoteDaDatabase(revisioneID)
+        videoForm.AggiornaUtentiCondivisi(Int(videoForm.lblRevAttiva.Text))
+        videoForm.AggiornaFrameCorrente(videoForm.TrackFrame.Value)
 
         Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
         overlay?.Invalidate()

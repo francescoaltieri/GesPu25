@@ -63,7 +63,11 @@ Partial Class GesPu25
         EsciToolStripMenuItem = New ToolStripMenuItem()
         VideoFbFToolStripMenuItem = New ToolStripMenuItem()
         ToolStripMenuItem1 = New ToolStripMenuItem()
+        StatusStrip1 = New StatusStrip()
+        toolStripUser = New ToolStripStatusLabel()
+        toolStripDataOra = New ToolStripStatusLabel()
         MenuStrip1.SuspendLayout()
+        StatusStrip1.SuspendLayout()
         SuspendLayout()
         ' 
         ' MenuStrip1
@@ -86,7 +90,7 @@ Partial Class GesPu25
         ' 
         TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem, MovSceneToolStripMenuItem})
         TabelleToolStripMenuItem.Name = "TabelleToolStripMenuItem"
-        TabelleToolStripMenuItem.Size = New Size(180, 22)
+        TabelleToolStripMenuItem.Size = New Size(115, 22)
         TabelleToolStripMenuItem.Text = "Tabelle"
         ' 
         ' EpisodiToolStripMenuItem
@@ -223,7 +227,7 @@ Partial Class GesPu25
         ' 
         OpzioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StrumentiToolStripMenuItem, ParametriToolStripMenuItem})
         OpzioniToolStripMenuItem.Name = "OpzioniToolStripMenuItem"
-        OpzioniToolStripMenuItem.Size = New Size(180, 22)
+        OpzioniToolStripMenuItem.Size = New Size(115, 22)
         OpzioniToolStripMenuItem.Text = "Opzioni"
         ' 
         ' StrumentiToolStripMenuItem
@@ -290,18 +294,18 @@ Partial Class GesPu25
         ' ToolStripMenuItem2
         ' 
         ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-        ToolStripMenuItem2.Size = New Size(177, 6)
+        ToolStripMenuItem2.Size = New Size(112, 6)
         ' 
         ' LogoutToolStripMenuItem
         ' 
         LogoutToolStripMenuItem.Name = "LogoutToolStripMenuItem"
-        LogoutToolStripMenuItem.Size = New Size(180, 22)
+        LogoutToolStripMenuItem.Size = New Size(115, 22)
         LogoutToolStripMenuItem.Text = "Logout"
         ' 
         ' EsciToolStripMenuItem
         ' 
         EsciToolStripMenuItem.Name = "EsciToolStripMenuItem"
-        EsciToolStripMenuItem.Size = New Size(180, 22)
+        EsciToolStripMenuItem.Size = New Size(115, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
         ' VideoFbFToolStripMenuItem
@@ -316,11 +320,39 @@ Partial Class GesPu25
         ToolStripMenuItem1.Size = New Size(24, 20)
         ToolStripMenuItem1.Text = "?"
         ' 
+        ' StatusStrip1
+        ' 
+        StatusStrip1.Items.AddRange(New ToolStripItem() {toolStripUser, toolStripDataOra})
+        StatusStrip1.Location = New Point(0, 1073)
+        StatusStrip1.Name = "StatusStrip1"
+        StatusStrip1.Size = New Size(1656, 22)
+        StatusStrip1.TabIndex = 3
+        StatusStrip1.Text = "StatusStrip1"
+        ' 
+        ' toolStripUser
+        ' 
+        toolStripUser.BorderSides = ToolStripStatusLabelBorderSides.Left Or ToolStripStatusLabelBorderSides.Top Or ToolStripStatusLabelBorderSides.Right Or ToolStripStatusLabelBorderSides.Bottom
+        toolStripUser.BorderStyle = Border3DStyle.RaisedOuter
+        toolStripUser.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        toolStripUser.ForeColor = SystemColors.HotTrack
+        toolStripUser.Name = "toolStripUser"
+        toolStripUser.Size = New Size(4, 17)
+        ' 
+        ' toolStripDataOra
+        ' 
+        toolStripDataOra.BorderSides = ToolStripStatusLabelBorderSides.Left Or ToolStripStatusLabelBorderSides.Top Or ToolStripStatusLabelBorderSides.Right Or ToolStripStatusLabelBorderSides.Bottom
+        toolStripDataOra.BorderStyle = Border3DStyle.RaisedOuter
+        toolStripDataOra.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        toolStripDataOra.ForeColor = SystemColors.Highlight
+        toolStripDataOra.Name = "toolStripDataOra"
+        toolStripDataOra.Size = New Size(4, 17)
+        ' 
         ' GesPu25
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(1656, 1095)
+        Controls.Add(StatusStrip1)
         Controls.Add(MenuStrip1)
         Icon = CType(resources.GetObject("$this.Icon"), Icon)
         IsMdiContainer = True
@@ -329,6 +361,8 @@ Partial Class GesPu25
         Text = "GesPu25"
         MenuStrip1.ResumeLayout(False)
         MenuStrip1.PerformLayout()
+        StatusStrip1.ResumeLayout(False)
+        StatusStrip1.PerformLayout()
         ResumeLayout(False)
         PerformLayout()
 
@@ -374,5 +408,8 @@ Partial Class GesPu25
     Friend WithEvents ListaRevisioniToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents AutorizzazioniRevisioneToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents AnnotazioniSuiFramesToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents StatusStrip1 As StatusStrip
+    Friend WithEvents toolStripUser As ToolStripStatusLabel
+    Friend WithEvents toolStripDataOra As ToolStripStatusLabel
 
 End Class

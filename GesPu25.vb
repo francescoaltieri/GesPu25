@@ -16,6 +16,7 @@ Public Class GesPu25
 
         Login.MdiParent = Me
         Login.Show()
+
     End Sub
 
     Private Sub LogoutToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles LogoutToolStripMenuItem.Click
@@ -230,5 +231,6 @@ Public Class GesPu25
     Private Sub AnnotazioniSuiFramesToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AnnotazioniSuiFramesToolStripMenuItem.Click
         ApriModuloConPermessi("Mov_FrameNote", Me)
     End Sub
+
 End Class
 

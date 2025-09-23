@@ -39,6 +39,11 @@ Public Class Login
             SessioneUtente.NomeUtenteCorrente = txtNomeUtente.Text
             SessioneUtente.Autorizzazioni = New AutorizzazioniUtente()
             SessioneUtente.Autorizzazioni.Carica(txtNomeUtente.Text)
+            SessioneUtente.DataConnessione = Now
+
+            ' Imposta i testi
+            GesPu25.toolStripUser.Text = "Utente: " & SessioneUtente.NomeUtenteCorrente
+            GesPu25.toolStripDataOra.Text = "Data Connessione: " & SessioneUtente.DataConnessione.ToString("dd/MM/yyyy HH:mm")
 
             Me.Hide()
             AttivaTuttiIMenu(GesPu25.MenuStrip1)

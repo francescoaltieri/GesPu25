@@ -16,6 +16,7 @@ Public Class VideoFBF
     Dim spessorePennino As Integer = 5
     Dim disegnoAttivo As Boolean = False
     Private FrameConNote As New List(Of Integer)
+    Private aggiornamentoInCorso As Boolean = False
 
     Public Property Parametri As RevisioneParametri
 
@@ -32,21 +33,127 @@ Public Class VideoFBF
     Private Sub VideoFBF_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         RipristinaPosizioneForm()
 
-        If Parametri IsNot Nothing Then
-            lblRevAttiva.Text = Parametri.RevisioneID
-            ' Altrimenti, carica la revisione 
-            If Parametri.RevisioneID = 0 Then
-                DisabilitaControlliModifica()
-                MessageBox.Show("Questa revisione non è modificabile.", "Modalità sola lettura", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            End If
-            lblRevAttiva.Text = Parametri.RevisioneID
-            ' Aggiorna la lista delle Note
-            CaricaNoteDaDatabase(Int(lblRevAttiva.Text))
-        Else
-            lblRevAttiva.Text = "Nessuna revisione attiva"
-        End If
+        lblRevAttiva.Text = "Nessuna revisione attiva"
+        CaricaUtentiDisponibili()
 
     End Sub
+
+    Private Sub CaricaUtentiDisponibili()
+        lstUtentiCondivisi.Items.Clear()
+
+        Using conn As New SqlConnection(ConnString)
+            Dim cmd As New SqlCommand("
+            SELECT NomeUtente, Generalità 
+            FROM Sys_Utenti 
+            WHERE IsActive = 1 AND (Amministratore = 1 OR Supervisore = 1)
+            ORDER BY Generalità", conn)
+
+            conn.Open()
+            Using reader = cmd.ExecuteReader()
+                While reader.Read()
+                    Dim nomeUtente = reader("NomeUtente").ToString()
+                    Dim generalita = reader("Generalità").ToString()
+
+                    If nomeUtente <> SessioneUtente.NomeUtenteCorrente Then
+                        ' Visualizza Generalità, memorizza NomeUtente
+                        lstUtentiCondivisi.Items.Add(New KeyValuePair(Of String, String)(nomeUtente, generalita), False)
+                    End If
+                End While
+            End Using
+        End Using
+    End Sub
+
+    Private Sub lstUtentiCondivisi_ItemCheck(sender As Object, e As ItemCheckEventArgs) Handles lstUtentiCondivisi.ItemCheck
+        If aggiornamentoInCorso Then Exit Sub
+
+        Me.BeginInvoke(Sub()
+                           Dim item = CType(lstUtentiCondivisi.Items(e.Index), KeyValuePair(Of String, String))
+                           Dim nomeUtente = item.Key
+                           Dim revisioneID = Int(lblRevAttiva.Text)
+
+                           If e.NewValue = CheckState.Checked Then
+                               AggiungiCondivisioneUtente(revisioneID, nomeUtente)
+                           ElseIf e.NewValue = CheckState.Unchecked Then
+                               RimuoviCondivisioneUtente(revisioneID, nomeUtente)
+                           End If
+                       End Sub)
+    End Sub
+
+    Public Sub AggiornaUtentiCondivisi(revisioneID As Integer)
+        aggiornamentoInCorso = True
+
+        ' Deseleziona tutto
+        For i = 0 To lstUtentiCondivisi.Items.Count - 1
+            lstUtentiCondivisi.SetItemChecked(i, False)
+        Next
+
+        ' Seleziona gli utenti condivisi
+        Using conn As New SqlConnection(ConnString)
+            Dim cmd As New SqlCommand("
+            SELECT NomeUtente 
+            FROM Mov_UtenteRevisione 
+            WHERE RevisioneID = @RevID", conn)
+            cmd.Parameters.AddWithValue("@RevID", revisioneID)
+            conn.Open()
+
+            Using reader = cmd.ExecuteReader()
+                While reader.Read()
+                    Dim nome = reader("NomeUtente").ToString()
+
+                    For i = 0 To lstUtentiCondivisi.Items.Count - 1
+                        Dim item = CType(lstUtentiCondivisi.Items(i), KeyValuePair(Of String, String))
+                        If item.Key = nome Then
+                            lstUtentiCondivisi.SetItemChecked(i, True)
+                            Exit For
+                        End If
+                    Next
+                End While
+            End Using
+        End Using
+
+        aggiornamentoInCorso = False
+    End Sub
+
+
+    Private Sub AggiungiCondivisioneUtente(revisioneID As Integer, nomeUtente As String)
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+
+            ' Verifica se esiste già
+            Dim checkCmd As New SqlCommand("
+            SELECT COUNT(*) 
+            FROM Mov_UtenteRevisione 
+            WHERE RevisioneID = @RevID AND NomeUtente = @NomeUtente", conn)
+            checkCmd.Parameters.AddWithValue("@RevID", revisioneID)
+            checkCmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
+
+            Dim esiste = Convert.ToInt32(checkCmd.ExecuteScalar()) > 0
+            If esiste Then Exit Sub
+
+            ' Inserisci solo se non esiste
+            Dim insertCmd As New SqlCommand("
+            INSERT INTO Mov_UtenteRevisione (RevisioneID, NomeUtente, Permesso)
+            VALUES (@RevID, @NomeUtente, 'visualizza')", conn)
+            insertCmd.Parameters.AddWithValue("@RevID", revisioneID)
+            insertCmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
+            insertCmd.ExecuteNonQuery()
+        End Using
+    End Sub
+
+
+    Private Sub RimuoviCondivisioneUtente(revisioneID As Integer, nomeUtente As String)
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+
+            Dim cmd As New SqlCommand("
+            DELETE FROM Mov_UtenteRevisione 
+            WHERE RevisioneID = @RevID AND NomeUtente = @NomeUtente", conn)
+            cmd.Parameters.AddWithValue("@RevID", revisioneID)
+            cmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
+            cmd.ExecuteNonQuery()
+        End Using
+    End Sub
+
 
     Private Sub RipristinaPosizioneForm()
         Using conn As New SqlConnection(ConnString)
@@ -274,7 +381,6 @@ Public Class VideoFBF
         End Using
     End Sub
 
-
     Private Sub trackFrame_Scroll(sender As Object, e As EventArgs) Handles TrackFrame.Scroll
         picFrame.Image = editor.LoadFrame(TrackFrame.Value)
         AggiornaFrameCorrente(TrackFrame.Value)
@@ -287,11 +393,15 @@ Public Class VideoFBF
         End If
 
         If editor.CurrentIndex < editor.FrameList.Count - 1 Then
-            picFrame.Image = editor.LoadFrame(editor.CurrentIndex + 1)
-            TrackFrame.Value = editor.CurrentIndex
-            txtNote.Text = editor.GetNotaPerFrame(editor.CurrentIndex)
+            Dim nuovoIndex = editor.CurrentIndex + 1
+            picFrame.Image = editor.LoadFrame(nuovoIndex)
+            TrackFrame.Value = nuovoIndex
+
+            ' Recupera nota dal database
+            txtNote.Text = RecuperaNotaDaDatabase(Int(lblRevAttiva.Text), nuovoIndex)
         End If
     End Sub
+
 
     Private Sub btnPrecedente_Click(sender As Object, e As EventArgs) Handles btnPrecedente.Click
         If editor Is Nothing OrElse picFrame Is Nothing OrElse TrackFrame Is Nothing OrElse txtNote Is Nothing Then
@@ -300,11 +410,30 @@ Public Class VideoFBF
         End If
 
         If editor.CurrentIndex > 0 Then
-            picFrame.Image = editor.LoadFrame(editor.CurrentIndex - 1)
-            TrackFrame.Value = editor.CurrentIndex
-            txtNote.Text = editor.GetNotaPerFrame(editor.CurrentIndex)
+            Dim nuovoIndex = editor.CurrentIndex - 1
+            picFrame.Image = editor.LoadFrame(nuovoIndex)
+            TrackFrame.Value = nuovoIndex
+
+            ' Recupera nota dal database
+            txtNote.Text = RecuperaNotaDaDatabase(Int(lblRevAttiva.Text), nuovoIndex)
         End If
     End Sub
+
+    Private Function RecuperaNotaDaDatabase(revisioneID As Integer, frameIndex As Integer) As String
+        Using conn As New SqlConnection(ConnString)
+            Dim cmd As New SqlCommand("
+            SELECT TestoNota 
+            FROM Mov_FrameNote 
+            WHERE RevisioneID = @RevID AND FrameIndex = @FrameIndex", conn)
+            cmd.Parameters.AddWithValue("@RevID", revisioneID)
+            cmd.Parameters.AddWithValue("@FrameIndex", frameIndex)
+            conn.Open()
+
+            Dim nota = cmd.ExecuteScalar()
+            Return If(nota IsNot Nothing, nota.ToString(), "")
+        End Using
+    End Function
+
 
     Private Sub picFrame_MouseDown(sender As Object, e As MouseEventArgs) Handles picFrame.MouseDown
         If picFrame.Image Is Nothing Then
@@ -351,9 +480,14 @@ Public Class VideoFBF
             ' Ignora il click se non ci sono frame
             Return
         End If
+
         editor.Undo()
         picFrame.Image = editor.DrawingBitmap
-        txtNote.Text = editor.GetNotaPerFrame(editor.CurrentIndex)
+
+        ' Recupera la nota dal database
+        Dim revisioneID = Int(lblRevAttiva.Text)
+        Dim frameIndex = editor.CurrentIndex
+        txtNote.Text = RecuperaNotaDaDatabase(revisioneID, frameIndex)
     End Sub
 
     Private Sub SalvaFrame()
@@ -377,10 +511,15 @@ Public Class VideoFBF
             Return
         End If
 
-        picFrame.Image = editor.LoadFrame(0)
-        TrackFrame.Value = editor.CurrentIndex
-        txtNote.Text = editor.GetNotaPerFrame(editor.CurrentIndex)
+        Dim primoIndex = 0
+        picFrame.Image = editor.LoadFrame(primoIndex)
+        TrackFrame.Value = primoIndex
+
+        ' Recupera la nota dal database
+        Dim revisioneID = Int(lblRevAttiva.Text)
+        txtNote.Text = RecuperaNotaDaDatabase(revisioneID, primoIndex)
     End Sub
+
 
     Private Sub btnUltimoFrame_Click(sender As Object, e As EventArgs) Handles btnUltimoFrame.Click
         If editor Is Nothing OrElse picFrame Is Nothing OrElse TrackFrame Is Nothing OrElse txtNote Is Nothing Then
@@ -388,9 +527,13 @@ Public Class VideoFBF
             Return
         End If
 
-        picFrame.Image = editor.LoadFrame(editor.FrameList.Count - 1)
-        TrackFrame.Value = editor.CurrentIndex
-        txtNote.Text = editor.GetNotaPerFrame(editor.CurrentIndex)
+        Dim ultimoIndex = editor.FrameList.Count - 1
+        picFrame.Image = editor.LoadFrame(ultimoIndex)
+        TrackFrame.Value = ultimoIndex
+
+        ' Recupera la nota dal database
+        Dim revisioneID = Int(lblRevAttiva.Text)
+        txtNote.Text = RecuperaNotaDaDatabase(revisioneID, ultimoIndex)
     End Sub
 
     Private Sub btnAvantiVeloce_Click(sender As Object, e As EventArgs) Handles btnAvantiVeloce.Click
@@ -432,10 +575,16 @@ Public Class VideoFBF
 
     Private Async Sub StartAutoScroll()
         While autoScrollActive
+            Dim nuovoIndex As Integer = editor.CurrentIndex
+
             If autoScrollDirection = "forward" AndAlso editor.CurrentIndex < editor.FrameList.Count - 1 Then
-                picFrame.Image = editor.LoadFrame(editor.CurrentIndex + 1)
+                nuovoIndex += 1
+                picFrame.Image = editor.LoadFrame(nuovoIndex)
+
             ElseIf autoScrollDirection = "backward" AndAlso editor.CurrentIndex > 0 Then
-                picFrame.Image = editor.LoadFrame(editor.CurrentIndex - 1)
+                nuovoIndex -= 1
+                picFrame.Image = editor.LoadFrame(nuovoIndex)
+
             Else
                 ' Fine raggiunta: interrompi e ripristina testo
                 autoScrollActive = False
@@ -446,8 +595,13 @@ Public Class VideoFBF
                 End If
             End If
 
-            txtNote.Text = editor.GetNotaPerFrame(editor.CurrentIndex)
-            TrackFrame.Value = editor.CurrentIndex
+            editor.CurrentIndex = nuovoIndex
+            TrackFrame.Value = nuovoIndex
+
+            ' Recupera nota dal database
+            Dim revisioneID = Int(lblRevAttiva.Text)
+            txtNote.Text = RecuperaNotaDaDatabase(revisioneID, nuovoIndex)
+
             Application.DoEvents()
             Await Task.Delay(60)
         End While
@@ -522,7 +676,6 @@ Public Class VideoFBF
             format.LineAlignment = StringAlignment.Near
             format.FormatFlags = StringFormatFlags.LineLimit
 
-
             g.DrawString(txtNote.Text, font, Brushes.White, rect, format)
         End Using
 
@@ -531,51 +684,54 @@ Public Class VideoFBF
     End Sub
 
     Private Sub btnSalvaNote_Click(sender As Object, e As EventArgs) Handles btnSalvaNote.Click
-        If picFrame.Image Is Nothing Then
-            ' Ignora il click se non ci sono frame
+        If picFrame.Image Is Nothing Then Return
+
+        Dim frameIndex = editor.CurrentIndex
+        Dim nota = txtNote.Text.Trim()
+        Dim nomeUtente = NomeUtenteCorrente
+        Dim revisioneID = Int(lblRevAttiva.Text)
+
+        ' Se la nota è vuota e c'è una selezione attiva, elimina
+        If nota = "" AndAlso lstNoteFrame.SelectedItems.Count > 0 Then
+            EliminaNotaSelezionata()
+            AggiornaNoteDaDatabase(revisioneID)
+            txtNote.Clear()
+            lblAutore.Text = ""
+            lblDataNota.Text = ""
             Return
         End If
-        Dim frameIndex = editor.CurrentIndex
-        Dim nota = txtNote.Text.Trim
-        Dim nomeUtente = NomeUtenteCorrente
-        Dim revisioneID = Int(Me.lblRevAttiva.Text)
 
-        If editor IsNot Nothing AndAlso txtNote.Text.Trim <> "" Then
-
+        ' Se c'è una nota da salvare
+        If nota <> "" Then
             Using conn As New SqlConnection(ConnString)
                 conn.Open()
 
-                ' Elimina nota precedente se esiste
-                Dim deleteCmd As New SqlCommand("
-                DELETE FROM Mov_FrameNote 
-                WHERE RevisioneID = @RevID AND FrameIndex = @FrameIndex", conn)
-                deleteCmd.Parameters.AddWithValue("@RevID", revisioneID)
-                deleteCmd.Parameters.AddWithValue("@FrameIndex", frameIndex)
-                deleteCmd.ExecuteNonQuery()
+                Dim cmd As New SqlCommand("
+                MERGE Mov_FrameNote AS target
+                USING (SELECT @RevID AS RevisioneID, @FrameIndex AS FrameIndex) AS source
+                ON target.RevisioneID = source.RevisioneID AND target.FrameIndex = source.FrameIndex
+                WHEN MATCHED THEN 
+                    UPDATE SET TestoNota = @TestoNota, NomeUtente = @NomeUtente, DataNota = GETDATE()
+                WHEN NOT MATCHED THEN
+                    INSERT (RevisioneID, FrameIndex, NomeUtente, TestoNota, DataNota)
+                    VALUES (@RevID, @FrameIndex, @NomeUtente, @TestoNota, GETDATE());", conn)
 
-                ' Inserisci nuova nota
-                Dim insertCmd As New SqlCommand("
-                INSERT INTO Mov_FrameNote (RevisioneID, FrameIndex, NomeUtente, TestoNota)
-                VALUES (@RevID, @FrameIndex, @NomeUtente, @TestoNota)", conn)
-                insertCmd.Parameters.AddWithValue("@RevID", revisioneID)
-                insertCmd.Parameters.AddWithValue("@FrameIndex", frameIndex)
-                insertCmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
-                insertCmd.Parameters.AddWithValue("@TestoNota", nota)
-                insertCmd.ExecuteNonQuery()
+                cmd.Parameters.AddWithValue("@RevID", revisioneID)
+                cmd.Parameters.AddWithValue("@FrameIndex", frameIndex)
+                cmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
+                cmd.Parameters.AddWithValue("@TestoNota", nota)
+                cmd.ExecuteNonQuery()
             End Using
         Else
             MessageBox.Show("Inserisci una nota prima di salvare.")
+            Return
         End If
 
-        ' Salva Nuova Nota nel database
-        RicaricaNoteDaDatabase(revisioneID)
-
-        ' Aggiorna la lista delle Note
-        CaricaNoteDaDatabase(revisioneID)
+        ' Aggiorna lista e segnalini
+        AggiornaNoteDaDatabase(revisioneID)
 
         ' Salva modifiche grafiche sul frame
         SalvaFrame()
-
     End Sub
 
     Private Sub btnCaricaRevisione_Click(sender As Object, e As EventArgs) Handles btnCaricaRevisione.Click
@@ -589,31 +745,91 @@ Public Class VideoFBF
 
     Private Sub CaricaListaNote()
         lstNoteFrame.Items.Clear()
+        Dim revisioneID = Int(lblRevAttiva.Text)
 
-        For Each index In editor.GetFrameAnnotati()
-            Dim testo = editor.GetNotaPerFrame(index)
-            Dim autore = editor.GetAutorePerFrame(index)
-            Dim data = editor.GetDataNotaPerFrame(index)
+        Using conn As New SqlConnection(ConnString)
+            Dim cmd As New SqlCommand("
+            SELECT FrameIndex, TestoNota, NomeUtente, DataNota
+            FROM Mov_FrameNote
+            WHERE RevisioneID = @RevID
+            ORDER BY FrameIndex", conn)
+            cmd.Parameters.AddWithValue("@RevID", revisioneID)
+            conn.Open()
 
-            Dim anteprima = If(testo.Length > 30, testo.Substring(0, 30) & "...", testo)
-            Dim voce = $"Frame {index + 1}: {anteprima}"
+            Using reader = cmd.ExecuteReader()
+                While reader.Read()
+                    Dim frameIndex = Convert.ToInt32(reader("FrameIndex"))
+                    Dim testo = reader("TestoNota").ToString()
+                    Dim autore = reader("NomeUtente").ToString()
+                    Dim data = Convert.ToDateTime(reader("DataNota"))
 
-            ' Aggiungi voce con tooltip
-            Dim item As New ListViewItem(voce)
-            item.Tag = index
-            item.ToolTipText = $"Autore: {autore}{Environment.NewLine}Data: {data:dd/MM/yyyy HH:mm}"
-            lstNoteFrame.Items.Add(voce)
-        Next
+                    Dim anteprima = If(testo.Length > 30, testo.Substring(0, 30) & "...", testo)
+                    Dim voce = $"Frame {frameIndex + 1}: {anteprima}"
+
+                    Dim item As New ListViewItem(voce)
+                    item.Tag = frameIndex
+                    item.ToolTipText = $"Autore: {autore}{Environment.NewLine}Data: {data:dd/MM/yyyy HH:mm}"
+                    lstNoteFrame.Items.Add(item)
+                End While
+            End Using
+        End Using
     End Sub
 
+    Private Sub lstNote_KeyDown(sender As Object, e As KeyEventArgs) Handles lstNoteFrame.KeyDown
+        If e.KeyCode = Keys.Delete Then
+            EliminaNotaSelezionata()
+        End If
+    End Sub
+
+    Private Sub EliminaNotaSelezionata()
+        If lstNoteFrame.SelectedItems.Count = 0 Then Return
+
+        Dim info = CType(lstNoteFrame.SelectedItems(0).Tag, NotaFrameInfo)
+        Dim revisioneID = Int(lblRevAttiva.Text)
+        Dim frameIndex = info.FrameIndex
+        Dim testoNota = info.TestoNota
+
+        Dim conferma = MessageBox.Show("Vuoi davvero eliminare questa nota?", "Conferma eliminazione", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+
+        If conferma = DialogResult.Yes Then
+            Using conn As New SqlConnection(ConnString)
+                conn.Open()
+                Dim cmd As New SqlCommand("
+                DELETE FROM Mov_FrameNote 
+                WHERE RevisioneID = @RevID AND FrameIndex = @FrameIndex AND TestoNota = @TestoNota", conn)
+                cmd.Parameters.AddWithValue("@RevID", revisioneID)
+                cmd.Parameters.AddWithValue("@FrameIndex", frameIndex)
+                cmd.Parameters.AddWithValue("@TestoNota", testoNota)
+                cmd.ExecuteNonQuery()
+            End Using
+
+            AggiornaNoteDaDatabase(revisioneID)
+            txtNote.Clear()
+            lblAutore.Text = ""
+            lblDataNota.Text = ""
+        End If
+    End Sub
+
+
+    'Private Sub EliminaNotaDaFile(nota As String)
+    '    Dim percorsoFile As String = Path.Combine(Application.StartupPath, "note.txt")
+    '
+    '    If File.Exists(percorsoFile) Then
+    '        Dim tutteLeNote = File.ReadAllLines(percorsoFile).ToList()
+    '        tutteLeNote.RemoveAll(Function(n) n.Trim() = nota.Trim())
+    '        File.WriteAllLines(percorsoFile, tutteLeNote)
+    'End If
+    'End Sub
+
     Private Sub lstNoteFrame_SelectedIndexChanged(sender As Object, e As EventArgs) Handles lstNoteFrame.SelectedIndexChanged
-        If lstNoteFrame.SelectedIndex >= 0 Then
-            Dim frameIndex = editor.GetFrameAnnotati()(lstNoteFrame.SelectedIndex)
+        If lstNoteFrame.SelectedItems.Count > 0 Then
+            Dim info = lstNoteFrame.SelectedItems(0).Tag
+            Dim frameIndex = info.FrameIndex
+
             TrackFrame.Value = frameIndex
             AggiornaFrameCorrente(frameIndex)
         End If
     End Sub
-
 
     Public Sub CaricaRevisione(videoID As Integer, revisioneID As Integer)
         ' Recupera il percorso del video dal database
@@ -645,8 +861,8 @@ Public Class VideoFBF
 
         editor = New VideoEditor(videoPath, frameDir)
 
-        ' Carica Annotazioni
-        CaricaNoteDaDatabase(revisioneID)
+        ' Carica Annotazioni (solo per disegno segnalini)
+        AggiornaNoteDaDatabase(revisioneID)
 
         Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
         overlay?.Invalidate()
@@ -656,9 +872,11 @@ Public Class VideoFBF
         TrackFrame.Maximum = editor.FrameList.Count - 1
         TrackFrame.Value = 0
         picFrame.Image = editor.LoadFrame(0)
-        txtNote.Text = editor.GetNotaPerFrame(0)
 
+        ' Recupera la nota dal database
+        txtNote.Text = RecuperaNotaDaDatabase(revisioneID, 0)
     End Sub
+
 
     Private Function OttieniPercorsoFramesBase() As String
         Using conn As New SqlConnection(ConnString)
@@ -691,51 +909,44 @@ Public Class VideoFBF
         End Using
     End Function
 
-    Public Sub CaricaNoteDaDatabase(revisioneID As Integer)
-        Using conn As New SqlConnection(ConnString)
-            Dim query As String = "
-            SELECT FrameIndex, TestoNota, NomeUtente, DataNota 
-            FROM Mov_FrameNote 
-            WHERE RevisioneID = @RevID"
+    'Public Sub CaricaNoteDaDatabase(revisioneID As Integer)
+    '    Using conn As New SqlConnection(ConnString)
+    '        Dim query As String = "
+    '        SELECT FrameIndex 
+    '        FROM Mov_FrameNote 
+    '        WHERE RevisioneID = @RevID"
+    '
+    '        Using cmd As New SqlCommand(query, conn)
+    '            cmd.Parameters.AddWithValue("@RevID", revisioneID)
+    '            conn.Open()
+    '            Using reader As SqlDataReader = cmd.ExecuteReader()
+    '                FrameConNote.Clear()
+    '                While reader.Read()
+    '                    Dim index = Convert.ToInt32(reader("FrameIndex"))
+    '                    FrameConNote.Add(index)
+    '                End While
+    '            End Using
+    ''        End Using
+    '    End Using
+    '
+    '    ' Ricrea il pannello dei segnalini
+    '    Dim vecchio = Me.Controls.OfType(Of Panel)().FirstOrDefault(Function(p) p.Name = "OverlayNotePanel")
+    '    If vecchio IsNot Nothing Then Me.Controls.Remove(vecchio)
+    '
+    '    Dim overlayPanel As New Panel With {
+    '    .Width = TrackFrame.Width,
+    '    .Height = 10,
+    '    .Location = New Point(TrackFrame.Left, TrackFrame.Top - 10),
+    '    .BackColor = Color.Transparent,
+    '    .Name = "OverlayNotePanel"
+    '}
+    '    Me.Controls.Add(overlayPanel)
+    '    AddHandler overlayPanel.Paint, AddressOf DisegnaSegnaliniNote
+    '
+    '    ' Carica la lista delle note nel ListView
+    '    CaricaListaNote()
+    'End Sub
 
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@RevID", revisioneID)
-                conn.Open()
-                Using reader As SqlDataReader = cmd.ExecuteReader()
-                    FrameConNote.Clear()
-                    While reader.Read()
-                        Dim index = Convert.ToInt32(reader("FrameIndex"))
-                        Dim nota = reader("TestoNota").ToString()
-                        Dim autore = reader("NomeUtente").ToString()
-                        Dim data = Convert.ToDateTime(reader("DataNota"))
-                        FrameConNote.Add(index)
-                        editor.SalvaNotaCompleta(index, nota, autore, data)
-                    End While
-
-                    Dim overlayPanel As New Panel With {
-                        .Width = TrackFrame.Width,
-                        .Height = 10,
-                        .Location = New Point(TrackFrame.Left, TrackFrame.Top - 10),
-                        .BackColor = Color.Transparent
-}
-                    overlayPanel.Name = "OverlayNotePanel"
-                    Me.Controls.Add(overlayPanel)
-                    AddHandler overlayPanel.Paint, AddressOf DisegnaSegnaliniNote
-
-                End Using
-            End Using
-        End Using
-        CaricaListaNote()
-
-        Using conn As New SqlConnection(ConnString)
-            Dim query As String = "
-        SELECT DISTINCT FrameIndex 
-        FROM Mov_FrameNote 
-        WHERE RevisioneID = @RevID"
-
-        End Using
-
-    End Sub
 
     Private Sub DisegnaSegnaliniNote(sender As Object, e As PaintEventArgs)
         If FrameConNote Is Nothing OrElse FrameConNote.Count = 0 Then Exit Sub
@@ -755,39 +966,133 @@ Public Class VideoFBF
         Next
     End Sub
 
-    Private Sub AggiornaFrameCorrente(index As Integer)
+    Public Sub AggiornaFrameCorrente(index As Integer)
         If editor Is Nothing Then Exit Sub
         If index < 0 OrElse index >= editor.FrameList.Count Then Exit Sub
 
         picFrame.Image = editor.LoadFrame(index)
-        txtNote.Text = editor.GetNotaPerFrame(index)
-        lblAutore.Text = $"Autore: {editor.GetAutorePerFrame(index)}"
-        lblDataNota.Text = $"Data: {editor.GetDataNotaPerFrame(index):dd/MM/yyyy HH:mm}"
+
+        Dim revisioneID = Int(lblRevAttiva.Text)
+
+        Using conn As New SqlConnection(ConnString)
+            Dim cmd As New SqlCommand("
+            SELECT TestoNota, NomeUtente, DataNota 
+            FROM Mov_FrameNote 
+            WHERE RevisioneID = @RevID AND FrameIndex = @FrameIndex", conn)
+            cmd.Parameters.AddWithValue("@RevID", revisioneID)
+            cmd.Parameters.AddWithValue("@FrameIndex", index)
+            conn.Open()
+
+            Using reader = cmd.ExecuteReader()
+                If reader.Read() Then
+                    txtNote.Text = reader("TestoNota").ToString()
+                    lblAutore.Text = reader("NomeUtente").ToString()
+                    lblDataNota.Text = $"{Convert.ToDateTime(reader("DataNota")):dd/MM/yyyy HH:mm}"
+                Else
+                    txtNote.Text = ""
+                    lblAutore.Text = ""
+                    lblDataNota.Text = ""
+                End If
+            End Using
+        End Using
     End Sub
 
-    Private Sub RicaricaNoteDaDatabase(revisioneID As Integer)
+    Public Sub AggiornaNoteDaDatabase(revisioneID As Integer)
+        FrameConNote.Clear()
+        lstNoteFrame.Items.Clear()
+
         Using conn As New SqlConnection(ConnString)
             Dim query As String = "
             SELECT FrameIndex, TestoNota, NomeUtente, DataNota 
             FROM Mov_FrameNote 
-            WHERE RevisioneID = @RevID"
+            WHERE RevisioneID = @RevID
+            ORDER BY FrameIndex"
 
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@RevID", revisioneID)
                 conn.Open()
+
                 Using reader As SqlDataReader = cmd.ExecuteReader()
                     While reader.Read()
-                        Dim index = Convert.ToInt32(reader("FrameIndex"))
-                        Dim nota = reader("TestoNota").ToString()
+                        Dim frameIndex = Convert.ToInt32(reader("FrameIndex"))
+                        Dim testo = reader("TestoNota").ToString()
                         Dim autore = reader("NomeUtente").ToString()
                         Dim data = Convert.ToDateTime(reader("DataNota"))
 
-                        editor.SalvaNotaCompleta(index, nota, autore, data)
+                        ' Aggiungi frame annotato
+                        If Not FrameConNote.Contains(frameIndex) Then
+                            FrameConNote.Add(frameIndex)
+                        End If
+
+                        ' Crea oggetto informativo
+                        Dim info As New NotaFrameInfo With {
+                        .FrameIndex = frameIndex,
+                        .TestoNota = testo,
+                        .Autore = autore,
+                        .DataNota = data
+                    }
+
+                        ' Crea voce per la lista
+                        Dim anteprima = If(testo.Length > 30, testo.Substring(0, 30) & "...", testo)
+                        Dim voce = $"Frame {frameIndex + 1}: {anteprima}"
+
+                        Dim item As New ListViewItem(voce) With {
+                        .Tag = info,
+                        .ToolTipText = $"Autore: {autore}{Environment.NewLine}Data: {data:dd/MM/yyyy HH:mm}"
+                    }
+
+                        lstNoteFrame.Items.Add(item)
                     End While
                 End Using
             End Using
         End Using
+
+        ' Ricrea o invalida il pannello dei segnalini
+        Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
+        If overlay Is Nothing Then
+            Dim nuovoOverlay As New Panel With {
+            .Width = TrackFrame.Width,
+            .Height = 10,
+            .Location = New Point(TrackFrame.Left, TrackFrame.Top - 10),
+            .BackColor = Color.Transparent,
+            .Name = "OverlayNotePanel"
+        }
+            Me.Controls.Add(nuovoOverlay)
+            AddHandler nuovoOverlay.Paint, AddressOf DisegnaSegnaliniNote
+        Else
+            overlay.Invalidate()
+        End If
     End Sub
+
+
+    'Private Sub RicaricaNoteDaDatabase(revisioneID As Integer)
+    '    FrameConNote.Clear()
+    '
+    '    Using conn As New SqlConnection(ConnString)
+    '        Dim query As String = "
+    '        SELECT DISTINCT FrameIndex 
+    '        FROM Mov_FrameNote 
+    '        WHERE RevisioneID = @RevID"
+    '
+    '        Using cmd As New SqlCommand(query, conn)
+    '            cmd.Parameters.AddWithValue("@RevID", revisioneID)
+    '            conn.Open()
+    '
+    '            Using reader As SqlDataReader = cmd.ExecuteReader()
+    '               While reader.Read()
+    '                    Dim index = Convert.ToInt32(reader("FrameIndex"))
+    '                    FrameConNote.Add(index)
+    '                End While
+    '            End Using
+    '        End Using
+    '    End Using
+    '
+    '     ' Aggiorna visualizzazione
+    '     CaricaListaNote()
+    '
+    '     Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
+    '     overlay?.Invalidate()
+    ' End Sub
 
     Private Sub VideoFBF_Activated(sender As Object, e As EventArgs) Handles Me.Activated
         If Me.Tag IsNot Nothing Then
@@ -798,7 +1103,7 @@ Public Class VideoFBF
 
             ' Carica revisione e imposta modalità
             CaricaRevisione(videoID, revisioneID)
-            CaricaNoteDaDatabase(revisioneID)
+            AggiornaNoteDaDatabase(revisioneID)
         End If
     End Sub
 
@@ -1020,4 +1325,11 @@ Public Class VideoFBF
         End Using
     End Function
 
+End Class
+
+Public Class NotaFrameInfo
+    Public Property FrameIndex As Integer
+    Public Property TestoNota As String
+    Public Property Autore As String
+    Public Property DataNota As DateTime
 End Class
