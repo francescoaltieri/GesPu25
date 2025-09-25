@@ -8,6 +8,7 @@ Imports Microsoft.Data.SqlClient
 Imports PdfSharp
 Imports PdfSharp.Drawing
 Imports PdfSharp.Drawing.Layout
+Imports PdfSharp.Events
 Imports PdfSharp.Pdf
 Imports WMPLib
 
@@ -27,6 +28,7 @@ Public Class DynamicDataForm
     Private lampeggioAttivo As Boolean = False
     Private Shared visualFormsAttivi As New Dictionary(Of String, VisualMediaForm)
     Private panelBottoniDinamici As FlowLayoutPanel
+    Private splitContainer As SplitContainer
 
     Public Sub New(campi As List(Of CampoDatabase), nomeTabella As String)
         Me.Name = nomeTabella
@@ -36,19 +38,18 @@ Public Class DynamicDataForm
         Me.campiDefiniti = RecuperaCampiDa(nomeTabella)
         Me.nomeTabellaCorrente = nomeTabella
 
-        ' Carica stato del form dal modulo condiviso
+        AddHandler Me.Load, AddressOf DynamicDataForm_Load
+
         GestioneStatoForm.CaricaStato(Me)
 
-        ' Layout principale a due colonne
-        Dim layoutPrincipale As New TableLayoutPanel With {
+        splitContainer = New SplitContainer With {
         .Dock = DockStyle.Fill,
-        .ColumnCount = 2
-    }
-        layoutPrincipale.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
-        layoutPrincipale.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50))
-        Me.Controls.Add(layoutPrincipale)
+        .Orientation = Orientation.Vertical,
+        .FixedPanel = FixedPanel.None
+}
+        Me.Controls.Add(SplitContainer)
 
-        ' Layout sinistro interno con 2 righe: campi + bottoni
+        ' Pannello sinistro con campi e bottoni
         Dim layoutSinistroInterno As New TableLayoutPanel With {
         .Dock = DockStyle.Fill,
         .RowCount = 2,
@@ -57,7 +58,6 @@ Public Class DynamicDataForm
         layoutSinistroInterno.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
         layoutSinistroInterno.RowStyles.Add(New RowStyle(SizeType.AutoSize))
 
-        ' Pannello sinistro con campi
         pannelloSinistro = New TableLayoutPanel With {
         .Dock = DockStyle.Top,
         .AutoSize = True,
@@ -65,11 +65,10 @@ Public Class DynamicDataForm
         .ColumnCount = 2,
         .Padding = New Padding(20),
         .GrowStyle = TableLayoutPanelGrowStyle.AddRows
-}
+    }
         pannelloSinistro.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
         pannelloSinistro.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
 
-        ' Etichetta modalità
         lblModalita = New Label With {
         .Text = "",
         .AutoSize = True,
@@ -82,7 +81,6 @@ Public Class DynamicDataForm
         pannelloSinistro.Controls.Add(lblModalita)
         pannelloSinistro.SetColumnSpan(lblModalita, 2)
 
-        ' Campi dinamici con righe uniformi
         For i = 0 To campi.Count - 1
             If pannelloSinistro.RowCount <= i + 1 Then
                 pannelloSinistro.RowCount += 1
@@ -106,9 +104,6 @@ Public Class DynamicDataForm
             pannelloSinistro.Controls.Add(ctrl, 1, i + 1)
         Next
 
-        'CaricaCollegamentiDinamici(nomeTabella)
-
-        ' Bottoni contenitore
         Dim panelBottoniContenitore As New FlowLayoutPanel With {
         .Dock = DockStyle.Fill,
         .FlowDirection = FlowDirection.LeftToRight,
@@ -118,7 +113,6 @@ Public Class DynamicDataForm
         .WrapContents = True
     }
 
-        ' Bottoni fissi
         panelBottoni = New FlowLayoutPanel With {
         .FlowDirection = FlowDirection.LeftToRight,
         .AutoSize = True,
@@ -135,7 +129,6 @@ Public Class DynamicDataForm
         DisabilitaPulsante("Annulla", True)
         AggiungiBottone("Esporta PDF", AddressOf EsportaPDF)
 
-        ' Bottoni dinamici
         panelBottoniDinamici = New FlowLayoutPanel With {
         .FlowDirection = FlowDirection.LeftToRight,
         .AutoSize = True,
@@ -143,17 +136,17 @@ Public Class DynamicDataForm
     }
         panelBottoniContenitore.Controls.Add(panelBottoniDinamici)
 
-        ' Inserimento layout sinistro completo
         layoutSinistroInterno.Controls.Add(pannelloSinistro, 0, 0)
         layoutSinistroInterno.Controls.Add(panelBottoniContenitore, 0, 1)
-        layoutPrincipale.Controls.Add(layoutSinistroInterno, 0, 0)
+        splitContainer.Panel1.Controls.Add(layoutSinistroInterno)
 
-        ' Sezione destra: Griglia dati
+        ' Griglia dati
         dgvDati = New DataGridView With {
         .Dock = DockStyle.Fill,
         .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
         .AllowUserToAddRows = False,
-        .ReadOnly = True
+        .ReadOnly = True,
+        .Name = nomeTabellaCorrente
     }
         With dgvDati
             .ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True
@@ -165,14 +158,14 @@ Public Class DynamicDataForm
 
         AddHandler dgvDati.CellClick, AddressOf dgvDati_CellClick
         AddHandler dgvDati.SelectionChanged, AddressOf dgvDati_SelectionChanged
-        layoutPrincipale.Controls.Add(dgvDati, 1, 0)
+        AddHandler dgvDati.DataBindingComplete, AddressOf dgvDati_DataBindingComplete
+
+        splitContainer.Panel2.Controls.Add(dgvDati)
 
         ' Caricamenti iniziali
         CaricaBottoniDinamici()
         CaricaDatiTabella(Me.Name)
-        ApplicaVisualizzazioneColonne()
 
-        ' Disabilita i controlli inizialmente
         For Each ctrl As Control In campoInputs.Values
             If TypeOf ctrl Is FlowLayoutPanel Then
                 For Each innerCtrl As Control In ctrl.Controls
@@ -184,54 +177,41 @@ Public Class DynamicDataForm
             End If
         Next
 
-        ' Nasconde colonne sensibili
-        For Each col As DataGridViewColumn In dgvDati.Columns
-            If col.Name.ToLower().Contains("password") Then col.Visible = False
-        Next
-
         UniformaDimensioniBottoni()
         ApplicaAutorizzazioni(NomeUtenteCorrente)
         PulisciCampi()
+
     End Sub
 
-    Private Sub CaricaCollegamentiDinamici(nomeTabella As String)
-        Dim query = "SELECT * FROM Sys_CollegamentiCampi WHERE NomeTabella = @nome"
+    Private Sub dgvDati_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        If dgvDati.Columns.Count > 0 Then
+            ApplicaConfigurazioneGriglia(dgvDati)
+            ApplicaVisualizzazioneColonne()
+            NascondiColonneSensibili()
+        Else
+            Debug.WriteLine("Le colonne della griglia non sono ancora disponibili.")
+        End If
+    End Sub
 
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
+    Private Sub NascondiColonneSensibili()
+        For Each col As DataGridViewColumn In dgvDati.Columns
+            If col.Name.ToLower().Contains("password") Then
+                col.Visible = False
+            End If
+        Next
+    End Sub
 
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@nome", nomeTabella)
+    Private Sub DynamicDataForm_Load(sender As Object, e As EventArgs)
+        If SplitContainer IsNot Nothing Then
+            SplitContainer.Panel1MinSize = 300
+            SplitContainer.Panel2MinSize = 300
+            splitContainer.SplitterDistance = Me.Width \ 1.5
+        End If
+    End Sub
 
-                Dim da As New SqlDataAdapter(cmd)
-                Dim dt As New DataTable()
-                da.Fill(dt)
 
-                For Each riga As DataRow In dt.Rows
-                    Dim nomeCampo = riga("NomeCampo").ToString()
-                    Dim tabellaCollegata = riga("TabellaCollegata").ToString()
-                    Dim campoValore = riga("CampoValore").ToString()
-                    Dim campoVisuale = riga("CampoVisuale").ToString()
-
-                    If campoInputs.ContainsKey(nomeCampo) AndAlso TypeOf campoInputs(nomeCampo) Is ComboBox Then
-                        Dim combo = CType(campoInputs(nomeCampo), ComboBox)
-
-                        ' Nuova query per la tabella collegata
-                        Dim queryCollegata = $"SELECT [{campoValore}], [{campoVisuale}] FROM [{tabellaCollegata}]"
-                        Using cmdCollegata As New SqlCommand(queryCollegata, conn)
-                            Dim daCollegata As New SqlDataAdapter(cmdCollegata)
-                            Dim dtCollegata As New DataTable()
-                            daCollegata.Fill(dtCollegata)
-
-                            combo.DataSource = dtCollegata
-                            combo.ValueMember = campoValore
-                            combo.DisplayMember = campoVisuale
-                            combo.DropDownStyle = ComboBoxStyle.DropDownList
-                        End Using
-                    End If
-                Next
-            End Using
-        End Using
+    Private Sub FormDinamico_Resize(sender As Object, e As EventArgs) Handles Me.Resize
+        ApplicaConfigurazioneGriglia(dgvDati)
     End Sub
 
     Private Sub AnnullaOperazione()
@@ -856,7 +836,6 @@ Public Class DynamicDataForm
         End If
     End Sub
 
-
     ' Bottoni dinamici da Sys_Form_Actions
     Private Sub CaricaBottoniDinamici()
 
@@ -970,7 +949,6 @@ Public Class DynamicDataForm
         CaricaDatiNeiControlli(dgvDati.Rows(e.RowIndex))
     End Sub
 
-
     Private Function GetEtichetta(nomeTabella As String, nomeColonna As String) As String
         Dim etichetta As String = ""
 
@@ -1070,7 +1048,6 @@ Public Class DynamicDataForm
             MessageBox.Show("Errore nel controllo autorizzazioni: " & ex.Message)
         End Try
     End Sub
-
 
     Private Sub DisabilitaPulsante(nomeBottone As String, disattiva As Boolean)
         For Each ctrl In panelBottoni.Controls
@@ -1189,9 +1166,9 @@ Public Class DynamicDataForm
         End If
     End Sub
 
-
     Private Sub DynamicDataForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
         GestioneStatoForm.SalvaStato(Me)
+        SalvaConfigurazioneGriglia()
     End Sub
 
     Private Sub EsportaPDF(sender As Object, e As EventArgs)
@@ -1273,6 +1250,136 @@ Public Class DynamicDataForm
             MDIMessageBox.Show("Errore durante l'esportazione PDF: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
+
+    Private Sub SalvaConfigurazioneGriglia()
+        If dgvDati Is Nothing OrElse dgvDati.Columns.Count = 0 Then Exit Sub
+
+        Dim nomeDbgrid As String = dgvDati.Name
+
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+
+            For Each col As DataGridViewColumn In dgvDati.Columns
+                Dim nomeColonna As String = col.Name
+                Dim colWidth As Integer = col.Width
+                Dim visibile As Boolean = col.Visible
+
+                Dim cmdCheck As New SqlCommand("
+                SELECT COUNT(*) FROM Sys_VisualizzaInDbgrid 
+                WHERE NomeTabella = @NomeTabella AND NomeColonna = @NomeColonna AND NomeDbgrid = @NomeDbgrid", conn)
+                cmdCheck.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
+                cmdCheck.Parameters.AddWithValue("@NomeColonna", nomeColonna)
+                cmdCheck.Parameters.AddWithValue("@NomeDbgrid", nomeDbgrid)
+
+                Dim esiste As Boolean = Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0
+
+                If esiste Then
+                    Dim cmdUpdate As New SqlCommand("
+                    UPDATE Sys_VisualizzaInDbgrid 
+                    SET ColWidth = @ColWidth, VisualizzaInDbgrid = @VisualizzaInDbgrid 
+                    WHERE NomeTabella = @NomeTabella AND NomeColonna = @NomeColonna AND NomeDbgrid = @NomeDbgrid", conn)
+                    cmdUpdate.Parameters.AddWithValue("@ColWidth", colWidth)
+                    cmdUpdate.Parameters.AddWithValue("@VisualizzaInDbgrid", If(visibile, 1, 0))
+                    cmdUpdate.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
+                    cmdUpdate.Parameters.AddWithValue("@NomeColonna", nomeColonna)
+                    cmdUpdate.Parameters.AddWithValue("@NomeDbgrid", nomeDbgrid)
+                    cmdUpdate.ExecuteNonQuery()
+                Else
+                    Dim cmdInsert As New SqlCommand("
+                    INSERT INTO Sys_VisualizzaInDbgrid (NomeTabella, NomeColonna, NomeDbgrid, ColWidth, VisualizzaInDbgrid)
+                    VALUES (@NomeTabella, @NomeColonna, @NomeDbgrid, @ColWidth, @VisualizzaInDbgrid)", conn)
+                    cmdInsert.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
+                    cmdInsert.Parameters.AddWithValue("@NomeColonna", nomeColonna)
+                    cmdInsert.Parameters.AddWithValue("@NomeDbgrid", nomeDbgrid)
+                    cmdInsert.Parameters.AddWithValue("@ColWidth", colWidth)
+                    cmdInsert.Parameters.AddWithValue("@VisualizzaInDbgrid", If(visibile, 1, 0))
+                    cmdInsert.ExecuteNonQuery()
+                End If
+            Next
+        End Using
+    End Sub
+
+    Private Sub ApplicaConfigurazioneGriglia(dgv As DataGridView)
+
+        If dgv Is Nothing OrElse dgv.Columns.Count = 0 Then Exit Sub
+
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+
+            Dim cmd As New SqlCommand("
+            SELECT NomeColonna, ColWidth, VisualizzaInDbgrid 
+            FROM Sys_VisualizzaInDbgrid 
+            WHERE NomeTabella = @NomeTabella AND NomeDbgrid = @NomeDbgrid", conn)
+            cmd.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
+            cmd.Parameters.AddWithValue("@NomeDbgrid", dgv.Name)
+
+            Using reader = cmd.ExecuteReader()
+                While reader.Read()
+                    Dim nomeColonna As String = reader("NomeColonna").ToString()
+                    Dim colWidth As Integer = If(IsDBNull(reader("ColWidth")), 0, Convert.ToInt32(reader("ColWidth")))
+                    Dim visibile As Boolean = If(IsDBNull(reader("VisualizzaInDbgrid")), True, Convert.ToBoolean(reader("VisualizzaInDbgrid")))
+
+                    Dim col = dgv.Columns.Cast(Of DataGridViewColumn)().
+                    FirstOrDefault(Function(c) String.Equals(c.Name, nomeColonna, StringComparison.OrdinalIgnoreCase))
+
+                    If col IsNot Nothing Then
+                        Try
+                            col.Visible = visibile
+                            If colWidth > 0 Then
+                                col.Width = colWidth
+                            Else
+                                col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+                            End If
+                        Catch ex As Exception
+                            Debug.WriteLine($"Errore su colonna '{nomeColonna}': {ex.Message}")
+                        End Try
+                    Else
+                        Debug.WriteLine($"Colonna non trovata o non inizializzata: {nomeColonna}")
+                    End If
+                End While
+            End Using
+        End Using
+    End Sub
+
+
+    Private Sub PosizionaGrigliaDaSysForm()
+
+        If dgvDati Is Nothing Then Exit Sub
+
+        Dim posizioneX As Integer = 10
+
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+
+            Dim cmd As New SqlCommand("
+            SELECT UltimoWidth 
+            FROM Sys_form 
+            WHERE FormName = @NomeTabella", conn)
+            cmd.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
+
+            Dim result = cmd.ExecuteScalar()
+            If result IsNot Nothing AndAlso Not IsDBNull(result) Then
+                posizioneX = Convert.ToInt32(result)
+            End If
+        End Using
+
+        Const margineLaterale As Integer = 4
+        dgvDati.Location = New Point(posizioneX, margineLaterale)
+        dgvDati.Size = New Size(Math.Max(Me.ClientSize.Width - posizioneX - margineLaterale, 100), Me.ClientSize.Height - 2 * margineLaterale)
+    End Sub
+
+    Private Function TrovaControlloPiùADestra(root As Control) As Control()
+        Dim lista = New List(Of Control)
+
+        For Each c In root.Controls
+            If c.Visible AndAlso Not TypeOf c Is DataGridView Then
+                lista.Add(c)
+            End If
+            lista.AddRange(TrovaControlloPiùADestra(c))
+        Next
+
+        Return lista.ToArray()
+    End Function
 
 
 End Class
@@ -1356,8 +1463,6 @@ Partial Public Class VisualMediaForm
             Me.Close()
         End If
     End Sub
-
-
 
     Private Sub VisualMediaForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
         ' Salva stato finestra al momento della chiusura

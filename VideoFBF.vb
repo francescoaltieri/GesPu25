@@ -206,38 +206,49 @@ Public Class VideoFBF
     End Sub
 
 
-    Private Sub btnCaricaVideo_Click(sender As Object, e As EventArgs) Handles btnCaricaVideo.Click
+    Private Async Sub btnCaricaVideo_Click(sender As Object, e As EventArgs) Handles btnCaricaVideo.Click
+        Try
+            OpenFileDialog1.Filter = "Video Files|*.mp4;*.mov"
 
-        OpenFileDialog1.Filter = "Video Files|*.mp4;*.mov"
+            If OpenFileDialog1.ShowDialog() <> DialogResult.OK Then Exit Sub
 
-        If OpenFileDialog1.ShowDialog() = DialogResult.OK Then
+            ' Disabilita UI
+            btnCaricaVideo.Enabled = False
+            lblRevAttiva.Text = "Caricamento in corso..."
+            Application.DoEvents()
+
             Dim videoPath = OpenFileDialog1.FileName
             Dim nomeVideo = Path.GetFileNameWithoutExtension(videoPath)
             Dim baseDir = Path.Combine(OttieniPercorsoFrames(), nomeVideo)
-            Dim videoID = OttieniVideoID(nomeVideo)
             Dim revisioneID As Integer
             Dim Approvato As Boolean = False
 
-            ' Se il video non esiste nel database
-            If videoID = -1 Then
-                videoID = InserisciVideo(nomeVideo, videoPath)
-                revisioneID = 1
-            Else
-                revisioneID = OttieniProssimoRevisioneID()
-            End If
+            ' Ottieni o inserisci video
+            Dim videoID = Await Task.Run(Function()
+                                             Dim id = OttieniVideoID(nomeVideo)
+                                             If id = -1 Then
+                                                 id = InserisciVideo(nomeVideo, videoPath)
+                                                 revisioneID = 1
+                                             Else
+                                                 revisioneID = OttieniProssimoRevisioneID()
+                                             End If
+                                             Return id
+                                         End Function)
 
             ' Crea directory revisione
             Dim revisioneDir = Path.Combine(baseDir, $"Revisione_{revisioneID:D4}")
-            If Not Directory.Exists(baseDir) Then Directory.CreateDirectory(baseDir)
-            If Not Directory.Exists(revisioneDir) Then Directory.CreateDirectory(revisioneDir)
+            Directory.CreateDirectory(baseDir)
+            Directory.CreateDirectory(revisioneDir)
 
-            ' Estrai i frame
-            Dim tempEditor = New VideoEditor(videoPath, revisioneDir)
-            tempEditor.ExtractFrames()
+            ' Estrai i frame in background
+            Dim tempEditor As New VideoEditor(videoPath, revisioneDir)
+            Await Task.Run(Sub() tempEditor.ExtractFrames())
 
-            ' Inserisci revisione nel database
-            InserisciRevisione(videoID, revisioneID, SessioneUtente.NomeUtenteCorrente, "Supervisione")
-            InserisciPermessoUtente(revisioneID, SessioneUtente.NomeUtenteCorrente)
+            ' Inserisci revisione e permesso
+            Await Task.Run(Sub()
+                               InserisciRevisione(videoID, revisioneID, SessioneUtente.NomeUtenteCorrente, "Supervisione")
+                               InserisciPermessoUtente(revisioneID, SessioneUtente.NomeUtenteCorrente)
+                           End Sub)
 
             MessageBox.Show($"Video caricato, frame estratti e Revisione_{revisioneID:D4} registrata.", "Operazione completata", MessageBoxButtons.OK, MessageBoxIcon.Information)
 
@@ -254,18 +265,27 @@ Public Class VideoFBF
             Approvato
         )
 
-            ' Carica editor
-            editor = New VideoEditor(videoPath, revisioneDir)
+            ' Carica editor e aggiorna UI
+            editor = tempEditor
             picFrame.Image = editor.LoadFrame(0)
+
+            RemoveHandler TrackFrame.Scroll, AddressOf trackFrame_Scroll
             TrackFrame.Minimum = 0
             TrackFrame.Maximum = editor.FrameList.Count - 1
             TrackFrame.Value = 0
+            AddHandler TrackFrame.Scroll, AddressOf trackFrame_Scroll
 
             Me.Parametri = parametri
             Me.AggiornaRevisioneAttiva()
-        End If
 
+        Catch ex As Exception
+            MessageBox.Show("Errore durante il caricamento: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            lblRevAttiva.Text = "Errore"
+        Finally
+            btnCaricaVideo.Enabled = True
+        End Try
     End Sub
+
 
 
     Private Function OttieniPercorsoFrames() As String

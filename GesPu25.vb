@@ -232,5 +232,8 @@ Public Class GesPu25
         ApriModuloConPermessi("Mov_FrameNote", Me)
     End Sub
 
+    Private Sub AssegnazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AssegnazioniToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_Assegnazioni", Me)
+    End Sub
 End Class
 

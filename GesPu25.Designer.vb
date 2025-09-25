@@ -66,13 +66,14 @@ Partial Class GesPu25
         StatusStrip1 = New StatusStrip()
         toolStripUser = New ToolStripStatusLabel()
         toolStripDataOra = New ToolStripStatusLabel()
+        AssegnazioniToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         StatusStrip1.SuspendLayout()
         SuspendLayout()
         ' 
         ' MenuStrip1
         ' 
-        MenuStrip1.Items.AddRange(New ToolStripItem() {FileToolStripMenuItem, VideoFbFToolStripMenuItem, ToolStripMenuItem1})
+        MenuStrip1.Items.AddRange(New ToolStripItem() {FileToolStripMenuItem, AssegnazioniToolStripMenuItem, VideoFbFToolStripMenuItem, ToolStripMenuItem1})
         MenuStrip1.Location = New Point(0, 0)
         MenuStrip1.Name = "MenuStrip1"
         MenuStrip1.Size = New Size(1656, 24)
@@ -90,7 +91,7 @@ Partial Class GesPu25
         ' 
         TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem, MovSceneToolStripMenuItem})
         TabelleToolStripMenuItem.Name = "TabelleToolStripMenuItem"
-        TabelleToolStripMenuItem.Size = New Size(115, 22)
+        TabelleToolStripMenuItem.Size = New Size(180, 22)
         TabelleToolStripMenuItem.Text = "Tabelle"
         ' 
         ' EpisodiToolStripMenuItem
@@ -227,7 +228,7 @@ Partial Class GesPu25
         ' 
         OpzioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StrumentiToolStripMenuItem, ParametriToolStripMenuItem})
         OpzioniToolStripMenuItem.Name = "OpzioniToolStripMenuItem"
-        OpzioniToolStripMenuItem.Size = New Size(115, 22)
+        OpzioniToolStripMenuItem.Size = New Size(180, 22)
         OpzioniToolStripMenuItem.Text = "Opzioni"
         ' 
         ' StrumentiToolStripMenuItem
@@ -294,18 +295,18 @@ Partial Class GesPu25
         ' ToolStripMenuItem2
         ' 
         ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-        ToolStripMenuItem2.Size = New Size(112, 6)
+        ToolStripMenuItem2.Size = New Size(177, 6)
         ' 
         ' LogoutToolStripMenuItem
         ' 
         LogoutToolStripMenuItem.Name = "LogoutToolStripMenuItem"
-        LogoutToolStripMenuItem.Size = New Size(115, 22)
+        LogoutToolStripMenuItem.Size = New Size(180, 22)
         LogoutToolStripMenuItem.Text = "Logout"
         ' 
         ' EsciToolStripMenuItem
         ' 
         EsciToolStripMenuItem.Name = "EsciToolStripMenuItem"
-        EsciToolStripMenuItem.Size = New Size(115, 22)
+        EsciToolStripMenuItem.Size = New Size(180, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
         ' VideoFbFToolStripMenuItem
@@ -346,6 +347,12 @@ Partial Class GesPu25
         toolStripDataOra.ForeColor = SystemColors.Highlight
         toolStripDataOra.Name = "toolStripDataOra"
         toolStripDataOra.Size = New Size(4, 17)
+        ' 
+        ' AssegnazioniToolStripMenuItem
+        ' 
+        AssegnazioniToolStripMenuItem.Name = "AssegnazioniToolStripMenuItem"
+        AssegnazioniToolStripMenuItem.Size = New Size(88, 20)
+        AssegnazioniToolStripMenuItem.Text = "Assegnazioni"
         ' 
         ' GesPu25
         ' 
@@ -411,5 +418,6 @@ Partial Class GesPu25
     Friend WithEvents StatusStrip1 As StatusStrip
     Friend WithEvents toolStripUser As ToolStripStatusLabel
     Friend WithEvents toolStripDataOra As ToolStripStatusLabel
+    Friend WithEvents AssegnazioniToolStripMenuItem As ToolStripMenuItem
 
 End Class
