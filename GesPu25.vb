@@ -8,6 +8,9 @@ Imports System.Text.RegularExpressions
 Public Class GesPu25
     Private Sub GesPu25_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Me.Name = "GesPu25"
+        Me.toolStripUser.Text = "Nessun utente connesso"
+        Me.toolStripDataOra.Text = "                                       "
+
         GestioneStatoForm.CaricaStato(Me)
 
         GlobalFontSettings.UseWindowsFontsUnderWindows = True
@@ -23,6 +26,9 @@ Public Class GesPu25
         ' Cancella la sessione utente
         SessioneUtente.NomeUtenteCorrente = Nothing
         SessioneUtente.Autorizzazioni = Nothing
+
+        Me.toolStripUser.Text = "Nessun utente connesso"
+        Me.toolStripDataOra.Text = "                                       "
 
         ' Chiude i form MDI aperti (escluso GesPu25)
         For Each frm As Form In Me.MdiChildren
@@ -197,7 +203,7 @@ Public Class GesPu25
     End Sub
 
     Private Sub TipoLavorazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles TipoLavorazioniToolStripMenuItem.Click
-        ApriModuloConPermessi("Tab_TipoLavorazioneMS", Me)
+        ApriModuloConPermessi("Tab_Lavorazioni", Me)
     End Sub
 
     Private Sub StatoLavorazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles StatoLavorazioniToolStripMenuItem.Click
@@ -208,7 +214,7 @@ Public Class GesPu25
         ApriModuloConPermessi("Tab_StatoAssegnazioni", Me)
     End Sub
 
-    Private Sub LavorazioniNonIdentificateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles LavorazioniNonIdentificateToolStripMenuItem.Click
+    Private Sub LavorazioniNonIdentificateToolStripMenuItem_Click(sender As Object, e As EventArgs)
         ApriModuloConPermessi("Tab_LavNonIdentificate", Me)
     End Sub
 

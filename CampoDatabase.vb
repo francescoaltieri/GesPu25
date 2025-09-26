@@ -7,4 +7,5 @@
     Public Property TabellaCollegata As String
     Public Property CampoVisuale As String
     Public Property CampoValore As String
+    Public Property Lunghezza As String
 End Class

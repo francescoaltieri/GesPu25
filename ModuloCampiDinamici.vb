@@ -14,44 +14,13 @@ Module ModuloCampiDinamici
             Case "varchar", "nvarchar", "char", "nchar", "text", "ntext" : Return "string"
             Case "varchar(max)", "nvarchar(max)", "char(max)", "nchar(max)", "text(max)", "ntext(max)" : Return "string_max"
             Case "uniqueidentifier" : Return "guid"
+            Case "money(max)" : Return "money"
             Case Else : Return "string000" ' campo non riconosciuto
         End Select
     End Function
 
-    ' Recupera l'etichetta (simulazione — personalizzabile)
     Public Function GetEtichetta(tabella As String, nomeCampo As String) As String
-        Return nomeCampo.Replace("_", " ") ' Puoi personalizzare o leggere da file config
-    End Function
-
-    ' Crea il controllo visivo per ogni campo
-    Public Function CreaControllo(campo As CampoDatabase) As Control
-        Select Case campo.Tipo.ToLower()
-            Case "string"
-                Return New TextBox With {.Text = "", .Anchor = AnchorStyles.Left}
-            Case "date"
-                Return New DateTimePicker With {.Format = DateTimePickerFormat.Short}
-            Case "boolean"
-                Return New CheckBox With {.Checked = False}
-            Case "imgvid"
-                Dim pannello As New FlowLayoutPanel With {
-                    .FlowDirection = FlowDirection.LeftToRight,
-                    .AutoSize = True
-                }
-
-                Dim txtPath As New TextBox With {.Width = 200}
-                Dim btnVisualizza As New Button With {.Text = "Visualizza"}
-
-                AddHandler btnVisualizza.Click, Sub(s, e)
-                                                    MessageBox.Show("Apri form visualizzazione immagine/video qui.", "Anteprima", MessageBoxButtons.OK)
-                                                End Sub
-
-                pannello.Controls.Add(txtPath)
-                pannello.Controls.Add(btnVisualizza)
-                Return pannello
-
-            Case Else
-                Return New TextBox With {.Text = "", .Anchor = AnchorStyles.Left}
-        End Select
+        Return nomeCampo.Replace("_", " ")
     End Function
 
     Public Function RipulisciStringa(valore As String) As String
@@ -86,7 +55,6 @@ Module ModuloCampiDinamici
             Using conn As New SqlConnection(ConnString)
                 conn.Open()
 
-                ' Recupera tutti i campi con info su tipo, lunghezza massima e identity
                 Dim queryCampi As String = "
                 SELECT 
                     c.COLUMN_NAME, 
@@ -132,7 +100,6 @@ Module ModuloCampiDinamici
                     End If
                 Next
 
-                ' 3. Recupera la chiave primaria
                 Dim queryChiave As String = "
                 SELECT ccu.COLUMN_NAME 
                 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
@@ -158,7 +125,6 @@ Module ModuloCampiDinamici
                     End If
                 Next
 
-                ' Integra i collegamenti da Sys_CollegamentiCampi
                 Dim queryCollegamenti = "
                 SELECT NomeCampo, TabellaCollegata, CampoValore, CampoVisuale
                 FROM Sys_CollegamentiCampi

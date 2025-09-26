@@ -43,7 +43,7 @@ Public Class Login
 
             ' Imposta i testi
             GesPu25.toolStripUser.Text = "Utente: " & SessioneUtente.NomeUtenteCorrente
-            GesPu25.toolStripDataOra.Text = "Data Connessione: " & SessioneUtente.DataConnessione.ToString("dd/MM/yyyy HH:mm")
+            GesPu25.toolStripDataOra.Text = "Connesso dalle " & SessioneUtente.DataConnessione.ToString("HH:mm - dd/MM/yyyy")
 
             Me.Hide()
             AttivaTuttiIMenu(GesPu25.MenuStrip1)

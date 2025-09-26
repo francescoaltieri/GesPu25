@@ -95,7 +95,7 @@ Public Class DynamicDataForm
         }
 
             Dim ctrl As Control = CreaControllo(campi(i))
-            ctrl.Width = 250
+            'ctrl.Width = 250
             ctrl.Anchor = AnchorStyles.Left
             ctrl.Margin = New Padding(5)
             campoInputs.Add(campi(i).Nome, ctrl)
@@ -154,6 +154,10 @@ Public Class DynamicDataForm
             .ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 9, FontStyle.Bold)
             .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing
             .ColumnHeadersHeight = 50
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToOrderColumns = True
+            .AllowUserToResizeColumns = True
         End With
 
         AddHandler dgvDati.CellClick, AddressOf dgvDati_CellClick
@@ -205,7 +209,7 @@ Public Class DynamicDataForm
         If SplitContainer IsNot Nothing Then
             SplitContainer.Panel1MinSize = 300
             SplitContainer.Panel2MinSize = 300
-            splitContainer.SplitterDistance = Me.Width \ 1.5
+            splitContainer.SplitterDistance = Me.Width / 2.5
         End If
     End Sub
 
@@ -250,17 +254,23 @@ Public Class DynamicDataForm
     End Sub
 
     Private Sub AbilitaCampi(abilita As Boolean)
-        For Each ctrl As Control In campoInputs.Values
+        For Each kvp In campoInputs
+            Dim nomeCampo As String = kvp.Key
+            Dim ctrl As Control = kvp.Value
+
+            ' Recupera definizione del campo
+            Dim campo As CampoDatabase = campiDefiniti.FirstOrDefault(Function(c) c.Nome = nomeCampo)
+            Dim isBloccato As Boolean = campo IsNot Nothing AndAlso (campo.IsIdentity OrElse campo.IsChiave)
+
             If TypeOf ctrl Is FlowLayoutPanel Then
                 For Each innerCtrl As Control In ctrl.Controls
-                    ' Il bottone "Visualizza" deve rimanere sempre attivo
                     If TypeOf innerCtrl Is Button AndAlso CType(innerCtrl, Button).Text = "Visualizza" Then
                         innerCtrl.Enabled = True
-                    Else
+                    ElseIf Not isBloccato Then
                         innerCtrl.Enabled = abilita
                     End If
                 Next
-            Else
+            ElseIf Not isBloccato Then
                 ctrl.Enabled = abilita
             End If
         Next
@@ -271,7 +281,7 @@ Public Class DynamicDataForm
     End Sub
 
     Private Function CampoIDGestitoManuale() As Boolean
-        Return False ' personalizzabile
+        Return False
     End Function
 
     Private Sub AggiungiBottone(nome As String, handler As EventHandler)
@@ -547,50 +557,99 @@ Public Class DynamicDataForm
 
     Private Function CreaControllo(campo As CampoDatabase) As Control
         If campo Is Nothing Then Return CreaLabelErrore("Campo non valido.")
+        'If campo.IsIdentity Then Return CreaTextBoxIdentity(campo)
 
-        If campo.IsIdentity Then Return CreaTextBoxIdentity()
+        ' Calcolo larghezza dinamica
+        Dim larghezzaBase As Integer = 100
+        Dim larghezzaMassima As Integer = 450
+        Dim larghezzaStimata As Integer
+        Dim CarCtrl As Byte = 2
 
-        If Not String.IsNullOrEmpty(campo.TabellaCollegata) Then
-            Return CreaComboDaTabella(campo)
+        If Len(campo.Nome.ToLower().ToString) < 2 Then
+            CarCtrl = 1
         End If
 
-        Dim tipoCampo = campo.Tipo.ToLower()
+        If campo.Lunghezza > 0 Then
+            larghezzaStimata = Math.Min(larghezzaBase + campo.Lunghezza * 7, larghezzaMassima)
+        ElseIf Not String.IsNullOrEmpty(campo.TabellaCollegata) Then
+            larghezzaStimata = 380 ' ComboBox con ID + descrizione
+        ElseIf campo.Nome.ToLower().Contains("descrizione") OrElse campo.Tipo.ToLower().Contains("text") Then
+            larghezzaStimata = 350
+        ElseIf campo.Tipo.ToLower().Contains("date") OrElse campo.Nome.ToLower().Substring(0, CarCtrl) = "id" OrElse campo.Nome.ToLower().Substring(0, CarCtrl) = "id" Then
+            larghezzaStimata = 120
+        Else
+            larghezzaStimata = 350
+        End If
 
-        Select Case tipoCampo
-            Case "string", "string_max", "nvarchar", "varchar", "text"
-                Return CreaTextBoxConGestioneTesto(campo)
+        campo.Lunghezza = larghezzaStimata
 
-            Case "date", "datetime"
-                Return CreaDatePicker()
+        ' Creazione controllo
+        Dim ctrl As Control
 
-            Case "combobox"
-                Return CreaComboBox()
+        If Not String.IsNullOrEmpty(campo.TabellaCollegata) Then
+            ctrl = CreaComboDaTabella(campo)
+        Else
+            Select Case campo.Tipo.ToLower()
+                Case "string", "string_max", "nvarchar", "varchar", "text"
+                    ctrl = CreaTextBoxConGestioneTesto(campo)
 
-            Case "checkbox", "boolean", "bit"
-                Return CreaCheckBox()
+                Case "date", "datetime"
+                    ctrl = CreaDatePicker()
 
-            Case "int", "money"
-                Return CreaTextBoxNumerico()
+                Case "combobox"
+                    ctrl = CreaComboBox()
 
-            Case "decimal"
-                Return CreaNumericUpDown()
+                Case "checkbox", "boolean", "bit"
+                    ctrl = CreaCheckBox()
 
-            Case "imgvid"
-                Return CreaPannelloMultimediale()
+                Case "money"
+                    ctrl = CreaTextBoxNumerico()
+                    With CType(ctrl, TextBox)
+                        .TextAlign = HorizontalAlignment.Right
+                        .Tag = "money"
+                        .Width = Math.Max(larghezzaStimata, 150)
+                    End With
 
-            Case Else
-                Return CreaLabelErrore($"Tipo campo '{tipoCampo}' non gestito.")
-        End Select
+                Case "int"
+                    ctrl = CreaTextBoxNumerico()
+
+                Case "decimal"
+                    ctrl = CreaNumericUpDown()
+
+                Case "imgvid"
+                    ctrl = CreaPannelloMultimediale()
+
+                Case Else
+                    ctrl = CreaLabelErrore($"Tipo campo '{campo.Tipo}' non gestito.")
+            End Select
+        End If
+
+        ' Applica larghezza se il controllo lo supporta
+        If ctrl IsNot Nothing AndAlso Not TypeOf ctrl Is CheckBox AndAlso Not TypeOf ctrl Is Label Then
+            If Not campo.Tipo.ToLower().Equals("money") Then
+                ctrl.Width = larghezzaStimata
+            End If
+
+            If TypeOf ctrl Is ComboBox Then
+                CType(ctrl, ComboBox).DropDownWidth = larghezzaStimata + 50
+            End If
+        End If
+
+        If campo.IsIdentity Then
+            ctrl.Enabled = False
+        End If
+
+        Return ctrl
     End Function
 
     Private Function CreaTextBoxConGestioneTesto(campo As CampoDatabase) As Control
-        Dim larghezzaStandard As Integer = 250
+
         Dim tipoCampo = campo.Tipo.ToLower()
         Dim isCampoLungo = tipoCampo.Contains("max") OrElse tipoCampo = "text" OrElse tipoCampo.Contains("varchar(max)")
 
         If campo.Nome.ToLower().Contains("password") Then
             Dim txt = New TextBox() With {
-            .Width = larghezzaStandard,
+            .Width = campo.Lunghezza,
             .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
             .UseSystemPasswordChar = True,
             .Margin = New Padding(5)
@@ -602,7 +661,7 @@ Public Class DynamicDataForm
 
         If isCampoLungo Then
             Return New TextBox() With {
-            .Width = larghezzaStandard,
+            .Width = campo.Lunghezza,
             .Height = 100,
             .Multiline = True,
             .ScrollBars = ScrollBars.Vertical,
@@ -612,7 +671,6 @@ Public Class DynamicDataForm
         End If
 
         Return New TextBox() With {
-        .Width = larghezzaStandard,
         .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
         .Margin = New Padding(5)
     }
@@ -627,21 +685,19 @@ Public Class DynamicDataForm
     }
     End Function
 
-    Private Function CreaTextBoxIdentity() As Control
-        Return New TextBox() With {
-        .Width = 200,
-        .ReadOnly = True,
-        .ForeColor = Color.Gray,
-        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-        .TextAlign = HorizontalAlignment.Left,
-        .Margin = New Padding(5)
-    }
+    Private Function CreaTextBoxIdentity(campo As CampoDatabase) As TextBox
+        Dim txt As New TextBox()
+        txt.ReadOnly = True
+        txt.Enabled = False
+        txt.BackColor = Color.LightGray
+        txt.Tag = "identity"
+        Return txt
     End Function
 
     Private Function CreaComboDaTabella(campo As CampoDatabase) As Control
         Dim combo As New ComboBox With {
         .DropDownStyle = ComboBoxStyle.DropDownList,
-        .Width = 250,
+        .Width = campo.Lunghezza,
         .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
         .Tag = campo,
         .Margin = New Padding(5)
@@ -675,8 +731,9 @@ Public Class DynamicDataForm
     End Function
 
     Private Function CreaDatePicker() As Control
+        Dim campo As New CampoDatabase
         Return New DateTimePicker() With {
-        .Width = 250,
+        .Width = campo.Lunghezza,
         .Format = DateTimePickerFormat.Short,
         .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
         .Margin = New Padding(5)
@@ -684,9 +741,10 @@ Public Class DynamicDataForm
     End Function
 
     Private Function CreaComboBox() As Control
+        Dim campo As New CampoDatabase
         Return New ComboBox() With {
         .DropDownStyle = ComboBoxStyle.DropDownList,
-        .Width = 250,
+        .Width = campo.Lunghezza,
         .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
         .Margin = New Padding(5)
     }
@@ -702,8 +760,9 @@ Public Class DynamicDataForm
     End Function
 
     Private Function CreaTextBoxNumerico() As Control
+        Dim campo As New CampoDatabase
         Return New TextBox() With {
-        .Width = 125,
+        .Width = campo.Lunghezza,
         .MaximumSize = New Size(125, 0),
         .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
         .TextAlign = HorizontalAlignment.Right,
@@ -712,8 +771,9 @@ Public Class DynamicDataForm
     End Function
 
     Private Function CreaNumericUpDown() As Control
+        Dim campo As New CampoDatabase
         Return New NumericUpDown() With {
-        .Width = 125,
+        .Width = campo.Lunghezza,
         .Maximum = 1000000,
         .Minimum = 0,
         .DecimalPlaces = 2,
@@ -742,7 +802,7 @@ Public Class DynamicDataForm
                                       End If
 
                                       Dim nomeFile = txtFileName.Text.Trim()
-                                      Dim percorso = OttieniPercorsoImgVid()
+                                      Dim percorso = OttieniPercorsoImgVid(nomeFile)
                                       If String.IsNullOrWhiteSpace(percorso) Then
                                           MDIMessageBox.Show("Percorso multimediale non configurato.", Me.MdiParent, MessageBoxButtons.OK)
                                           Return
@@ -781,7 +841,6 @@ Public Class DynamicDataForm
         Return pannello
     End Function
 
-
     Private Sub PulisciCampi()
         For Each ctrl As Control In Me.Controls
             PulisciControllo(ctrl)
@@ -810,11 +869,13 @@ Public Class DynamicDataForm
         End If
     End Sub
 
-    Private Function OttieniPercorsoImgVid() As String
+    Private Function OttieniPercorsoImgVid(NomeFile As String) As String
         Using conn As New SqlConnection(ConnString)
             conn.Open()
-            Dim query = "SELECT PercorsoImgVid FROM Sys_Parametri"
+            Dim query As String = "SELECT Valore FROM Sys_Parametri WHERE Descrizione = @DescPar"
+
             Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@DescPar", "Percorso" & NomeFile.Substring(0, 2))
                 Dim result = cmd.ExecuteScalar()
                 If result IsNot Nothing Then
                     Return result.ToString()
@@ -906,23 +967,80 @@ Public Class DynamicDataForm
                     Dim dt As New DataTable()
                     adapter.Fill(dt)
 
-                    ' Assegna sorgente
                     dgvDati.DataSource = dt
 
-                    'For Each col As DataGridViewColumn In dgvDati.Columns
-                    'col.HeaderText = SpaziaMaiuscole(col.Name)
-                    'Next
+                    ' Recupera i collegamenti definiti per la tabella
+                    Dim dtCollegamenti As DataTable = EseguiQuery($"
+                    SELECT NomeCampo, TabellaCollegata, CampoValore, CampoVisuale
+                    FROM Sys_CollegamentiCampi
+                    WHERE NomeTabella = '{nomeTabella}'")
 
+                    ' Ricostruisci le intestazioni e applica visualizzazione descrittiva
                     For Each col As DataGridViewColumn In dgvDati.Columns
-                        col.HeaderText = GetEtichetta(Me.Name, col.Name)
+                        Dim nomeCampo = col.Name
+                        Dim etichetta = GetEtichetta(Me.Name, nomeCampo)
+                        col.HeaderText = etichetta
+
+                        ' Verifica se il campo ha un collegamento esterno
+                        Dim rigaCollegata = dtCollegamenti.AsEnumerable().
+                        FirstOrDefault(Function(r) r("NomeCampo").ToString() = nomeCampo)
+
+                        If rigaCollegata IsNot Nothing Then
+                            Dim tabellaCollegata = rigaCollegata("TabellaCollegata").ToString()
+                            Dim campoValore = rigaCollegata("CampoValore").ToString()
+                            Dim campoVisuale = rigaCollegata("CampoVisuale").ToString()
+
+                            ' Costruisci dizionario ID → Descrizione
+                            Dim dtValori = EseguiQuery($"
+                            SELECT {campoValore}, {campoVisuale}
+                            FROM {tabellaCollegata}")
+
+                            Dim dizionario = dtValori.AsEnumerable().
+                            ToDictionary(Function(r) r(campoValore).ToString(), Function(r) r(campoVisuale).ToString())
+
+                            ' Sostituisci il valore visualizzato nella cella
+                            For Each row As DataGridViewRow In dgvDati.Rows
+                                If Not row.IsNewRow Then
+                                    Dim id = row.Cells(nomeCampo).Value?.ToString()
+                                    If Not String.IsNullOrEmpty(id) AndAlso dizionario.ContainsKey(id) Then
+                                        row.Cells(nomeCampo).Value = $"{id} - {dizionario(id)}"
+                                    End If
+                                End If
+                            Next
+                        End If
                     Next
                 End Using
             End Using
         Catch ex As Exception
-            Dim risposta = MDIMessageBox.Show("Errore nel caricamento dei dati della tabella.", Me.MdiParent, MessageBoxButtons.OK)
+            MDIMessageBox.Show("Errore nel caricamento dei dati della tabella." & vbCrLf & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+        End Try
+    End Sub
+
+
+    Public Function EseguiQuery(query As String) As DataTable
+        Dim dt As New DataTable()
+
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.CommandTimeout = 60 ' Timeout esteso per query complesse
+                    conn.Open()
+                    Using adapter As New SqlDataAdapter(cmd)
+                        adapter.Fill(dt)
+                    End Using
+                End Using
+            End Using
+        Catch ex As SqlException
+            ' Log dettagliato per errori SQL
+            MDIMessageBox.Show("Errore SQL: " & ex.Message & vbCrLf & "Query: " & query, Nothing, MessageBoxButtons.OK)
+        Catch ex As Exception
+            ' Log generico per altri errori
+            MDIMessageBox.Show("Errore generico: " & ex.Message, Nothing, MessageBoxButtons.OK)
         End Try
 
-    End Sub
+        Return dt
+    End Function
+
 
     Private Sub BottoneDinamico_Click(sender As Object, e As EventArgs)
         Dim btn As Button = CType(sender, Button)
@@ -944,6 +1062,7 @@ Public Class DynamicDataForm
             CaricaDatiNeiControlli(dgvDati.SelectedRows(0))
         End If
     End Sub
+
     Private Sub dgvDati_CellClick(sender As Object, e As DataGridViewCellEventArgs)
         If e.RowIndex < 0 Then Return
         CaricaDatiNeiControlli(dgvDati.Rows(e.RowIndex))
@@ -1108,12 +1227,25 @@ Public Class DynamicDataForm
             End If
         End Using
     End Sub
+
     Private Sub CaricaDatiNeiControlli(riga As DataGridViewRow)
+        ' Recupera i collegamenti per la tabella corrente
+        Dim dtCollegamenti As DataTable = EseguiQuery($"
+        SELECT NomeCampo FROM Sys_CollegamentiCampi
+        WHERE NomeTabella = '{nomeTabellaCorrente}'")
+
+        Dim campiCollegati As HashSet(Of String) = New HashSet(Of String)(
+        dtCollegamenti.AsEnumerable().Select(Function(r) r("NomeCampo").ToString()))
+
         For Each campo In campoInputs.Keys
             If Not dgvDati.Columns.Contains(campo) Then Continue For
 
             Dim valoreObj = riga.Cells(campo).Value
-            Dim valore = If(valoreObj IsNot DBNull.Value AndAlso valoreObj IsNot Nothing, valoreObj.ToString(), "")
+            Dim valoreRaw = If(valoreObj IsNot DBNull.Value AndAlso valoreObj IsNot Nothing, valoreObj.ToString(), "")
+            Dim valore = If(campiCollegati.Contains(campo) AndAlso valoreRaw.Contains("-"),
+                        valoreRaw.Split("-"c)(0).Trim(),
+                        valoreRaw)
+
             Dim ctrl = campoInputs(campo)
             Dim isPassword As Boolean = campo.ToLower().Contains("password")
 
@@ -1146,10 +1278,10 @@ Public Class DynamicDataForm
                             ImpostaValoreCombo(CType(innerCtrl, ComboBox), valore)
                         End If
                     Next
-
             End Select
         Next
     End Sub
+
 
     Private Sub ImpostaValoreCombo(combo As ComboBox, valore As Object)
         If combo.DataSource Is Nothing OrElse combo.ValueMember Is Nothing Then
@@ -1340,7 +1472,6 @@ Public Class DynamicDataForm
             End Using
         End Using
     End Sub
-
 
     Private Sub PosizionaGrigliaDaSysForm()
 

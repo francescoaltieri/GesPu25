@@ -40,7 +40,6 @@ Partial Class GesPu25
         TipoLavorazioniToolStripMenuItem = New ToolStripMenuItem()
         StatoLavorazioniToolStripMenuItem = New ToolStripMenuItem()
         StatoAssegnazioniToolStripMenuItem = New ToolStripMenuItem()
-        LavorazioniNonIdentificateToolStripMenuItem = New ToolStripMenuItem()
         MovSceneToolStripMenuItem = New ToolStripMenuItem()
         SceneAssegnateToolStripMenuItem = New ToolStripMenuItem()
         AutorizzazioniScenaToolStripMenuItem = New ToolStripMenuItem()
@@ -61,12 +60,12 @@ Partial Class GesPu25
         ToolStripMenuItem2 = New ToolStripSeparator()
         LogoutToolStripMenuItem = New ToolStripMenuItem()
         EsciToolStripMenuItem = New ToolStripMenuItem()
+        AssegnazioniToolStripMenuItem = New ToolStripMenuItem()
         VideoFbFToolStripMenuItem = New ToolStripMenuItem()
         ToolStripMenuItem1 = New ToolStripMenuItem()
         StatusStrip1 = New StatusStrip()
         toolStripUser = New ToolStripStatusLabel()
         toolStripDataOra = New ToolStripStatusLabel()
-        AssegnazioniToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         StatusStrip1.SuspendLayout()
         SuspendLayout()
@@ -158,7 +157,7 @@ Partial Class GesPu25
         ' 
         ' LavorazioniToolStripMenuItem
         ' 
-        LavorazioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {TipoLavorazioniToolStripMenuItem, StatoLavorazioniToolStripMenuItem, StatoAssegnazioniToolStripMenuItem, LavorazioniNonIdentificateToolStripMenuItem})
+        LavorazioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {TipoLavorazioniToolStripMenuItem, StatoLavorazioniToolStripMenuItem, StatoAssegnazioniToolStripMenuItem})
         LavorazioniToolStripMenuItem.Name = "LavorazioniToolStripMenuItem"
         LavorazioniToolStripMenuItem.Size = New Size(190, 22)
         LavorazioniToolStripMenuItem.Text = "Lavorazioni"
@@ -166,26 +165,20 @@ Partial Class GesPu25
         ' TipoLavorazioniToolStripMenuItem
         ' 
         TipoLavorazioniToolStripMenuItem.Name = "TipoLavorazioniToolStripMenuItem"
-        TipoLavorazioniToolStripMenuItem.Size = New Size(220, 22)
-        TipoLavorazioniToolStripMenuItem.Text = "Tipo Lavorazioni"
+        TipoLavorazioniToolStripMenuItem.Size = New Size(180, 22)
+        TipoLavorazioniToolStripMenuItem.Text = "Lista Lavorazioni"
         ' 
         ' StatoLavorazioniToolStripMenuItem
         ' 
         StatoLavorazioniToolStripMenuItem.Name = "StatoLavorazioniToolStripMenuItem"
-        StatoLavorazioniToolStripMenuItem.Size = New Size(220, 22)
+        StatoLavorazioniToolStripMenuItem.Size = New Size(180, 22)
         StatoLavorazioniToolStripMenuItem.Text = "Stato Lavorazioni"
         ' 
         ' StatoAssegnazioniToolStripMenuItem
         ' 
         StatoAssegnazioniToolStripMenuItem.Name = "StatoAssegnazioniToolStripMenuItem"
-        StatoAssegnazioniToolStripMenuItem.Size = New Size(220, 22)
+        StatoAssegnazioniToolStripMenuItem.Size = New Size(180, 22)
         StatoAssegnazioniToolStripMenuItem.Text = "Stato Assegnazioni"
-        ' 
-        ' LavorazioniNonIdentificateToolStripMenuItem
-        ' 
-        LavorazioniNonIdentificateToolStripMenuItem.Name = "LavorazioniNonIdentificateToolStripMenuItem"
-        LavorazioniNonIdentificateToolStripMenuItem.Size = New Size(220, 22)
-        LavorazioniNonIdentificateToolStripMenuItem.Text = "Lavorazioni non identificate"
         ' 
         ' MovSceneToolStripMenuItem
         ' 
@@ -309,6 +302,12 @@ Partial Class GesPu25
         EsciToolStripMenuItem.Size = New Size(180, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
+        ' AssegnazioniToolStripMenuItem
+        ' 
+        AssegnazioniToolStripMenuItem.Name = "AssegnazioniToolStripMenuItem"
+        AssegnazioniToolStripMenuItem.Size = New Size(88, 20)
+        AssegnazioniToolStripMenuItem.Text = "Assegnazioni"
+        ' 
         ' VideoFbFToolStripMenuItem
         ' 
         VideoFbFToolStripMenuItem.Name = "VideoFbFToolStripMenuItem"
@@ -347,12 +346,6 @@ Partial Class GesPu25
         toolStripDataOra.ForeColor = SystemColors.Highlight
         toolStripDataOra.Name = "toolStripDataOra"
         toolStripDataOra.Size = New Size(4, 17)
-        ' 
-        ' AssegnazioniToolStripMenuItem
-        ' 
-        AssegnazioniToolStripMenuItem.Name = "AssegnazioniToolStripMenuItem"
-        AssegnazioniToolStripMenuItem.Size = New Size(88, 20)
-        AssegnazioniToolStripMenuItem.Text = "Assegnazioni"
         ' 
         ' GesPu25
         ' 
@@ -400,7 +393,6 @@ Partial Class GesPu25
     Friend WithEvents TipoLavorazioniToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents StatoLavorazioniToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents StatoAssegnazioniToolStripMenuItem As ToolStripMenuItem
-    Friend WithEvents LavorazioniNonIdentificateToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ParametriToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents GestioneFormToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ParametriToolStripMenuItem1 As ToolStripMenuItem
