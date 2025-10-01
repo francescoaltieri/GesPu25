@@ -358,13 +358,6 @@ Public Class DynamicDataForm
         Next
     End Sub
 
-    Private Sub CaricaValoridaGriglia()
-        ' Carica valori dalla griglia nei controlli
-        For Each campo In campiDefiniti
-            campoInputs(campo.Nome).Text = dgvDati.SelectedRows(0).Cells(campo.Nome).Value.ToString()
-        Next
-    End Sub
-
     Private Sub ModificaDati(sender As Object, e As EventArgs)
 
         If dgvDati.SelectedRows.Count = 0 Then
@@ -594,7 +587,7 @@ Public Class DynamicDataForm
                     ctrl = CreaTextBoxConGestioneTesto(campo)
 
                 Case "date", "datetime"
-                    ctrl = CreaDatePicker()
+                    ctrl = CreaDatePicker(campo.CampoValore)
 
                 Case "combobox"
                     ctrl = CreaComboBox()
@@ -730,15 +723,26 @@ Public Class DynamicDataForm
         Return combo
     End Function
 
-    Private Function CreaDatePicker() As Control
+    Private Function CreaDatePicker(valoreCampo As Object) As Control
         Dim campo As New CampoDatabase
-        Return New DateTimePicker() With {
+        Dim dtPicker As New DateTimePicker With {
         .Width = campo.Lunghezza,
         .Format = DateTimePickerFormat.Short,
         .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
         .Margin = New Padding(5)
     }
+
+        If Not IsDBNull(valoreCampo) AndAlso valoreCampo IsNot Nothing Then
+            dtPicker.Value = CDate(valoreCampo)
+        Else
+            dtPicker.Format = DateTimePickerFormat.Custom
+            dtPicker.CustomFormat = " "
+        End If
+
+        Return dtPicker
     End Function
+
+
 
     Private Function CreaComboBox() As Control
         Dim campo As New CampoDatabase
@@ -1265,9 +1269,17 @@ Public Class DynamicDataForm
                     ImpostaValoreCombo(CType(ctrl, ComboBox), valore)
 
                 Case TypeOf ctrl Is DateTimePicker
+                    Dim dtPicker As DateTimePicker = CType(ctrl, DateTimePicker)
                     Dim dt As DateTime
+
                     If DateTime.TryParse(valore, dt) Then
-                        CType(ctrl, DateTimePicker).Value = dt
+                        dtPicker.Format = DateTimePickerFormat.Short
+                        dtPicker.Value = dt
+                        dtPicker.Checked = True
+                    Else
+                        dtPicker.Format = DateTimePickerFormat.Custom
+                        dtPicker.CustomFormat = " "
+                        dtPicker.Checked = False
                     End If
 
                 Case TypeOf ctrl Is FlowLayoutPanel
