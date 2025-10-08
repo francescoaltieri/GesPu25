@@ -114,7 +114,6 @@ Public Class VideoFBF
         aggiornamentoInCorso = False
     End Sub
 
-
     Private Sub AggiungiCondivisioneUtente(revisioneID As Integer, nomeUtente As String)
         Using conn As New SqlConnection(ConnString)
             conn.Open()
@@ -140,7 +139,6 @@ Public Class VideoFBF
         End Using
     End Sub
 
-
     Private Sub RimuoviCondivisioneUtente(revisioneID As Integer, nomeUtente As String)
         Using conn As New SqlConnection(ConnString)
             conn.Open()
@@ -153,7 +151,6 @@ Public Class VideoFBF
             cmd.ExecuteNonQuery()
         End Using
     End Sub
-
 
     Private Sub RipristinaPosizioneForm()
         Using conn As New SqlConnection(ConnString)
@@ -204,7 +201,6 @@ Public Class VideoFBF
             End Using
         End Using
     End Sub
-
 
     Private Async Sub btnCaricaVideo_Click(sender As Object, e As EventArgs) Handles btnCaricaVideo.Click
         Try
@@ -286,15 +282,20 @@ Public Class VideoFBF
         End Try
     End Sub
 
-
-
     Private Function OttieniPercorsoFrames() As String
         Using conn As New SqlConnection(ConnString)
             conn.Open()
-            Dim cmd As New SqlCommand("SELECT TOP 1 PercorsoFramesRevisioni FROM Sys_Parametri", conn)
-            Dim result = cmd.ExecuteScalar()
-            Return If(result IsNot Nothing, result.ToString(), "")
+            Dim query As String = "SELECT Valore FROM Sys_Parametri WHERE Descrizione = @DescPar"
+
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@DescPar", "PercorsoFrames")
+                Dim result = cmd.ExecuteScalar()
+                If result IsNot Nothing Then
+                    Return result.ToString()
+                End If
+            End Using
         End Using
+        Return ""
     End Function
 
     Private Function OttieniVideoID(nomeVideo As String) As Integer
@@ -350,7 +351,6 @@ Public Class VideoFBF
         End Using
     End Function
 
-
     Private Function RevisioneZeroEsiste(videoID As Integer) As Boolean
         Using conn As New SqlConnection(ConnString)
             conn.Open()
@@ -364,7 +364,6 @@ Public Class VideoFBF
             End Using
         End Using
     End Function
-
 
     Private Function InserisciRevisioneZero(videoID As Integer, nomeVideo As String) As Integer
         Using conn As New SqlConnection(ConnString)
@@ -385,7 +384,6 @@ Public Class VideoFBF
 
         Return 0 ' perché la revisione è 0
     End Function
-
 
     Private Sub InserisciPermessoUtente(revisioneID As Integer, nomeUtente As String)
         Using conn As New SqlConnection(ConnString)
@@ -422,7 +420,6 @@ Public Class VideoFBF
         End If
     End Sub
 
-
     Private Sub btnPrecedente_Click(sender As Object, e As EventArgs) Handles btnPrecedente.Click
         If editor Is Nothing OrElse picFrame Is Nothing OrElse TrackFrame Is Nothing OrElse txtNote Is Nothing Then
             MessageBox.Show("Impossibile caricare il frame.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -453,7 +450,6 @@ Public Class VideoFBF
             Return If(nota IsNot Nothing, nota.ToString(), "")
         End Using
     End Function
-
 
     Private Sub picFrame_MouseDown(sender As Object, e As MouseEventArgs) Handles picFrame.MouseDown
         If picFrame.Image Is Nothing Then
@@ -493,7 +489,6 @@ Public Class VideoFBF
     Private Function RevisioneModificabile() As Boolean
         Return Parametri IsNot Nothing AndAlso Parametri.RevisioneID <> 0
     End Function
-
 
     Private Sub btnAnnulla_Click(sender As Object, e As EventArgs) Handles btnAnnulla.Click
         If picFrame.Image Is Nothing Then
@@ -539,7 +534,6 @@ Public Class VideoFBF
         Dim revisioneID = Int(lblRevAttiva.Text)
         txtNote.Text = RecuperaNotaDaDatabase(revisioneID, primoIndex)
     End Sub
-
 
     Private Sub btnUltimoFrame_Click(sender As Object, e As EventArgs) Handles btnUltimoFrame.Click
         If editor Is Nothing OrElse picFrame Is Nothing OrElse TrackFrame Is Nothing OrElse txtNote Is Nothing Then
@@ -830,17 +824,6 @@ Public Class VideoFBF
         End If
     End Sub
 
-
-    'Private Sub EliminaNotaDaFile(nota As String)
-    '    Dim percorsoFile As String = Path.Combine(Application.StartupPath, "note.txt")
-    '
-    '    If File.Exists(percorsoFile) Then
-    '        Dim tutteLeNote = File.ReadAllLines(percorsoFile).ToList()
-    '        tutteLeNote.RemoveAll(Function(n) n.Trim() = nota.Trim())
-    '        File.WriteAllLines(percorsoFile, tutteLeNote)
-    'End If
-    'End Sub
-
     Private Sub lstNoteFrame_SelectedIndexChanged(sender As Object, e As EventArgs) Handles lstNoteFrame.SelectedIndexChanged
         If lstNoteFrame.SelectedItems.Count > 0 Then
             Dim info = lstNoteFrame.SelectedItems(0).Tag
@@ -855,7 +838,7 @@ Public Class VideoFBF
         ' Recupera il percorso del video dal database
         Dim videoPath As String = ""
         Dim nomeVideo = OttieniNomeVideo(videoID)
-        Dim basePath = OttieniPercorsoFramesBase()
+        Dim basePath = OttieniPercorsoFrames()
         Dim frameDir = Path.Combine(basePath, nomeVideo, $"Revisione_{revisioneID:0000}")
 
         Using conn As New SqlConnection(ConnString)
@@ -897,22 +880,6 @@ Public Class VideoFBF
         txtNote.Text = RecuperaNotaDaDatabase(revisioneID, 0)
     End Sub
 
-
-    Private Function OttieniPercorsoFramesBase() As String
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query = "SELECT TOP 1 PercorsoFramesRevisioni FROM Sys_Parametri"
-            Using cmd As New SqlCommand(query, conn)
-                Dim result = cmd.ExecuteScalar()
-                If result IsNot Nothing Then
-                    Return result.ToString().TrimEnd("\"c)
-                Else
-                    Throw New Exception("PercorsoFramesRevisioni non configurato in Sys_Parametri.")
-                End If
-            End Using
-        End Using
-    End Function
-
     Private Function OttieniNomeVideo(videoID As Integer) As String
         Using conn As New SqlConnection(ConnString)
             conn.Open()
@@ -928,45 +895,6 @@ Public Class VideoFBF
             End Using
         End Using
     End Function
-
-    'Public Sub CaricaNoteDaDatabase(revisioneID As Integer)
-    '    Using conn As New SqlConnection(ConnString)
-    '        Dim query As String = "
-    '        SELECT FrameIndex 
-    '        FROM Mov_FrameNote 
-    '        WHERE RevisioneID = @RevID"
-    '
-    '        Using cmd As New SqlCommand(query, conn)
-    '            cmd.Parameters.AddWithValue("@RevID", revisioneID)
-    '            conn.Open()
-    '            Using reader As SqlDataReader = cmd.ExecuteReader()
-    '                FrameConNote.Clear()
-    '                While reader.Read()
-    '                    Dim index = Convert.ToInt32(reader("FrameIndex"))
-    '                    FrameConNote.Add(index)
-    '                End While
-    '            End Using
-    ''        End Using
-    '    End Using
-    '
-    '    ' Ricrea il pannello dei segnalini
-    '    Dim vecchio = Me.Controls.OfType(Of Panel)().FirstOrDefault(Function(p) p.Name = "OverlayNotePanel")
-    '    If vecchio IsNot Nothing Then Me.Controls.Remove(vecchio)
-    '
-    '    Dim overlayPanel As New Panel With {
-    '    .Width = TrackFrame.Width,
-    '    .Height = 10,
-    '    .Location = New Point(TrackFrame.Left, TrackFrame.Top - 10),
-    '    .BackColor = Color.Transparent,
-    '    .Name = "OverlayNotePanel"
-    '}
-    '    Me.Controls.Add(overlayPanel)
-    '    AddHandler overlayPanel.Paint, AddressOf DisegnaSegnaliniNote
-    '
-    '    ' Carica la lista delle note nel ListView
-    '    CaricaListaNote()
-    'End Sub
-
 
     Private Sub DisegnaSegnaliniNote(sender As Object, e As PaintEventArgs)
         If FrameConNote Is Nothing OrElse FrameConNote.Count = 0 Then Exit Sub
@@ -1084,36 +1012,6 @@ Public Class VideoFBF
         End If
     End Sub
 
-
-    'Private Sub RicaricaNoteDaDatabase(revisioneID As Integer)
-    '    FrameConNote.Clear()
-    '
-    '    Using conn As New SqlConnection(ConnString)
-    '        Dim query As String = "
-    '        SELECT DISTINCT FrameIndex 
-    '        FROM Mov_FrameNote 
-    '        WHERE RevisioneID = @RevID"
-    '
-    '        Using cmd As New SqlCommand(query, conn)
-    '            cmd.Parameters.AddWithValue("@RevID", revisioneID)
-    '            conn.Open()
-    '
-    '            Using reader As SqlDataReader = cmd.ExecuteReader()
-    '               While reader.Read()
-    '                    Dim index = Convert.ToInt32(reader("FrameIndex"))
-    '                    FrameConNote.Add(index)
-    '                End While
-    '            End Using
-    '        End Using
-    '    End Using
-    '
-    '     ' Aggiorna visualizzazione
-    '     CaricaListaNote()
-    '
-    '     Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
-    '     overlay?.Invalidate()
-    ' End Sub
-
     Private Sub VideoFBF_Activated(sender As Object, e As EventArgs) Handles Me.Activated
         If Me.Tag IsNot Nothing Then
             Dim param = CType(Me.Tag, Object)
@@ -1173,7 +1071,6 @@ Public Class VideoFBF
 
     End Sub
 
-
     Private Sub InserisciRevisione(videoId, RevisioneID, nomeUtente, stato)
 
         Dim Titolo = OttieniNomeVideo(videoId)
@@ -1188,8 +1085,7 @@ Public Class VideoFBF
         Dim nomeRevisione = $"Revisione {RevisioneID} - {dataRevisione:dd/MM/yyyy}"
         Using conn As New SqlConnection(ConnString)
             conn.Open()
-            Dim query = "
-                        INSERT INTO Mov_Revisione (RevisioneID, VideoID, Autore, DataRevisione, NumRetake, Note, Stato)
+            Dim query = "INSERT INTO Mov_Revisione (RevisioneID, VideoID, Autore, DataRevisione, NumRetake, Note, Stato)
                         VALUES (@RevisioneID, @VideoID, @Autore, @Data, @NumRetake, @Note, @Stato)"
 
             Using cmd As New SqlCommand(query, conn)
@@ -1218,7 +1114,6 @@ Public Class VideoFBF
         End Using
     End Function
 
-
     Private Function OttieniProssimoRevisioneID() As Integer
         Using conn As New SqlConnection(ConnString)
             conn.Open()
@@ -1246,7 +1141,6 @@ Public Class VideoFBF
         ' Se non ci sono revisioni, restituisce -1
         Return numero
     End Function
-
 
     Public Function IsRevisioneModificabile(revisioneID As Integer) As Boolean
         Dim modificabile As Boolean = False

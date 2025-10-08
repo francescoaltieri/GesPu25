@@ -61,6 +61,11 @@ Partial Class GesPu25
         LogoutToolStripMenuItem = New ToolStripMenuItem()
         EsciToolStripMenuItem = New ToolStripMenuItem()
         AssegnazioniToolStripMenuItem = New ToolStripMenuItem()
+        StoryboardToolStripMenuItem = New ToolStripMenuItem()
+        StoryboardToolStripMenuItem1 = New ToolStripMenuItem()
+        SceneToolStripMenuItem = New ToolStripMenuItem()
+        AssegnazioniToolStripMenuItem1 = New ToolStripMenuItem()
+        ConsegneToolStripMenuItem = New ToolStripMenuItem()
         VideoFbFToolStripMenuItem = New ToolStripMenuItem()
         ToolStripMenuItem1 = New ToolStripMenuItem()
         StatusStrip1 = New StatusStrip()
@@ -90,7 +95,7 @@ Partial Class GesPu25
         ' 
         TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem, MovSceneToolStripMenuItem})
         TabelleToolStripMenuItem.Name = "TabelleToolStripMenuItem"
-        TabelleToolStripMenuItem.Size = New Size(180, 22)
+        TabelleToolStripMenuItem.Size = New Size(115, 22)
         TabelleToolStripMenuItem.Text = "Tabelle"
         ' 
         ' EpisodiToolStripMenuItem
@@ -165,19 +170,19 @@ Partial Class GesPu25
         ' TipoLavorazioniToolStripMenuItem
         ' 
         TipoLavorazioniToolStripMenuItem.Name = "TipoLavorazioniToolStripMenuItem"
-        TipoLavorazioniToolStripMenuItem.Size = New Size(180, 22)
+        TipoLavorazioniToolStripMenuItem.Size = New Size(173, 22)
         TipoLavorazioniToolStripMenuItem.Text = "Lista Lavorazioni"
         ' 
         ' StatoLavorazioniToolStripMenuItem
         ' 
         StatoLavorazioniToolStripMenuItem.Name = "StatoLavorazioniToolStripMenuItem"
-        StatoLavorazioniToolStripMenuItem.Size = New Size(180, 22)
+        StatoLavorazioniToolStripMenuItem.Size = New Size(173, 22)
         StatoLavorazioniToolStripMenuItem.Text = "Stato Lavorazioni"
         ' 
         ' StatoAssegnazioniToolStripMenuItem
         ' 
         StatoAssegnazioniToolStripMenuItem.Name = "StatoAssegnazioniToolStripMenuItem"
-        StatoAssegnazioniToolStripMenuItem.Size = New Size(180, 22)
+        StatoAssegnazioniToolStripMenuItem.Size = New Size(173, 22)
         StatoAssegnazioniToolStripMenuItem.Text = "Stato Assegnazioni"
         ' 
         ' MovSceneToolStripMenuItem
@@ -221,7 +226,7 @@ Partial Class GesPu25
         ' 
         OpzioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StrumentiToolStripMenuItem, ParametriToolStripMenuItem})
         OpzioniToolStripMenuItem.Name = "OpzioniToolStripMenuItem"
-        OpzioniToolStripMenuItem.Size = New Size(180, 22)
+        OpzioniToolStripMenuItem.Size = New Size(115, 22)
         OpzioniToolStripMenuItem.Text = "Opzioni"
         ' 
         ' StrumentiToolStripMenuItem
@@ -288,25 +293,57 @@ Partial Class GesPu25
         ' ToolStripMenuItem2
         ' 
         ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-        ToolStripMenuItem2.Size = New Size(177, 6)
+        ToolStripMenuItem2.Size = New Size(112, 6)
         ' 
         ' LogoutToolStripMenuItem
         ' 
         LogoutToolStripMenuItem.Name = "LogoutToolStripMenuItem"
-        LogoutToolStripMenuItem.Size = New Size(180, 22)
+        LogoutToolStripMenuItem.Size = New Size(115, 22)
         LogoutToolStripMenuItem.Text = "Logout"
         ' 
         ' EsciToolStripMenuItem
         ' 
         EsciToolStripMenuItem.Name = "EsciToolStripMenuItem"
-        EsciToolStripMenuItem.Size = New Size(180, 22)
+        EsciToolStripMenuItem.Size = New Size(115, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
         ' AssegnazioniToolStripMenuItem
         ' 
+        AssegnazioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StoryboardToolStripMenuItem, AssegnazioniToolStripMenuItem1, ConsegneToolStripMenuItem})
         AssegnazioniToolStripMenuItem.Name = "AssegnazioniToolStripMenuItem"
-        AssegnazioniToolStripMenuItem.Size = New Size(88, 20)
-        AssegnazioniToolStripMenuItem.Text = "Assegnazioni"
+        AssegnazioniToolStripMenuItem.Size = New Size(40, 20)
+        AssegnazioniToolStripMenuItem.Text = "BDL"
+        ' 
+        ' StoryboardToolStripMenuItem
+        ' 
+        StoryboardToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StoryboardToolStripMenuItem1, SceneToolStripMenuItem})
+        StoryboardToolStripMenuItem.Name = "StoryboardToolStripMenuItem"
+        StoryboardToolStripMenuItem.Size = New Size(180, 22)
+        StoryboardToolStripMenuItem.Text = "Storyboard"
+        ' 
+        ' StoryboardToolStripMenuItem1
+        ' 
+        StoryboardToolStripMenuItem1.Name = "StoryboardToolStripMenuItem1"
+        StoryboardToolStripMenuItem1.Size = New Size(180, 22)
+        StoryboardToolStripMenuItem1.Text = "Storyboard"
+        ' 
+        ' SceneToolStripMenuItem
+        ' 
+        SceneToolStripMenuItem.Name = "SceneToolStripMenuItem"
+        SceneToolStripMenuItem.Size = New Size(180, 22)
+        SceneToolStripMenuItem.Text = "Scene"
+        ' 
+        ' AssegnazioniToolStripMenuItem1
+        ' 
+        AssegnazioniToolStripMenuItem1.Name = "AssegnazioniToolStripMenuItem1"
+        AssegnazioniToolStripMenuItem1.Size = New Size(180, 22)
+        AssegnazioniToolStripMenuItem1.Text = "Assegnazioni"
+        ' 
+        ' ConsegneToolStripMenuItem
+        ' 
+        ConsegneToolStripMenuItem.Name = "ConsegneToolStripMenuItem"
+        ConsegneToolStripMenuItem.Size = New Size(180, 22)
+        ConsegneToolStripMenuItem.Text = "Consegne"
         ' 
         ' VideoFbFToolStripMenuItem
         ' 
@@ -411,5 +448,10 @@ Partial Class GesPu25
     Friend WithEvents toolStripUser As ToolStripStatusLabel
     Friend WithEvents toolStripDataOra As ToolStripStatusLabel
     Friend WithEvents AssegnazioniToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents StoryboardToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents StoryboardToolStripMenuItem1 As ToolStripMenuItem
+    Friend WithEvents SceneToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AssegnazioniToolStripMenuItem1 As ToolStripMenuItem
+    Friend WithEvents ConsegneToolStripMenuItem As ToolStripMenuItem
 
 End Class

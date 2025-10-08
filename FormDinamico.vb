@@ -11,6 +11,7 @@ Imports PdfSharp.Drawing.Layout
 Imports PdfSharp.Events
 Imports PdfSharp.Pdf
 Imports WMPLib
+Imports System.Text.RegularExpressions
 
 Public Class DynamicDataForm
     Inherits Form
@@ -29,6 +30,7 @@ Public Class DynamicDataForm
     Private Shared visualFormsAttivi As New Dictionary(Of String, VisualMediaForm)
     Private panelBottoniDinamici As FlowLayoutPanel
     Private splitContainer As SplitContainer
+    Public Property FiltroIniziale As String
 
     Public Sub New(campi As List(Of CampoDatabase), nomeTabella As String)
         Me.Name = nomeTabella
@@ -143,10 +145,12 @@ Public Class DynamicDataForm
         ' Griglia dati
         dgvDati = New DataGridView With {
         .Dock = DockStyle.Fill,
-        .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
         .AllowUserToAddRows = False,
         .ReadOnly = True,
-        .Name = nomeTabellaCorrente
+        .Name = nomeTabellaCorrente,
+        .ScrollBars = ScrollBars.Both,
+        .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+        .AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None
     }
         With dgvDati
             .ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True
@@ -156,7 +160,7 @@ Public Class DynamicDataForm
             .ColumnHeadersHeight = 50
             .AllowUserToAddRows = False
             .AllowUserToDeleteRows = False
-            .AllowUserToOrderColumns = True
+            .AllowUserToOrderColumns = False
             .AllowUserToResizeColumns = True
         End With
 
@@ -168,7 +172,6 @@ Public Class DynamicDataForm
 
         ' Caricamenti iniziali
         CaricaBottoniDinamici()
-        CaricaDatiTabella(Me.Name)
 
         For Each ctrl As Control In campoInputs.Values
             If TypeOf ctrl Is FlowLayoutPanel Then
@@ -206,12 +209,16 @@ Public Class DynamicDataForm
     End Sub
 
     Private Sub DynamicDataForm_Load(sender As Object, e As EventArgs)
-        If SplitContainer IsNot Nothing Then
-            SplitContainer.Panel1MinSize = 300
-            SplitContainer.Panel2MinSize = 300
+        If splitContainer IsNot Nothing Then
+            splitContainer.Panel1MinSize = 300
+            splitContainer.Panel2MinSize = 300
             splitContainer.SplitterDistance = Me.Width / 2.5
         End If
+
+        ' Carica i dati con eventuale filtro
+        CaricaDatiTabella(Me.Name)
     End Sub
+
 
 
     Private Sub FormDinamico_Resize(sender As Object, e As EventArgs) Handles Me.Resize
@@ -273,6 +280,12 @@ Public Class DynamicDataForm
             ElseIf Not isBloccato Then
                 ctrl.Enabled = abilita
             End If
+
+            If nomeCampo.StartsWith("Calc_") Then
+                ctrl.Enabled = False
+                Continue For
+            End If
+
         Next
     End Sub
 
@@ -399,7 +412,7 @@ Public Class DynamicDataForm
 
     Private Sub CancellaDati(sender As Object, e As EventArgs)
         If dgvDati.SelectedRows.Count = 0 Then
-            Dim risposta = MDIMessageBox.Show("Seleziona prima una riga da cancellare dalla griglia.", Me.MdiParent, MessageBoxButtons.OK)
+            MDIMessageBox.Show("Seleziona prima una riga da cancellare dalla griglia.", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
 
@@ -408,31 +421,68 @@ Public Class DynamicDataForm
         ' Trova la chiave primaria
         Dim campoChiave = campiDefiniti.FirstOrDefault(Function(c) c.IsChiave)
         If campoChiave Is Nothing Then
-            Dim risposta = MDIMessageBox.Show("Nessuna chiave primaria.", Me.MdiParent, MessageBoxButtons.OK)
+            MDIMessageBox.Show("Nessuna chiave primaria definita.", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
 
-        Dim valoreChiave = dgvDati.SelectedRows(0).Cells(campoChiave.Nome).Value.ToString()
-        Dim conferma = MDIMessageBox.Show($"Sei sicuro di voler cancellare il record con chiave {campoChiave.Nome} = {valoreChiave}?", Me.MdiParent, MessageBoxButtons.YesNo
-)
+        Dim cella = dgvDati.SelectedRows(0).Cells(campoChiave.Nome)
+        If cella.Value Is Nothing Then
+            MDIMessageBox.Show("Il valore della chiave è nullo.", Me.MdiParent, MessageBoxButtons.OK)
+            Return
+        End If
+
+        Dim valoreChiave = cella.Value.ToString()
+        Dim conferma = MDIMessageBox.Show($"Sei sicuro di voler cancellare il record con chiave {campoChiave.Nome} = {valoreChiave}?", Me.MdiParent, MessageBoxButtons.YesNo)
+
         If conferma = DialogResult.Yes Then
             Dim query As String = $"DELETE FROM [{Me.Name}] WHERE {campoChiave.Nome} = @{campoChiave.Nome}"
 
-            Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand(query, conn)
-                    cmd.Parameters.AddWithValue("@" & campoChiave.Nome, valoreChiave)
-                    conn.Open()
-                    cmd.ExecuteNonQuery()
+            Try
+                Using conn As New SqlConnection(ConnString)
+                    Using cmd As New SqlCommand(query, conn)
+                        cmd.Parameters.AddWithValue("@" & campoChiave.Nome, valoreChiave)
+                        conn.Open()
+                        cmd.ExecuteNonQuery()
+                    End Using
                 End Using
-            End Using
 
-            CaricaDatiTabella(Me.Name)
+                CaricaDatiTabella(Me.Name)
+
+            Catch ex As SqlException
+                If ex.Number = 547 Then ' Violazione vincolo FK
+                    MDIMessageBox.Show("Impossibile cancellare il record: è referenziato da altre tabelle.", Me.MdiParent, MessageBoxButtons.OK)
+                Else
+                    MDIMessageBox.Show("Errore SQL durante la cancellazione: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+                End If
+            Catch ex As Exception
+                MDIMessageBox.Show("Errore imprevisto: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+            End Try
         End If
     End Sub
+
 
     Private Sub SalvaInserimento()
         Dim campiBit As String() = {"CanView", "CanInsert", "CanUpdate", "CanDelete"}
 
+        ' Recupera formule e tipi
+        Dim campiCalcolati = RecuperaCampiCalcolati()
+        Dim formule = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.Formula)
+        Dim tipiValore = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.TipoValore)
+
+        ' Calcola i valori
+        Dim valoriCalcolati = CalcolaValoriCampiCalcolati(formule, tipiValore)
+
+        ' Aggiorna i controlli con i valori calcolati
+        For Each kvp In valoriCalcolati
+            If campoInputs.ContainsKey(kvp.Key) Then
+                Dim ctrl = campoInputs(kvp.Key)
+                If TypeOf ctrl Is TextBox Then
+                    CType(ctrl, TextBox).Text = kvp.Value?.ToString()
+                End If
+            End If
+        Next
+
+        ' Costruisci query di inserimento
         Dim colonne = campiDefiniti.
         Where(Function(c) Not c.IsIdentity).
         Select(Function(c) c.Nome).ToList()
@@ -445,7 +495,7 @@ Public Class DynamicDataForm
                 Using cmd As New SqlCommand(query, conn)
                     For Each nomeCampo In colonne
                         Dim input = campoInputs(nomeCampo)
-                        Dim valore = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
+                        Dim valore = EstraiValoreDaControllo(nomeCampo, input)
                         cmd.Parameters.AddWithValue("@" & nomeCampo, valore)
                     Next
 
@@ -481,6 +531,24 @@ Public Class DynamicDataForm
         Dim cripta As New CriptaHash()
         Dim colonneValid As New List(Of String)
 
+        ' Recupera formule e tipi
+        Dim campiCalcolati = RecuperaCampiCalcolati()
+        Dim formule = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.Formula)
+        Dim tipiValore = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.TipoValore)
+
+        ' Calcola i valori
+        Dim valoriCalcolati = CalcolaValoriCampiCalcolati(formule, tipiValore)
+
+        ' Aggiorna i controlli con i valori calcolati
+        For Each kvp In valoriCalcolati
+            If campoInputs.ContainsKey(kvp.Key) Then
+                Dim ctrl = campoInputs(kvp.Key)
+                If TypeOf ctrl Is TextBox Then
+                    CType(ctrl, TextBox).Text = kvp.Value?.ToString()
+                End If
+            End If
+        Next
+
         ' Costruzione lista colonne da aggiornare
         For Each campo In campiDefiniti
             If campo.IsChiave OrElse campo.IsIdentity Then Continue For
@@ -498,23 +566,39 @@ Public Class DynamicDataForm
 
         Dim query As String = $"UPDATE [{Me.Name}] SET {String.Join(",", colonneValid.Select(Function(n) $"{n} = @{n}"))} WHERE {campoChiave.Nome} = @{campoChiave.Nome}"
 
-        Using conn As New SqlConnection(ConnString)
-            Using cmd As New SqlCommand(query, conn)
-                For Each nomeCampo In colonneValid
-                    Dim input = campoInputs(nomeCampo)
-                    Dim valoreCampo = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
-                    If valoreCampo IsNot Nothing Then
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    For Each nomeCampo In colonneValid
+                        Dim input = campoInputs(nomeCampo)
+                        Dim valoreCampo As Object
+                        If valoriCalcolati.ContainsKey(nomeCampo) Then
+                            valoreCampo = valoriCalcolati(nomeCampo)
+                        Else
+                            valoreCampo = EstraiValoreDaControllo(nomeCampo, input)
+                        End If
                         cmd.Parameters.AddWithValue("@" & nomeCampo, valoreCampo)
-                    End If
-                Next
+                    Next
 
-                cmd.Parameters.AddWithValue("@" & campoChiave.Nome, valoreChiave)
-                Debug.WriteLine(cmd.CommandText)
-                conn.Open()
-                cmd.ExecuteNonQuery()
+                    cmd.Parameters.AddWithValue("@" & campoChiave.Nome, valoreChiave)
+                    conn.Open()
+                    cmd.ExecuteNonQuery()
+                End Using
             End Using
-        End Using
+
+            MDIMessageBox.Show("Modifica salvata correttamente.", Me.MdiParent, MessageBoxButtons.OK)
+
+        Catch ex As SqlException
+            If ex.Number = 547 Then
+                MDIMessageBox.Show("Impossibile salvare: il record viola vincoli di integrità referenziale.", Me.MdiParent, MessageBoxButtons.OK)
+            Else
+                MDIMessageBox.Show("Errore SQL durante il salvataggio: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+            End If
+        Catch ex As Exception
+            MDIMessageBox.Show("Errore imprevisto: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+        End Try
     End Sub
+
 
     Private Function EstraiValoreDaControllo(nomeCampo As String, input As Control) As Object
         Dim campiBit As String() = {"CanView", "CanInsert", "CanUpdate", "CanDelete"}
@@ -522,7 +606,10 @@ Public Class DynamicDataForm
 
         Select Case True
             Case campiBit.Contains(nomeCampo, StringComparer.OrdinalIgnoreCase) AndAlso TypeOf input Is CheckBox
-                Return CType(input, CheckBox).Checked
+                Return If(CType(input, CheckBox).Checked, 1, 0)
+
+            Case TypeOf input Is CheckBox
+                Return If(CType(input, CheckBox).Checked, 1, 0)
 
             Case TypeOf input Is ComboBox
                 Return CType(input, ComboBox).SelectedValue
@@ -542,6 +629,16 @@ Public Class DynamicDataForm
                     Return (New CriptaHash).HashPassword(valore)
                 End If
                 Return valore
+
+            Case TypeOf input Is DateTimePicker
+                Dim dtp = CType(input, DateTimePicker)
+                Dim tag = dtp.Tag.ToString()
+
+                If tag.EndsWith("|NULL") OrElse dtp.CustomFormat = " " Then
+                    Return DBNull.Value
+                End If
+
+                Return dtp.Value
 
             Case Else
                 Return input.Text
@@ -587,7 +684,7 @@ Public Class DynamicDataForm
                     ctrl = CreaTextBoxConGestioneTesto(campo)
 
                 Case "date", "datetime"
-                    ctrl = CreaDatePicker(campo.CampoValore)
+                    ctrl = CreaDatePickerConGestioneVuoto(campo)
 
                 Case "combobox"
                     ctrl = CreaComboBox()
@@ -633,6 +730,31 @@ Public Class DynamicDataForm
         End If
 
         Return ctrl
+    End Function
+
+    Private Function CreaDatePickerConGestioneVuoto(campo As CampoDatabase) As Control
+        Dim dtp As New DateTimePicker()
+        dtp.Format = DateTimePickerFormat.Custom
+        dtp.CustomFormat = " " ' campo visivamente vuoto
+        dtp.Width = 140
+        dtp.Tag = campo.Nome
+
+        ' Mostra la data quando selezionata
+        AddHandler dtp.ValueChanged, Sub()
+                                         dtp.CustomFormat = "dd/MM/yyyy"
+                                         dtp.Tag = campo.Nome ' rimuove eventuale flag di cancellazione
+                                     End Sub
+
+        ' Aggiungi menu contestuale per cancellare la data
+        Dim menu As New ContextMenuStrip()
+        menu.Items.Add("Cancella data", Nothing, Sub()
+                                                     dtp.CustomFormat = " "               ' Nasconde la data
+                                                     dtp.Value = dtp.MaxDate              ' Imposta una data fittizia non selezionabile
+                                                     dtp.Tag = campo.Nome & "|NULL"       ' Flag per salvataggio
+                                                 End Sub)
+        dtp.ContextMenuStrip = menu
+
+        Return dtp
     End Function
 
     Private Function CreaTextBoxConGestioneTesto(campo As CampoDatabase) As Control
@@ -741,8 +863,6 @@ Public Class DynamicDataForm
 
         Return dtPicker
     End Function
-
-
 
     Private Function CreaComboBox() As Control
         Dim campo As New CampoDatabase
@@ -905,7 +1025,7 @@ Public Class DynamicDataForm
     Private Sub CaricaBottoniDinamici()
 
         Dim formNameCorrente As String = Me.Name
-        Dim query As String = "SELECT FormActionName, ButtonText FROM Sys_Form_Actions WHERE FormName = @formName ORDER BY Ordine"
+        Dim query As String = "SELECT * FROM Sys_BottoniDinamici WHERE FormName = @formName ORDER BY Ordine"
 
         Try
             Using conn As New SqlConnection(ConnString)
@@ -915,23 +1035,57 @@ Public Class DynamicDataForm
                     conn.Open()
                     Using reader = cmd.ExecuteReader()
                         While reader.Read()
-                            Dim FormactionName As String = reader("FormActionName").ToString()
-                            Dim buttonText As String = reader("ButtonText").ToString()
+                            Dim bottoneDinamico = reader("BottoneDinamico").ToString()
+                            Dim buttonText = reader("ButtonText").ToString()
+                            Dim campoChiavePadre = reader("CampoChiavePadre").ToString()
+                            Dim campoChiaveFiglia = reader("CampoChiaveFiglia").ToString()
 
                             Dim btnDinamico As New Button With {
-                            .Text = buttonText,
-                            .AutoSize = True,
-                            .Margin = New Padding(5),
-                            .Tag = FormactionName
-                        }
+    .Text = buttonText,
+    .AutoSize = True,
+    .Margin = New Padding(5),
+    .Tag = New With {
+        Key .FormName = bottoneDinamico,
+        Key .CampoPadre = campoChiavePadre,
+        Key .CampoFiglia = campoChiaveFiglia,
+        Key .Titolo = buttonText
+    }
+}
+
 
                             AddHandler btnDinamico.Click, Sub(s, e)
-                                                              Dim campi = RecuperaCampiDa(FormactionName)
-                                                              Dim form As New DynamicDataForm(campi, FormactionName)
-                                                              form.MdiParent = GesPu25
-                                                              form.Text = CType(s, Button).Text
-                                                              form.Show()
+                                                              If dgvDati.SelectedRows.Count = 0 Then
+                                                                  MDIMessageBox.Show("Seleziona prima una riga dalla griglia per aprire il form collegato.", Me.MdiParent, MessageBoxButtons.OK)
+                                                                  Return
+                                                              End If
+
+                                                              Dim info = CType(CType(s, Button).Tag, Object)
+                                                              Dim valoreChiavePadre = dgvDati.SelectedRows(0).Cells(info.CampoPadre).Value?.ToString()
+
+                                                              If String.IsNullOrWhiteSpace(valoreChiavePadre) Then
+                                                                  MDIMessageBox.Show("Il valore della chiave primaria selezionata è nullo o non valido.", Me.MdiParent, MessageBoxButtons.OK)
+                                                                  Return
+                                                              End If
+
+                                                              ' Verifica se il form è già aperto
+                                                              For Each f As Form In GesPu25.MdiChildren
+                                                                  If TypeOf f Is DynamicDataForm AndAlso f.Name = info.FormName Then
+                                                                      f.WindowState = FormWindowState.Normal
+                                                                      f.BringToFront()
+                                                                      f.Activate()
+                                                                      Return
+                                                                  End If
+                                                              Next
+
+                                                              Dim campiFigli = RecuperaCampiDa(info.FormName)
+                                                              Dim nuovoForm As New DynamicDataForm(campiFigli, info.FormName)
+                                                              nuovoForm.MdiParent = GesPu25
+                                                              nuovoForm.Text = $"{info.Titolo} - Filtrato per {info.CampoPadre} = {valoreChiavePadre}"
+                                                              nuovoForm.FiltroIniziale = $"{info.CampoFiglia} = '{valoreChiavePadre}'"
+                                                              nuovoForm.Show()
                                                           End Sub
+
+
 
                             panelBottoni.Controls.Add(btnDinamico)
                         End While
@@ -939,7 +1093,7 @@ Public Class DynamicDataForm
                 End Using
             End Using
         Catch ex As Exception
-            MessageBox.Show("Errore nel caricamento bottoni dinamici: " & ex.Message)
+            MDIMessageBox.Show("Errore nel caricamento bottoni dinamici: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
         End Try
     End Sub
 
@@ -961,7 +1115,10 @@ Public Class DynamicDataForm
     End Function
 
     Private Sub CaricaDatiTabella(nomeTabella As String)
-        Dim query As String = $"SELECT * FROM {nomeTabella}"
+        Dim query As String = $"SELECT * FROM [{nomeTabella}]"
+        If Not String.IsNullOrWhiteSpace(FiltroIniziale) Then
+            query &= $" WHERE {FiltroIniziale}"
+        End If
 
         Try
             Using conn As New SqlConnection(ConnString)
@@ -975,9 +1132,9 @@ Public Class DynamicDataForm
 
                     ' Recupera i collegamenti definiti per la tabella
                     Dim dtCollegamenti As DataTable = EseguiQuery($"
-                    SELECT NomeCampo, TabellaCollegata, CampoValore, CampoVisuale
-                    FROM Sys_CollegamentiCampi
-                    WHERE NomeTabella = '{nomeTabella}'")
+                SELECT NomeCampo, TabellaCollegata, CampoValore, CampoVisuale
+                FROM Sys_CollegamentiCampi
+                WHERE NomeTabella = '{nomeTabella}'")
 
                     ' Ricostruisci le intestazioni e applica visualizzazione descrittiva
                     For Each col As DataGridViewColumn In dgvDati.Columns
@@ -996,8 +1153,8 @@ Public Class DynamicDataForm
 
                             ' Costruisci dizionario ID → Descrizione
                             Dim dtValori = EseguiQuery($"
-                            SELECT {campoValore}, {campoVisuale}
-                            FROM {tabellaCollegata}")
+                        SELECT {campoValore}, {campoVisuale}
+                        FROM {tabellaCollegata}")
 
                             Dim dizionario = dtValori.AsEnumerable().
                             ToDictionary(Function(r) r(campoValore).ToString(), Function(r) r(campoVisuale).ToString())
@@ -1019,7 +1176,6 @@ Public Class DynamicDataForm
             MDIMessageBox.Show("Errore nel caricamento dei dati della tabella." & vbCrLf & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
         End Try
     End Sub
-
 
     Public Function EseguiQuery(query As String) As DataTable
         Dim dt As New DataTable()
@@ -1045,21 +1201,31 @@ Public Class DynamicDataForm
         Return dt
     End Function
 
+    'Private Sub BottoneDinamico_Click(sender As Object, e As EventArgs)
+    '    Dim btn As Button = CType(sender, Button)
+    '    Dim config As BottoneLogico = CType(btn.Tag, BottoneLogico)
+    '
+    ' Cerca tra i form MDI già aperti
+    '    For Each f As Form In GesPu25.MdiChildren
+    '        If TypeOf f Is DynamicDataForm AndAlso f.Name = config.TabellaDestinazione Then
+    '            f.WindowState = FormWindowState.Normal
+    '            f.BringToFront()
+    '            f.Activate()
+    '            Return
+    '        End If
+    '    Next
 
-    Private Sub BottoneDinamico_Click(sender As Object, e As EventArgs)
-        Dim btn As Button = CType(sender, Button)
-        Dim config As BottoneLogico = CType(btn.Tag, BottoneLogico)
+    ' Recupera i campi della tabella destinazione
+    '    Dim campiDestinazione As List(Of CampoDatabase) = RecuperaCampiDa(config.TabellaDestinazione)
 
-        ' Recupera i campi della tabella destinazione
-        Dim campiDestinazione As List(Of CampoDatabase) = RecuperaCampiDa(config.TabellaDestinazione)
-
-        ' Apri form dinamico
-        Dim formDestinazione As New DynamicDataForm(campiDestinazione, config.TabellaDestinazione)
-        formDestinazione.Size = New Size(config.LarghezzaForm, config.AltezzaForm)
-        'formDestinazione.MdiParent = Me
-        formDestinazione.Text = config.Etichetta
-        formDestinazione.Show()
-    End Sub
+    ' Crea e mostra nuovo form
+    '    Dim formDestinazione As New DynamicDataForm(campiDestinazione, config.TabellaDestinazione)
+    '    formDestinazione.Size = New Size(config.LarghezzaForm, config.AltezzaForm)
+    '    formDestinazione.MdiParent = GesPu25
+    '    formDestinazione.Text = config.Etichetta
+    '    formDestinazione.Name = config.TabellaDestinazione
+    '    formDestinazione.Show()
+    'End Sub
 
     Private Sub dgvDati_SelectionChanged(sender As Object, e As EventArgs)
         If dgvDati.SelectedRows.Count > 0 Then
@@ -1294,7 +1460,6 @@ Public Class DynamicDataForm
         Next
     End Sub
 
-
     Private Sub ImpostaValoreCombo(combo As ComboBox, valore As Object)
         If combo.DataSource Is Nothing OrElse combo.ValueMember Is Nothing Then
             combo.SelectedIndex = -1
@@ -1475,10 +1640,10 @@ Public Class DynamicDataForm
                                 col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
                             End If
                         Catch ex As Exception
-                            Debug.WriteLine($"Errore su colonna '{nomeColonna}': {ex.Message}")
+                            MDIMessageBox.Show($"Errore su colonna '{nomeColonna}': {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
                         End Try
                     Else
-                        Debug.WriteLine($"Colonna non trovata o non inizializzata: {nomeColonna}")
+                        MDIMessageBox.Show($"Colonna non trovata o non inizializzata: {nomeColonna}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
                     End If
                 End While
             End Using
@@ -1522,6 +1687,109 @@ Public Class DynamicDataForm
         Next
 
         Return lista.ToArray()
+    End Function
+
+    Private Function RecuperaCampiCalcolati() As Dictionary(Of String, (Formula As String, TipoValore As String))
+        Dim dizionario As New Dictionary(Of String, (String, String))
+
+        Using conn As New SqlConnection(ConnString)
+            Dim query = "SELECT NomeCampo, Formula, Tipovalore FROM Sys_CampiCalcolati WHERE NomeTabella = @NomeTabella"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@NomeTabella", Me.Name)
+
+                conn.Open()
+                Using reader = cmd.ExecuteReader()
+                    While reader.Read()
+                        Dim nomeCampo = reader("NomeCampo").ToString()
+                        Dim formula = reader("Formula").ToString()
+                        Dim tipoValore = reader("Tipovalore").ToString().ToLower()
+                        dizionario(nomeCampo) = (formula, tipoValore)
+                    End While
+                End Using
+            End Using
+        End Using
+
+        Return dizionario
+    End Function
+
+
+    Private Function CalcolaValoriCampiCalcolati(formule As Dictionary(Of String, String), tipiValore As Dictionary(Of String, String)) As Dictionary(Of String, Object)
+
+        Dim risultati As New Dictionary(Of String, Object)
+
+        For Each kvp In formule
+            Dim nomeCampo = kvp.Key
+            Dim formula = kvp.Value
+            Dim tipoValore = If(tipiValore.ContainsKey(nomeCampo), tipiValore(nomeCampo).ToLower(), "numero")
+
+            ' Controllo tipo valido
+            Dim tipiAmmessi As String() = {"numero", "stringa", "data", "booleano", "raw", "testo"}
+            If Not tipiAmmessi.Contains(tipoValore) Then
+                tipoValore = "Numero"
+            End If
+
+            Try
+                Dim espressione = formula
+
+                ' Sostituisci i nomi dei campi con i valori correnti
+                For Each vInput In campoInputs
+                    Dim nome = vInput.Key
+                    Dim valore = EstraiValoreDaControllo(nome, vInput.Value)
+
+                    Dim valoreStringa As String
+                    If valore Is Nothing OrElse valore Is DBNull.Value Then
+                        valoreStringa = If(tipoValore = "stringa", """ """, "0")
+                        MDIMessageBox.Show($"[Campo calcolato] Il campo '{nome}' è nullo. Usato valore '{valoreStringa}'.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+                    ElseIf TypeOf valore Is DateTime Then
+                        valoreStringa = $"""{CDate(valore).ToString("yyyy-MM-dd")}"""
+                    ElseIf tipoValore = "stringa" Then
+                        valoreStringa = $"""{valore.ToString().Replace("""", """""")}"""
+                    Else
+                        valoreStringa = Convert.ToString(valore, Globalization.CultureInfo.InvariantCulture)
+                    End If
+
+                    ' Sostituzione sicura con regex
+                    Dim regex As New Regex($"\b{Regex.Escape(nome)}\b", RegexOptions.IgnoreCase)
+                    espressione = regex.Replace(espressione, valoreStringa)
+                Next
+
+                ' Valutazione
+                Dim risultato As Object
+                If tipoValore = "numero" Then
+                    risultato = New DataTable().Compute(espressione, Nothing)
+                    If IsNumeric(risultato) Then
+                        risultato = Convert.ToDouble(risultato, Globalization.CultureInfo.InvariantCulture)
+                    Else
+                        MDIMessageBox.Show($"[Campo calcolato] Il risultato di '{nomeCampo}' non è numerico: {risultato}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+                        risultato = Nothing
+                    End If
+                ElseIf tipoValore = "stringa" Then
+                    risultato = ValutaEspressioneStringa(espressione)
+                Else
+                    risultato = espressione ' fallback
+                End If
+
+                risultati(nomeCampo) = risultato
+            Catch ex As Exception
+                MDIMessageBox.Show($"[Campo calcolato] Errore nel calcolo di '{nomeCampo}': {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+                risultati(nomeCampo) = Nothing
+            End Try
+        Next
+
+        Return risultati
+    End Function
+
+    Private Function ValutaEspressioneStringa(expr As String) As String
+        Try
+            Dim dt As New DataTable()
+            dt.Columns.Add("Expr", GetType(String), expr)
+            Dim row = dt.NewRow()
+            dt.Rows.Add(row)
+            Return row("Expr").ToString()
+        Catch ex As Exception
+            MDIMessageBox.Show($"[StringEval] Errore: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return ""
+        End Try
     End Function
 
 
@@ -1583,7 +1851,7 @@ Partial Public Class VisualMediaForm
                     percorsoOriginale = pngPath
                     estensione = ".png"
                 Else
-                    MessageBox.Show("Formato non riconosciuto e nessun file alternativo trovato: " & baseName)
+                    MDIMessageBox.Show("Formato non riconosciuto e nessun file alternativo trovato: " & baseName, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
                     Me.Close()
                     Return
                 End If
@@ -1602,7 +1870,7 @@ Partial Public Class VisualMediaForm
             pictureBox.Visible = False
 
         Else
-            MessageBox.Show("Tipo di file non supportato: " & estensione)
+            MDIMessageBox.Show("Tipo di file non supportato: " & estensione, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
             Me.Close()
         End If
     End Sub

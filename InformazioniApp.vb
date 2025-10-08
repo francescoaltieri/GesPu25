@@ -33,7 +33,7 @@
             .Width = 300,
             .Height = 100,
             .Location = New Point(20, 100),
-            .Text = "Questa applicazione consente di gestire ..."
+            .Text = "Questa applicazione consente di gestire i processi legati alla Produzione di Animazioni Grafiche"
         }
 
         Dim linkContatto As New LinkLabel With {

@@ -13,8 +13,12 @@ Public Class Login
         End If
     End Sub
 
-    Private Sub BtnAnnulla_Click(sender As Object, e As EventArgs) Handles BtnAnnulla.Click
+    Private Sub Login_Closed(sender As Object, e As EventArgs) Handles Me.Closed
         Application.Exit()
+    End Sub
+
+    Private Sub BtnAnnulla_Click(sender As Object, e As EventArgs) Handles BtnAnnulla.Click
+        Me.Close()
     End Sub
 
     Private Sub BtnLogin_Click(sender As Object, e As EventArgs) Handles BtnLogin.Click

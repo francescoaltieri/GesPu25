@@ -57,10 +57,7 @@ Public Class GesPu25
 
     Private Sub ToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles ToolStripMenuItem1.Click
         Dim infoForm As New InformazioniApp()
-
-        ' Se vuoi aprirlo come finestra figlia all'interno del form principale
         infoForm.MdiParent = Me
-
         infoForm.Show()
     End Sub
 
@@ -74,6 +71,10 @@ Public Class GesPu25
     End Sub
 
     Public Sub ApriModuloConPermessi(nomeTabella As String, mdiParent As Form)
+
+        Cursor.Current = Cursors.WaitCursor
+        Application.DoEvents()
+
         Dim permessi = SessioneUtente.Autorizzazioni.GetPermessi(nomeTabella)
         Dim isAdmin = IsUtenteAdmin(SessioneUtente.NomeUtenteCorrente) ' ← uso della funzione helper
 
@@ -94,9 +95,16 @@ Public Class GesPu25
         nuovoForm.Text = $"Modulo: {nomeTabella}"
         nuovoForm.MdiParent = mdiParent
         nuovoForm.Show()
+
+        Cursor.Current = Cursors.Default
+
     End Sub
 
     Public Sub ApriModulo2ConPermessi(nomeTabella As String, pForm As Form)
+
+        Cursor.Current = Cursors.WaitCursor
+        Application.DoEvents()
+
         Dim permessi = SessioneUtente.Autorizzazioni.GetPermessi(nomeTabella)
         Dim isAdmin = IsUtenteAdmin(SessioneUtente.NomeUtenteCorrente) ' ← uso della funzione helper
 
@@ -114,6 +122,8 @@ Public Class GesPu25
 
         pForm.MdiParent = Me
         pForm.Show()
+
+        Cursor.Current = Cursors.Default
 
     End Sub
 
@@ -135,7 +145,7 @@ Public Class GesPu25
     End Function
 
     Private Sub VideoFbFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles VideoFbFToolStripMenuItem.Click
-        Dim modulo As New VideoFBF() ' Form vuoto
+        Dim modulo As New VideoFBF()
         ApriModulo2ConPermessi("VideoFBF", modulo)
     End Sub
 
@@ -238,8 +248,17 @@ Public Class GesPu25
         ApriModuloConPermessi("Mov_FrameNote", Me)
     End Sub
 
-    Private Sub AssegnazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AssegnazioniToolStripMenuItem.Click
+    Private Sub AssegnazioniToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles AssegnazioniToolStripMenuItem1.Click
         ApriModuloConPermessi("Mov_Assegnazioni", Me)
     End Sub
+
+    Private Sub StoryboardToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles StoryboardToolStripMenuItem1.Click
+        ApriModuloConPermessi("Mov_Storyboard", Me)
+    End Sub
+
+    Private Sub SceneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SceneToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_SceneStoryboard", Me)
+    End Sub
+
 End Class
 
