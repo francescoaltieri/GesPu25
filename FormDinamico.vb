@@ -994,20 +994,38 @@ Public Class DynamicDataForm
     End Sub
 
     Private Function OttieniPercorsoImgVid(NomeFile As String) As String
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query As String = "SELECT Valore FROM Sys_Parametri WHERE Descrizione = @DescPar"
+        ' Validazione iniziale: verifica che il nome del file sia almeno di 2 caratteri
+        If String.IsNullOrWhiteSpace(NomeFile) OrElse NomeFile.Length < 2 Then
+            Return ""
+        End If
 
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@DescPar", "Percorso" & NomeFile.Substring(0, 2))
-                Dim result = cmd.ExecuteScalar()
-                If result IsNot Nothing Then
-                    Return result.ToString()
-                End If
+        Try
+            Using conn As New SqlConnection(ConnString)
+                conn.Open()
+
+                ' Costruzione del parametro dinamico
+                Dim codiceTipo As String = NomeFile.Substring(0, 2).ToUpper().Trim()
+                Dim query As String = "SELECT Valore FROM Sys_Parametri WHERE Descrizione = @DescPar"
+
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@DescPar", "Percorso" & codiceTipo)
+
+                    Dim result As Object = cmd.ExecuteScalar()
+                    If result IsNot Nothing AndAlso Not Convert.IsDBNull(result) Then
+                        Return result.ToString()
+                    End If
+                End Using
             End Using
-        End Using
+        Catch ex As Exception
+            MDIMessageBox.Show("Errore nel recupero del percorso ", Me.MdiParent, MessageBoxButtons.OK)
+            Return ""
+        End Try
+
+        ' Nessun risultato trovato
+        MDIMessageBox.Show("Nella Tabella Sys_Paramettri non è statp trovato nessun risultato", Me.MdiParent, MessageBoxButtons.OK)
         Return ""
     End Function
+
 
     Private Sub TextBoxPassword_KeyDown(sender As Object, e As KeyEventArgs)
         If e.Control AndAlso (e.KeyCode = Keys.C OrElse e.KeyCode = Keys.V OrElse e.KeyCode = Keys.X) Then

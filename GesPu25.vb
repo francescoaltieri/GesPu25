@@ -260,5 +260,12 @@ Public Class GesPu25
         ApriModuloConPermessi("Mov_SceneStoryboard", Me)
     End Sub
 
+    Private Sub PanelToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles PanelToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_PanelScene", Me)
+    End Sub
+
+    Private Sub OggettiLavorazioneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiLavorazioneToolStripMenuItem.Click
+        ApriModuloConPermessi("Tab_OggettiLavorazione", Me)
+    End Sub
 End Class
 
