@@ -8,4 +8,13 @@
     Public Property CampoVisuale As String
     Public Property CampoValore As String
     Public Property Lunghezza As String
+
+    ' Proprietà di convalida
+    Public Property TipoConvalida As String ' "I" o "E"
+    Public Property IntervalloMin As String
+    Public Property IntervalloMax As String
+    Public Property TabellaElenco As String
+    Public Property ChiaveElenco As String
+    Public Property DescrizioneChiave As String
 End Class
+

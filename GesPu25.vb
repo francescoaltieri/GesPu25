@@ -267,5 +267,9 @@ Public Class GesPu25
     Private Sub OggettiLavorazioneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiLavorazioneToolStripMenuItem.Click
         ApriModuloConPermessi("Tab_OggettiLavorazione", Me)
     End Sub
+
+    Private Sub ConsegneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConsegneToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_Consegne", Me)
+    End Sub
 End Class
 

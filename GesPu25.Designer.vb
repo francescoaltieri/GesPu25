@@ -40,6 +40,7 @@ Partial Class GesPu25
         TipoLavorazioniToolStripMenuItem = New ToolStripMenuItem()
         StatoLavorazioniToolStripMenuItem = New ToolStripMenuItem()
         StatoAssegnazioniToolStripMenuItem = New ToolStripMenuItem()
+        OggettiLavorazioneToolStripMenuItem = New ToolStripMenuItem()
         MovSceneToolStripMenuItem = New ToolStripMenuItem()
         SceneAssegnateToolStripMenuItem = New ToolStripMenuItem()
         AutorizzazioniScenaToolStripMenuItem = New ToolStripMenuItem()
@@ -72,7 +73,6 @@ Partial Class GesPu25
         StatusStrip1 = New StatusStrip()
         toolStripUser = New ToolStripStatusLabel()
         toolStripDataOra = New ToolStripStatusLabel()
-        OggettiLavorazioneToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         StatusStrip1.SuspendLayout()
         SuspendLayout()
@@ -97,7 +97,7 @@ Partial Class GesPu25
         ' 
         TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem, MovSceneToolStripMenuItem})
         TabelleToolStripMenuItem.Name = "TabelleToolStripMenuItem"
-        TabelleToolStripMenuItem.Size = New Size(180, 22)
+        TabelleToolStripMenuItem.Size = New Size(115, 22)
         TabelleToolStripMenuItem.Text = "Tabelle"
         ' 
         ' EpisodiToolStripMenuItem
@@ -141,25 +141,25 @@ Partial Class GesPu25
         ' BackgroundToolStripMenuItem1
         ' 
         BackgroundToolStripMenuItem1.Name = "BackgroundToolStripMenuItem1"
-        BackgroundToolStripMenuItem1.Size = New Size(180, 22)
+        BackgroundToolStripMenuItem1.Size = New Size(138, 22)
         BackgroundToolStripMenuItem1.Text = "Background"
         ' 
         ' CharactersToolStripMenuItem
         ' 
         CharactersToolStripMenuItem.Name = "CharactersToolStripMenuItem"
-        CharactersToolStripMenuItem.Size = New Size(180, 22)
+        CharactersToolStripMenuItem.Size = New Size(138, 22)
         CharactersToolStripMenuItem.Text = "Characters"
         ' 
         ' PropsToolStripMenuItem
         ' 
         PropsToolStripMenuItem.Name = "PropsToolStripMenuItem"
-        PropsToolStripMenuItem.Size = New Size(180, 22)
+        PropsToolStripMenuItem.Size = New Size(138, 22)
         PropsToolStripMenuItem.Text = "Props"
         ' 
         ' EffettiToolStripMenuItem
         ' 
         EffettiToolStripMenuItem.Name = "EffettiToolStripMenuItem"
-        EffettiToolStripMenuItem.Size = New Size(180, 22)
+        EffettiToolStripMenuItem.Size = New Size(138, 22)
         EffettiToolStripMenuItem.Text = "Effetti"
         ' 
         ' LavorazioniToolStripMenuItem
@@ -186,6 +186,12 @@ Partial Class GesPu25
         StatoAssegnazioniToolStripMenuItem.Name = "StatoAssegnazioniToolStripMenuItem"
         StatoAssegnazioniToolStripMenuItem.Size = New Size(180, 22)
         StatoAssegnazioniToolStripMenuItem.Text = "Stato Assegnazioni"
+        ' 
+        ' OggettiLavorazioneToolStripMenuItem
+        ' 
+        OggettiLavorazioneToolStripMenuItem.Name = "OggettiLavorazioneToolStripMenuItem"
+        OggettiLavorazioneToolStripMenuItem.Size = New Size(180, 22)
+        OggettiLavorazioneToolStripMenuItem.Text = "Oggetti Lavorazione"
         ' 
         ' MovSceneToolStripMenuItem
         ' 
@@ -228,7 +234,7 @@ Partial Class GesPu25
         ' 
         OpzioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StrumentiToolStripMenuItem, ParametriToolStripMenuItem})
         OpzioniToolStripMenuItem.Name = "OpzioniToolStripMenuItem"
-        OpzioniToolStripMenuItem.Size = New Size(180, 22)
+        OpzioniToolStripMenuItem.Size = New Size(115, 22)
         OpzioniToolStripMenuItem.Text = "Opzioni"
         ' 
         ' StrumentiToolStripMenuItem
@@ -295,18 +301,18 @@ Partial Class GesPu25
         ' ToolStripMenuItem2
         ' 
         ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-        ToolStripMenuItem2.Size = New Size(177, 6)
+        ToolStripMenuItem2.Size = New Size(112, 6)
         ' 
         ' LogoutToolStripMenuItem
         ' 
         LogoutToolStripMenuItem.Name = "LogoutToolStripMenuItem"
-        LogoutToolStripMenuItem.Size = New Size(180, 22)
+        LogoutToolStripMenuItem.Size = New Size(115, 22)
         LogoutToolStripMenuItem.Text = "Logout"
         ' 
         ' EsciToolStripMenuItem
         ' 
         EsciToolStripMenuItem.Name = "EsciToolStripMenuItem"
-        EsciToolStripMenuItem.Size = New Size(180, 22)
+        EsciToolStripMenuItem.Size = New Size(115, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
         ' AssegnazioniToolStripMenuItem
@@ -391,12 +397,6 @@ Partial Class GesPu25
         toolStripDataOra.ForeColor = SystemColors.Highlight
         toolStripDataOra.Name = "toolStripDataOra"
         toolStripDataOra.Size = New Size(4, 17)
-        ' 
-        ' OggettiLavorazioneToolStripMenuItem
-        ' 
-        OggettiLavorazioneToolStripMenuItem.Name = "OggettiLavorazioneToolStripMenuItem"
-        OggettiLavorazioneToolStripMenuItem.Size = New Size(180, 22)
-        OggettiLavorazioneToolStripMenuItem.Text = "Oggetti Lavorazione"
         ' 
         ' GesPu25
         ' 

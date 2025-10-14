@@ -1,6 +1,8 @@
-﻿Imports System.Data.SqlClient
+﻿Imports System.ComponentModel
+Imports System.Data.SqlClient
 Imports System.IO
 Imports System.Text
+Imports System.Text.RegularExpressions
 Imports System.Windows.Forms
 Imports AxWMPLib
 Imports GesPu25.ModuloCampiDinamici
@@ -11,7 +13,6 @@ Imports PdfSharp.Drawing.Layout
 Imports PdfSharp.Events
 Imports PdfSharp.Pdf
 Imports WMPLib
-Imports System.Text.RegularExpressions
 
 Public Class DynamicDataForm
     Inherits Form
@@ -38,6 +39,19 @@ Public Class DynamicDataForm
         Me.Size = New Size(1100, 600)
         Me.StartPosition = FormStartPosition.CenterScreen
         Me.campiDefiniti = RecuperaCampiDa(nomeTabella)
+        Dim convalide = RecuperaConvalideDaSys(nomeTabella)
+        For Each campo In campi
+            If convalide.ContainsKey(campo.Nome) Then
+                Dim r = convalide(campo.Nome)
+                campo.TipoConvalida = r("TipoConvalida").ToString()
+                campo.IntervalloMin = r("IntervalloMin").ToString()
+                campo.IntervalloMax = r("IntervalloMax").ToString()
+                campo.TabellaElenco = r("TabellaElenco").ToString()
+                campo.ChiaveElenco = r("ChiaveElenco").ToString()
+                campo.DescrizioneChiave = r("DescrizioneChiave").ToString()
+            End If
+        Next
+
         Me.nomeTabellaCorrente = nomeTabella
 
         AddHandler Me.Load, AddressOf DynamicDataForm_Load
@@ -188,7 +202,29 @@ Public Class DynamicDataForm
         ApplicaAutorizzazioni(NomeUtenteCorrente)
         PulisciCampi()
 
+        'VisualizzaCampiJoin()
+
     End Sub
+
+    Private Function RecuperaConvalideDaSys(nomeTabella As String) As Dictionary(Of String, DataRow)
+        Dim convalide As New Dictionary(Of String, DataRow)
+        Using conn As New SqlConnection(ConnString)
+            Dim query = "SELECT * FROM Sys_ConvalidaCampi WHERE NomeTabella = @Tabella"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@Tabella", nomeTabella)
+                Dim da As New SqlDataAdapter(cmd)
+                Dim dt As New DataTable()
+                da.Fill(dt)
+                For Each row As DataRow In dt.Rows
+                    Dim nomeCampo = row("NomeCampo").ToString()
+                    If Not convalide.ContainsKey(nomeCampo) Then
+                        convalide.Add(nomeCampo, row)
+                    End If
+                Next
+            End Using
+        End Using
+        Return convalide
+    End Function
 
     Private Sub dgvDati_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
         If dgvDati.Columns.Count > 0 Then
@@ -218,8 +254,6 @@ Public Class DynamicDataForm
         ' Carica i dati con eventuale filtro
         CaricaDatiTabella(Me.Name)
     End Sub
-
-
 
     Private Sub FormDinamico_Resize(sender As Object, e As EventArgs) Handles Me.Resize
         ApplicaConfigurazioneGriglia(dgvDati)
@@ -512,6 +546,7 @@ Public Class DynamicDataForm
     End Sub
 
     Private Sub SalvaModifica()
+
         campiDefiniti = RecuperaCampiDa(Me.Name)
 
         Dim campoChiave = campiDefiniti.FirstOrDefault(Function(c) c.IsChiave)
@@ -599,7 +634,6 @@ Public Class DynamicDataForm
         End Try
     End Sub
 
-
     Private Function EstraiValoreDaControllo(nomeCampo As String, input As Control) As Object
         Dim campiBit As String() = {"CanView", "CanInsert", "CanUpdate", "CanDelete"}
         Dim isPassword = nomeCampo.ToLower().Contains("password")
@@ -646,8 +680,8 @@ Public Class DynamicDataForm
     End Function
 
     Private Function CreaControllo(campo As CampoDatabase) As Control
+
         If campo Is Nothing Then Return CreaLabelErrore("Campo non valido.")
-        'If campo.IsIdentity Then Return CreaTextBoxIdentity(campo)
 
         ' Calcolo larghezza dinamica
         Dim larghezzaBase As Integer = 100
@@ -686,8 +720,8 @@ Public Class DynamicDataForm
                 Case "date", "datetime"
                     ctrl = CreaDatePickerConGestioneVuoto(campo)
 
-                Case "combobox"
-                    ctrl = CreaComboBox()
+                    'Case "combobox"
+                 '   ctrl = CreaComboBox()
 
                 Case "checkbox", "boolean", "bit"
                     ctrl = CreaCheckBox()
@@ -729,8 +763,185 @@ Public Class DynamicDataForm
             ctrl.Enabled = False
         End If
 
+        If campo.TipoConvalida = "E" Then
+            AddHandler ctrl.Validated, Sub(sender, e)
+                                           ValidazioneElenco(campo, CType(sender, Control))
+                                       End Sub
+
+            AddHandler ctrl.DoubleClick, Sub(sender, e)
+                                             ApriSelezioneElenco(campo, CType(sender, Control))
+                                         End Sub
+        End If
+
+        ' Aggiunta evento di convalida per TipoConvalida = "I"
+        If campo.TipoConvalida = "I" Then
+            AddHandler ctrl.Validated, Sub(sender, e)
+                                           ValidazioneIntervallo(campo, CType(sender, Control))
+                                       End Sub
+        End If
+
         Return ctrl
     End Function
+
+    Private Sub ApplicaFeedbackVisivo(ctrl As Control, isValido As Boolean)
+        If isValido Then
+            ctrl.BackColor = SystemColors.Window
+        Else
+            ctrl.BackColor = Color.LightPink
+        End If
+    End Sub
+
+    Private Sub ValidazioneIntervallo(campo As CampoDatabase, inputControl As Control)
+        Dim valoreObj As Object = EstraiValoreDaControllo(campo.Nome, inputControl)
+        If valoreObj Is Nothing OrElse Not IsNumeric(valoreObj) Then
+            inputControl.BackColor = SystemColors.Window
+            Exit Sub
+        End If
+
+        Dim valore As Decimal = Convert.ToDecimal(valoreObj)
+        Dim minOk As Boolean = True
+        Dim maxOk As Boolean = True
+
+        If Not String.IsNullOrWhiteSpace(campo.IntervalloMin) AndAlso IsNumeric(campo.IntervalloMin) Then
+            minOk = valore >= Convert.ToDecimal(campo.IntervalloMin)
+        End If
+
+        If Not String.IsNullOrWhiteSpace(campo.IntervalloMax) AndAlso IsNumeric(campo.IntervalloMax) Then
+            maxOk = valore <= Convert.ToDecimal(campo.IntervalloMax)
+        End If
+
+        Dim valido = minOk AndAlso maxOk
+        ApplicaFeedbackVisivo(inputControl, valido)
+        If Not valido Then
+            MDIMessageBox.Show($"Il valore '{valore}' per il campo '{campo.Nome}' è fuori dall'intervallo consentito ({campo.IntervalloMin} - {campo.IntervalloMax}).", Me.MdiParent, MessageBoxButtons.OK)
+        End If
+    End Sub
+
+    Private Sub ValidazioneElenco(campo As CampoDatabase, inputControl As Control)
+        Dim valore As Object = EstraiValoreDaControllo(campo.Nome, inputControl)
+        If valore Is Nothing OrElse String.IsNullOrWhiteSpace(valore.ToString()) Then
+            inputControl.BackColor = SystemColors.Window
+            Exit Sub
+        End If
+
+        Dim query = $"SELECT COUNT(*) FROM [{campo.TabellaElenco}] WHERE [{campo.ChiaveElenco}] = @valore"
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@valore", valore)
+                    conn.Open()
+                    Dim count = Convert.ToInt32(cmd.ExecuteScalar())
+                    Dim valido = (count > 0)
+                    ApplicaFeedbackVisivo(inputControl, valido)
+                    If Not valido Then
+                        MDIMessageBox.Show($"Il valore '{valore}' non è valido per il campo '{campo.Nome}'.", Me.MdiParent, MessageBoxButtons.OK)
+                    End If
+                End Using
+            End Using
+        Catch ex As Exception
+            inputControl.BackColor = Color.LightPink
+            MDIMessageBox.Show("Errore durante la convalida: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+        End Try
+    End Sub
+
+    Private Sub ApriSelezioneElenco(campo As CampoDatabase, inputControl As Control)
+        Dim form = New Form With {
+        .Text = $"Seleziona valore per {campo.Nome}",
+        .Size = New Size(800, 500),
+        .StartPosition = FormStartPosition.CenterParent
+    }
+
+        Dim dtOriginale As New DataTable()
+
+        Dim griglia = New DataGridView With {
+        .Dock = DockStyle.Fill,
+        .ReadOnly = True,
+        .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+        .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
+        .AllowUserToAddRows = False,
+        .AllowUserToDeleteRows = False
+    }
+
+        ' Pulsante "Mostra tutti"
+        Dim btnMostraTutti As New Button With {
+        .Text = "Mostra tutti",
+        .Dock = DockStyle.Fill,
+        .Height = 30
+    }
+        AddHandler btnMostraTutti.Click, Sub(s, e)
+                                             griglia.DataSource = dtOriginale
+                                         End Sub
+
+        ' Layout contenitore
+        Dim layout = New TableLayoutPanel With {
+        .Dock = DockStyle.Fill,
+        .RowCount = 2,
+        .ColumnCount = 1
+    }
+        layout.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Pulsante
+        layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Griglia
+        layout.Controls.Add(btnMostraTutti, 0, 0)
+        layout.Controls.Add(griglia, 0, 1)
+        form.Controls.Add(layout)
+
+        ' Doppio click su cella → filtro o selezione
+        AddHandler griglia.CellDoubleClick, Sub(s, e)
+                                                If e.RowIndex >= 0 AndAlso e.ColumnIndex >= 0 Then
+                                                    Dim colonnaCliccata = griglia.Columns(e.ColumnIndex).Name
+                                                    Dim valoreCellaObj = griglia.Rows(e.RowIndex).Cells(e.ColumnIndex).Value
+                                                    Dim valoreTesto As String = If(valoreCellaObj Is Nothing OrElse TypeOf valoreCellaObj Is DBNull, "", valoreCellaObj.ToString().Trim())
+
+                                                    If colonnaCliccata.Equals(campo.ChiaveElenco, StringComparison.OrdinalIgnoreCase) Then
+                                                        ' Se è la colonna chiave → seleziona e chiudi
+                                                        If TypeOf inputControl Is TextBox Then
+                                                            CType(inputControl, TextBox).Text = valoreTesto
+                                                        ElseIf TypeOf inputControl Is ComboBox Then
+                                                            CType(inputControl, ComboBox).SelectedValue = valoreTesto
+                                                        End If
+                                                        form.Close()
+                                                    Else
+                                                        ' Altrimenti → filtro su tutte le colonne
+                                                        valoreTesto = valoreTesto.Replace("'", "''")
+                                                        Dim colonnaTipo = dtOriginale.Columns(colonnaCliccata).DataType
+                                                        Dim filtro As String
+
+                                                        If colonnaTipo = GetType(Integer) OrElse colonnaTipo = GetType(Decimal) OrElse colonnaTipo = GetType(Double) Then
+                                                            If IsNumeric(valoreTesto) Then
+                                                                filtro = $"[{colonnaCliccata}] = {valoreTesto}"
+                                                            Else
+                                                                filtro = "1=0"
+                                                                MDIMessageBox.Show("Valore non numerico su colonna numerica → nessuna corrispondenza", Me.MdiParent, MessageBoxButtons.OK)
+                                                            End If
+                                                        Else
+                                                            filtro = $"CONVERT([{colonnaCliccata}], System.String) LIKE '%{valoreTesto}%'"
+                                                        End If
+
+                                                        Dim dtFiltrato = dtOriginale.Clone()
+                                                        For Each row As DataRow In dtOriginale.Select(filtro)
+                                                            dtFiltrato.ImportRow(row)
+                                                        Next
+                                                        griglia.DataSource = dtFiltrato
+                                                    End If
+                                                End If
+                                            End Sub
+
+        ' Carica tutti i dati dalla tabella elenco
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Dim query = $"SELECT * FROM [{campo.TabellaElenco}]"
+                Using da As New SqlDataAdapter(query, conn)
+                    da.Fill(dtOriginale)
+                    griglia.DataSource = dtOriginale
+                End Using
+            End Using
+        Catch ex As Exception
+            MessageBox.Show("Errore nel caricamento elenco: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End Try
+
+        form.ShowDialog(Me)
+    End Sub
+
 
     Private Function CreaDatePickerConGestioneVuoto(campo As CampoDatabase) As Control
         Dim dtp As New DateTimePicker()
@@ -864,15 +1075,15 @@ Public Class DynamicDataForm
         Return dtPicker
     End Function
 
-    Private Function CreaComboBox() As Control
-        Dim campo As New CampoDatabase
-        Return New ComboBox() With {
-        .DropDownStyle = ComboBoxStyle.DropDownList,
-        .Width = campo.Lunghezza,
-        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-        .Margin = New Padding(5)
-    }
-    End Function
+    'Private Function CreaComboBox() As Control
+    'Dim campo As New CampoDatabase
+    'Return New ComboBox() With {
+    '    .DropDownStyle = ComboBoxStyle.DropDownList,
+    '    .Width = campo.Lunghezza,
+    '    .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+    '    .Margin = New Padding(5)
+    '}
+    'End Function
 
     Private Function CreaCheckBox() As Control
         Return New CheckBox() With {
@@ -1059,16 +1270,16 @@ Public Class DynamicDataForm
                             Dim campoChiaveFiglia = reader("CampoChiaveFiglia").ToString()
 
                             Dim btnDinamico As New Button With {
-    .Text = buttonText,
-    .AutoSize = True,
-    .Margin = New Padding(5),
-    .Tag = New With {
-        Key .FormName = bottoneDinamico,
-        Key .CampoPadre = campoChiavePadre,
-        Key .CampoFiglia = campoChiaveFiglia,
-        Key .Titolo = buttonText
-    }
-}
+                                .Text = buttonText,
+                                .AutoSize = True,
+                                .Margin = New Padding(5),
+                                .Tag = New With {
+                                    Key .FormName = bottoneDinamico,
+                                    Key .CampoPadre = campoChiavePadre,
+                                    Key .CampoFiglia = campoChiaveFiglia,
+                                    Key .Titolo = buttonText
+                                }
+                            }
 
 
                             AddHandler btnDinamico.Click, Sub(s, e)
@@ -1150,9 +1361,9 @@ Public Class DynamicDataForm
 
                     ' Recupera i collegamenti definiti per la tabella
                     Dim dtCollegamenti As DataTable = EseguiQuery($"
-                SELECT NomeCampo, TabellaCollegata, CampoValore, CampoVisuale
-                FROM Sys_CollegamentiCampi
-                WHERE NomeTabella = '{nomeTabella}'")
+                        SELECT NomeCampo, TabellaCollegata, CampoValore, CampoVisuale
+                        FROM Sys_CollegamentiCampi
+                        WHERE NomeTabella = '{nomeTabella}'")
 
                     ' Ricostruisci le intestazioni e applica visualizzazione descrittiva
                     For Each col As DataGridViewColumn In dgvDati.Columns
@@ -1219,36 +1430,36 @@ Public Class DynamicDataForm
         Return dt
     End Function
 
-    'Private Sub BottoneDinamico_Click(sender As Object, e As EventArgs)
-    '    Dim btn As Button = CType(sender, Button)
-    '    Dim config As BottoneLogico = CType(btn.Tag, BottoneLogico)
-    '
-    ' Cerca tra i form MDI già aperti
-    '    For Each f As Form In GesPu25.MdiChildren
-    '        If TypeOf f Is DynamicDataForm AndAlso f.Name = config.TabellaDestinazione Then
-    '            f.WindowState = FormWindowState.Normal
-    '            f.BringToFront()
-    '            f.Activate()
-    '            Return
-    '        End If
-    '    Next
+    Private Sub RimuoviCampiJoin()
+        Dim righeDaRimuovere As New List(Of Integer)
 
-    ' Recupera i campi della tabella destinazione
-    '    Dim campiDestinazione As List(Of CampoDatabase) = RecuperaCampiDa(config.TabellaDestinazione)
+        For r = 0 To pannelloSinistro.RowCount - 1
+            For c = 0 To pannelloSinistro.ColumnCount - 1
+                Dim ctrl = pannelloSinistro.GetControlFromPosition(c, r)
+                If ctrl IsNot Nothing AndAlso ctrl.Tag?.ToString() = "CampoJoin" Then
+                    pannelloSinistro.Controls.Remove(ctrl)
+                    righeDaRimuovere.Add(r)
+                End If
+            Next
+        Next
 
-    ' Crea e mostra nuovo form
-    '    Dim formDestinazione As New DynamicDataForm(campiDestinazione, config.TabellaDestinazione)
-    '    formDestinazione.Size = New Size(config.LarghezzaForm, config.AltezzaForm)
-    '    formDestinazione.MdiParent = GesPu25
-    '    formDestinazione.Text = config.Etichetta
-    '    formDestinazione.Name = config.TabellaDestinazione
-    '    formDestinazione.Show()
-    'End Sub
+        ' Rimuovi le righe in ordine inverso
+        For Each riga In righeDaRimuovere.Distinct().OrderByDescending(Function(x) x)
+            pannelloSinistro.RowStyles.RemoveAt(riga)
+        Next
+    End Sub
 
     Private Sub dgvDati_SelectionChanged(sender As Object, e As EventArgs)
-        If dgvDati.SelectedRows.Count > 0 Then
-            CaricaDatiNeiControlli(dgvDati.SelectedRows(0))
-        End If
+        If dgvDati.SelectedRows.Count = 0 Then Exit Sub
+
+        ' Carica i dati nei controlli principali
+        CaricaDatiNeiControlli(dgvDati.SelectedRows(0))
+
+        ' Rimuovi eventuali CampiJoin precedenti
+        RimuoviCampiJoin()
+
+        ' Visualizza i nuovi CampiJoin
+        VisualizzaCampiJoin()
     End Sub
 
     Private Sub dgvDati_CellClick(sender As Object, e As DataGridViewCellEventArgs)
@@ -1476,6 +1687,9 @@ Public Class DynamicDataForm
                     Next
             End Select
         Next
+
+        VisualizzaCampiJoin()
+
     End Sub
 
     Private Sub ImpostaValoreCombo(combo As ComboBox, valore As Object)
@@ -1508,6 +1722,7 @@ Public Class DynamicDataForm
             page.Orientation = PageOrientation.Landscape
             Dim gfx As XGraphics = XGraphics.FromPdfPage(page)
             Dim font As New XFont("Arial", 8, XFontStyleEx.Regular)
+            Dim fontBold As New XFont("Arial", 8, XFontStyleEx.Bold)
             Dim formatter As New XTextFormatter(gfx)
 
             Dim margin As Double = 40
@@ -1534,7 +1749,7 @@ Public Class DynamicDataForm
             For i = 0 To colCount - 1
                 Dim header = SpaziaPrimaDelleMaiuscole(colonne(i).HeaderText)
                 Dim rect As New XRect(margin + (i * colWidth), topOffset, colWidth, lineHeight)
-                formatter.DrawString(header, font, XBrushes.DarkBlue, rect, XStringFormats.TopLeft)
+                formatter.DrawString(header, fontBold, XBrushes.DarkBlue, rect, XStringFormats.TopLeft)
             Next
             topOffset += lineHeight
 
@@ -1552,7 +1767,7 @@ Public Class DynamicDataForm
                     For i = 0 To colCount - 1
                         Dim header = SpaziaPrimaDelleMaiuscole(colonne(i).HeaderText)
                         Dim rect As New XRect(margin + (i * colWidth), topOffset, colWidth, lineHeight)
-                        formatter.DrawString(header, font, XBrushes.DarkBlue, rect, XStringFormats.TopLeft)
+                        formatter.DrawString(header, fontBold, XBrushes.DarkBlue, rect, XStringFormats.TopLeft)
                     Next
                     topOffset += lineHeight
                 End If
@@ -1565,6 +1780,36 @@ Public Class DynamicDataForm
                     formatter.DrawString(valore, font, XBrushes.Black, rect, XStringFormats.TopLeft)
                 Next
                 topOffset += lineHeight * 2
+
+                ' CampiJoin
+                Dim campiJoin = RecuperaCampiJoin(Me.Name)
+                If campiJoin.Count > 0 Then
+                    For Each campo In campiJoin
+                        ' Verifica che la colonna esista nella griglia
+                        If Not dgvDati.Columns.Contains(campo.ChiaveFiglia) Then Continue For
+
+                        Dim valoreChiaveFiglia = row.Cells(campo.ChiaveFiglia).Value?.ToString()
+                        If String.IsNullOrEmpty(valoreChiaveFiglia) Then Continue For
+
+                        Dim valorePadre As String = ""
+                        Using conn As New SqlConnection(ConnString)
+                            Dim query = $"SELECT [{campo.CampoDaVisualizzare}] FROM [{campo.TabellaPadre}] WHERE [{campo.ChiavePadre}] = @Chiave"
+                            Using cmd As New SqlCommand(query, conn)
+                                cmd.Parameters.AddWithValue("@Chiave", valoreChiaveFiglia)
+                                conn.Open()
+                                Dim result = cmd.ExecuteScalar()
+                                valorePadre = If(result IsNot Nothing, result.ToString(), "")
+                            End Using
+                        End Using
+
+                        ' Scrivi CampiJoin sotto la riga con evidenziazione blu
+                        Dim rectJoin As New XRect(margin, topOffset, usableWidth, lineHeight)
+                        gfx.DrawRectangle(New XSolidBrush(XColor.FromArgb(230, 240, 255)), rectJoin) ' sfondo azzurrino
+                        formatter.DrawString($"{campo.EtichettaCampo}: {valorePadre}", fontBold, XBrushes.Blue, rectJoin, XStringFormats.TopLeft)
+                        topOffset += lineHeight
+                    Next
+                End If
+
             Next
 
             ' Salvataggio
@@ -1730,7 +1975,6 @@ Public Class DynamicDataForm
         Return dizionario
     End Function
 
-
     Private Function CalcolaValoriCampiCalcolati(formule As Dictionary(Of String, String), tipiValore As Dictionary(Of String, String)) As Dictionary(Of String, Object)
 
         Dim risultati As New Dictionary(Of String, Object)
@@ -1810,7 +2054,99 @@ Public Class DynamicDataForm
         End Try
     End Function
 
+    Private Function RecuperaCampiJoin(tabellaFiglia As String) As List(Of CampoJoin)
+        Dim lista As New List(Of CampoJoin)
 
+        Using conn As New SqlConnection(ConnString)
+            Dim query = "SELECT * FROM Sys_CampiJoin WHERE TabellaFiglia = @TabellaFiglia"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@TabellaFiglia", tabellaFiglia)
+                conn.Open()
+                Using reader = cmd.ExecuteReader()
+                    While reader.Read()
+                        lista.Add(New CampoJoin With {
+                        .TabellaPadre = reader("TabellaPadre").ToString(),
+                        .ChiaveFiglia = reader("ChiaveFiglia").ToString(),
+                        .ChiavePadre = reader("ChiavePadre").ToString(),
+                        .EtichettaCampo = reader("EtichettaCampo").ToString(),
+                        .CampoDaVisualizzare = reader("CampoDaVisualizzare").ToString()
+                    })
+                    End While
+                End Using
+            End Using
+        End Using
+
+        Return lista
+    End Function
+
+    Private Sub VisualizzaCampiJoin()
+        Dim campiJoin = RecuperaCampiJoin(Me.nomeTabellaCorrente)
+        If campiJoin.Count = 0 Then Exit Sub
+
+        ' Rimuovi controlli CampoJoin e le righe associate
+        For i = pannelloSinistro.RowCount - 1 To 0 Step -1
+            For j = 0 To pannelloSinistro.ColumnCount - 1
+                Dim ctrl = pannelloSinistro.GetControlFromPosition(j, i)
+                If ctrl IsNot Nothing AndAlso ctrl.Tag?.ToString() = "CampoJoin" Then
+                    pannelloSinistro.Controls.Remove(ctrl)
+                End If
+            Next
+        Next
+
+        ' Ricostruisci righe CampoJoin
+        Dim rigaCorrente As DataGridViewRow = If(dgvDati.SelectedRows.Count > 0, dgvDati.SelectedRows(0), Nothing)
+
+        For Each campo In campiJoin
+            Dim valorePadre As String = ""
+
+            If rigaCorrente IsNot Nothing AndAlso dgvDati.Columns.Contains(campo.ChiaveFiglia) Then
+                Dim valoreChiaveFiglia = rigaCorrente.Cells(campo.ChiaveFiglia).Value?.ToString()
+                If Not String.IsNullOrEmpty(valoreChiaveFiglia) Then
+                    Using conn As New SqlConnection(ConnString)
+                        Dim query = $"SELECT [{campo.CampoDaVisualizzare}] FROM [{campo.TabellaPadre}] WHERE [{campo.ChiavePadre}] = @Chiave"
+                        Using cmd As New SqlCommand(query, conn)
+                            cmd.Parameters.AddWithValue("@Chiave", valoreChiaveFiglia)
+                            conn.Open()
+                            Dim result = cmd.ExecuteScalar()
+                            valorePadre = If(result IsNot Nothing, result.ToString(), "")
+                        End Using
+                    End Using
+                End If
+            End If
+
+            ' Aggiungi nuova riga CampoJoin
+            pannelloSinistro.RowCount += 1
+            pannelloSinistro.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lblEtichetta As New Label With {
+                .Text = campo.EtichettaCampo,
+                .AutoSize = True,
+                .Margin = New Padding(5),
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold),
+                .Tag = "CampoJoin"
+            }
+
+            Dim lblValore As New Label With {
+                .Text = valorePadre,
+                .AutoSize = True,
+                .Margin = New Padding(5),
+                .ForeColor = Color.DarkBlue,
+                .Tag = "CampoJoin"
+            }
+
+            pannelloSinistro.Controls.Add(lblEtichetta, 0, pannelloSinistro.RowCount - 1)
+            pannelloSinistro.Controls.Add(lblValore, 1, pannelloSinistro.RowCount - 1)
+        Next
+    End Sub
+
+End Class
+
+Public Class CampoJoin
+    Public Property TabellaPadre As String
+    Public Property ChiaveFiglia As String
+    Public Property ChiavePadre As String
+    Public Property EtichettaCampo As String
+    Public Property CampoDaVisualizzare As String
 End Class
 
 Partial Public Class VisualMediaForm
@@ -1899,7 +2235,3 @@ Partial Public Class VisualMediaForm
     End Sub
 
 End Class
-
-
-
-
