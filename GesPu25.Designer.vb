@@ -67,7 +67,12 @@ Partial Class GesPu25
         SceneToolStripMenuItem = New ToolStripMenuItem()
         PanelToolStripMenuItem = New ToolStripMenuItem()
         AssegnazioniToolStripMenuItem1 = New ToolStripMenuItem()
+        AssegnazioniToolStripMenuItem2 = New ToolStripMenuItem()
+        AssegnazioniAnimazioniToolStripMenuItem = New ToolStripMenuItem()
+        AssegnazioniDiverseToolStripMenuItem = New ToolStripMenuItem()
         ConsegneToolStripMenuItem = New ToolStripMenuItem()
+        ConsegneAnimazioniToolStripMenuItem = New ToolStripMenuItem()
+        ConsegneDiverseToolStripMenuItem = New ToolStripMenuItem()
         VideoFbFToolStripMenuItem = New ToolStripMenuItem()
         ToolStripMenuItem1 = New ToolStripMenuItem()
         StatusStrip1 = New StatusStrip()
@@ -349,15 +354,47 @@ Partial Class GesPu25
         ' 
         ' AssegnazioniToolStripMenuItem1
         ' 
+        AssegnazioniToolStripMenuItem1.DropDownItems.AddRange(New ToolStripItem() {AssegnazioniToolStripMenuItem2, AssegnazioniAnimazioniToolStripMenuItem, AssegnazioniDiverseToolStripMenuItem})
         AssegnazioniToolStripMenuItem1.Name = "AssegnazioniToolStripMenuItem1"
         AssegnazioniToolStripMenuItem1.Size = New Size(180, 22)
         AssegnazioniToolStripMenuItem1.Text = "Assegnazioni"
         ' 
+        ' AssegnazioniToolStripMenuItem2
+        ' 
+        AssegnazioniToolStripMenuItem2.Name = "AssegnazioniToolStripMenuItem2"
+        AssegnazioniToolStripMenuItem2.Size = New Size(254, 22)
+        AssegnazioniToolStripMenuItem2.Text = "Prime Assegnazioni"
+        ' 
+        ' AssegnazioniAnimazioniToolStripMenuItem
+        ' 
+        AssegnazioniAnimazioniToolStripMenuItem.Name = "AssegnazioniAnimazioniToolStripMenuItem"
+        AssegnazioniAnimazioniToolStripMenuItem.Size = New Size(254, 22)
+        AssegnazioniAnimazioniToolStripMenuItem.Text = "Assegnazioni Lavori di Animazioni"
+        ' 
+        ' AssegnazioniDiverseToolStripMenuItem
+        ' 
+        AssegnazioniDiverseToolStripMenuItem.Name = "AssegnazioniDiverseToolStripMenuItem"
+        AssegnazioniDiverseToolStripMenuItem.Size = New Size(254, 22)
+        AssegnazioniDiverseToolStripMenuItem.Text = "Assegnazioni Lavori Diversi"
+        ' 
         ' ConsegneToolStripMenuItem
         ' 
+        ConsegneToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ConsegneAnimazioniToolStripMenuItem, ConsegneDiverseToolStripMenuItem})
         ConsegneToolStripMenuItem.Name = "ConsegneToolStripMenuItem"
         ConsegneToolStripMenuItem.Size = New Size(180, 22)
         ConsegneToolStripMenuItem.Text = "Consegne"
+        ' 
+        ' ConsegneAnimazioniToolStripMenuItem
+        ' 
+        ConsegneAnimazioniToolStripMenuItem.Name = "ConsegneAnimazioniToolStripMenuItem"
+        ConsegneAnimazioniToolStripMenuItem.Size = New Size(190, 22)
+        ConsegneAnimazioniToolStripMenuItem.Text = "Consegne Animazioni"
+        ' 
+        ' ConsegneDiverseToolStripMenuItem
+        ' 
+        ConsegneDiverseToolStripMenuItem.Name = "ConsegneDiverseToolStripMenuItem"
+        ConsegneDiverseToolStripMenuItem.Size = New Size(190, 22)
+        ConsegneDiverseToolStripMenuItem.Text = "Consegne Diverse"
         ' 
         ' VideoFbFToolStripMenuItem
         ' 
@@ -469,5 +506,10 @@ Partial Class GesPu25
     Friend WithEvents ConsegneToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents PanelToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents OggettiLavorazioneToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AssegnazioniAnimazioniToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AssegnazioniDiverseToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AssegnazioniToolStripMenuItem2 As ToolStripMenuItem
+    Friend WithEvents ConsegneAnimazioniToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ConsegneDiverseToolStripMenuItem As ToolStripMenuItem
 
 End Class

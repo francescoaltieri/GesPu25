@@ -1,5 +1,4 @@
 ﻿Imports Microsoft.Data.SqlClient
-'Imports ModuloCampiDinamici
 Imports PdfSharp.Pdf
 Imports PdfSharp.Drawing
 Imports PdfSharp.Fonts
@@ -64,7 +63,6 @@ Public Class GesPu25
     Private Sub ImportaDaExcelToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ImportaDaExcelToolStripMenuItem.Click
         Dim ImportForm As New ImportaExcel()
 
-        ' Se vuoi aprirlo come finestra figlia all'interno del form principale
         ImportForm.MdiParent = Me
 
         ImportForm.Show()
@@ -76,7 +74,7 @@ Public Class GesPu25
         Application.DoEvents()
 
         Dim permessi = SessioneUtente.Autorizzazioni.GetPermessi(nomeTabella)
-        Dim isAdmin = IsUtenteAdmin(SessioneUtente.NomeUtenteCorrente) ' ← uso della funzione helper
+        Dim isAdmin = IsUtenteAdmin(SessioneUtente.NomeUtenteCorrente)
 
         If Not permessi.CanView AndAlso Not isAdmin Then
             MDIMessageBox.Show($"Accesso negato al modulo {nomeTabella}.", mdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -248,10 +246,6 @@ Public Class GesPu25
         ApriModuloConPermessi("Mov_FrameNote", Me)
     End Sub
 
-    Private Sub AssegnazioniToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles AssegnazioniToolStripMenuItem1.Click
-        ApriModuloConPermessi("Mov_Assegnazioni", Me)
-    End Sub
-
     Private Sub StoryboardToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles StoryboardToolStripMenuItem1.Click
         ApriModuloConPermessi("Mov_Storyboard", Me)
     End Sub
@@ -268,8 +262,16 @@ Public Class GesPu25
         ApriModuloConPermessi("Tab_OggettiLavorazione", Me)
     End Sub
 
-    Private Sub ConsegneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConsegneToolStripMenuItem.Click
-        ApriModuloConPermessi("Mov_Consegne", Me)
+    Private Sub AssegnazioniAnimazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AssegnazioniAnimazioniToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_AssegnazioniLavA", Me)
+    End Sub
+
+    Private Sub AssegnazioniToolStripMenuItem2_Click(sender As Object, e As EventArgs) Handles AssegnazioniToolStripMenuItem2.Click
+        ApriModuloConPermessi("Mov_Assegnazioni", Me)
+    End Sub
+
+    Private Sub ConsegneAnimazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConsegneAnimazioniToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_ConsegneLavA", Me)
     End Sub
 End Class
 
