@@ -273,5 +273,9 @@ Public Class GesPu25
     Private Sub ConsegneAnimazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConsegneAnimazioniToolStripMenuItem.Click
         ApriModuloConPermessi("Mov_ConsegneLavA", Me)
     End Sub
+
+    Private Sub ConvalidaCampiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConvalidaCampiToolStripMenuItem.Click
+        ApriModuloConPermessi("Sys_ConvalidaCampi", Me)
+    End Sub
 End Class
 

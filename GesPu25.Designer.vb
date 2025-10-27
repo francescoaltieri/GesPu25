@@ -78,6 +78,7 @@ Partial Class GesPu25
         StatusStrip1 = New StatusStrip()
         toolStripUser = New ToolStripStatusLabel()
         toolStripDataOra = New ToolStripStatusLabel()
+        ConvalidaCampiToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         StatusStrip1.SuspendLayout()
         SuspendLayout()
@@ -102,7 +103,7 @@ Partial Class GesPu25
         ' 
         TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem, MovSceneToolStripMenuItem})
         TabelleToolStripMenuItem.Name = "TabelleToolStripMenuItem"
-        TabelleToolStripMenuItem.Size = New Size(115, 22)
+        TabelleToolStripMenuItem.Size = New Size(180, 22)
         TabelleToolStripMenuItem.Text = "Tabelle"
         ' 
         ' EpisodiToolStripMenuItem
@@ -239,33 +240,33 @@ Partial Class GesPu25
         ' 
         OpzioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StrumentiToolStripMenuItem, ParametriToolStripMenuItem})
         OpzioniToolStripMenuItem.Name = "OpzioniToolStripMenuItem"
-        OpzioniToolStripMenuItem.Size = New Size(115, 22)
+        OpzioniToolStripMenuItem.Size = New Size(180, 22)
         OpzioniToolStripMenuItem.Text = "Opzioni"
         ' 
         ' StrumentiToolStripMenuItem
         ' 
         StrumentiToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {GestioneUtentiToolStripMenuItem, ImportaDaExcelToolStripMenuItem})
         StrumentiToolStripMenuItem.Name = "StrumentiToolStripMenuItem"
-        StrumentiToolStripMenuItem.Size = New Size(126, 22)
+        StrumentiToolStripMenuItem.Size = New Size(180, 22)
         StrumentiToolStripMenuItem.Text = "Strumenti"
         ' 
         ' GestioneUtentiToolStripMenuItem
         ' 
         GestioneUtentiToolStripMenuItem.Name = "GestioneUtentiToolStripMenuItem"
-        GestioneUtentiToolStripMenuItem.Size = New Size(161, 22)
+        GestioneUtentiToolStripMenuItem.Size = New Size(180, 22)
         GestioneUtentiToolStripMenuItem.Text = "Gestione Utenti"
         ' 
         ' ImportaDaExcelToolStripMenuItem
         ' 
         ImportaDaExcelToolStripMenuItem.Name = "ImportaDaExcelToolStripMenuItem"
-        ImportaDaExcelToolStripMenuItem.Size = New Size(161, 22)
+        ImportaDaExcelToolStripMenuItem.Size = New Size(180, 22)
         ImportaDaExcelToolStripMenuItem.Text = "Importa da Excel"
         ' 
         ' ParametriToolStripMenuItem
         ' 
-        ParametriToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ParametriToolStripMenuItem1, ToolStripMenuItem3, GestioneFormToolStripMenuItem, GestioneFormCollegatiToolStripMenuItem, TestoEtichetteToolStripMenuItem, GestioneGriglieToolStripMenuItem})
+        ParametriToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ParametriToolStripMenuItem1, ToolStripMenuItem3, GestioneFormToolStripMenuItem, GestioneFormCollegatiToolStripMenuItem, TestoEtichetteToolStripMenuItem, GestioneGriglieToolStripMenuItem, ConvalidaCampiToolStripMenuItem})
         ParametriToolStripMenuItem.Name = "ParametriToolStripMenuItem"
-        ParametriToolStripMenuItem.Size = New Size(126, 22)
+        ParametriToolStripMenuItem.Size = New Size(180, 22)
         ParametriToolStripMenuItem.Text = "Sistema"
         ' 
         ' ParametriToolStripMenuItem1
@@ -306,18 +307,18 @@ Partial Class GesPu25
         ' ToolStripMenuItem2
         ' 
         ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-        ToolStripMenuItem2.Size = New Size(112, 6)
+        ToolStripMenuItem2.Size = New Size(177, 6)
         ' 
         ' LogoutToolStripMenuItem
         ' 
         LogoutToolStripMenuItem.Name = "LogoutToolStripMenuItem"
-        LogoutToolStripMenuItem.Size = New Size(115, 22)
+        LogoutToolStripMenuItem.Size = New Size(180, 22)
         LogoutToolStripMenuItem.Text = "Logout"
         ' 
         ' EsciToolStripMenuItem
         ' 
         EsciToolStripMenuItem.Name = "EsciToolStripMenuItem"
-        EsciToolStripMenuItem.Size = New Size(115, 22)
+        EsciToolStripMenuItem.Size = New Size(180, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
         ' AssegnazioniToolStripMenuItem
@@ -331,7 +332,7 @@ Partial Class GesPu25
         ' 
         StoryboardToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StoryboardToolStripMenuItem1, SceneToolStripMenuItem, PanelToolStripMenuItem})
         StoryboardToolStripMenuItem.Name = "StoryboardToolStripMenuItem"
-        StoryboardToolStripMenuItem.Size = New Size(180, 22)
+        StoryboardToolStripMenuItem.Size = New Size(143, 22)
         StoryboardToolStripMenuItem.Text = "Storyboard"
         ' 
         ' StoryboardToolStripMenuItem1
@@ -356,7 +357,7 @@ Partial Class GesPu25
         ' 
         AssegnazioniToolStripMenuItem1.DropDownItems.AddRange(New ToolStripItem() {AssegnazioniToolStripMenuItem2, AssegnazioniAnimazioniToolStripMenuItem, AssegnazioniDiverseToolStripMenuItem})
         AssegnazioniToolStripMenuItem1.Name = "AssegnazioniToolStripMenuItem1"
-        AssegnazioniToolStripMenuItem1.Size = New Size(180, 22)
+        AssegnazioniToolStripMenuItem1.Size = New Size(143, 22)
         AssegnazioniToolStripMenuItem1.Text = "Assegnazioni"
         ' 
         ' AssegnazioniToolStripMenuItem2
@@ -381,7 +382,7 @@ Partial Class GesPu25
         ' 
         ConsegneToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ConsegneAnimazioniToolStripMenuItem, ConsegneDiverseToolStripMenuItem})
         ConsegneToolStripMenuItem.Name = "ConsegneToolStripMenuItem"
-        ConsegneToolStripMenuItem.Size = New Size(180, 22)
+        ConsegneToolStripMenuItem.Size = New Size(143, 22)
         ConsegneToolStripMenuItem.Text = "Consegne"
         ' 
         ' ConsegneAnimazioniToolStripMenuItem
@@ -434,6 +435,12 @@ Partial Class GesPu25
         toolStripDataOra.ForeColor = SystemColors.Highlight
         toolStripDataOra.Name = "toolStripDataOra"
         toolStripDataOra.Size = New Size(4, 17)
+        ' 
+        ' ConvalidaCampiToolStripMenuItem
+        ' 
+        ConvalidaCampiToolStripMenuItem.Name = "ConvalidaCampiToolStripMenuItem"
+        ConvalidaCampiToolStripMenuItem.Size = New Size(201, 22)
+        ConvalidaCampiToolStripMenuItem.Text = "Convalida Campi"
         ' 
         ' GesPu25
         ' 
@@ -511,5 +518,6 @@ Partial Class GesPu25
     Friend WithEvents AssegnazioniToolStripMenuItem2 As ToolStripMenuItem
     Friend WithEvents ConsegneAnimazioniToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ConsegneDiverseToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ConvalidaCampiToolStripMenuItem As ToolStripMenuItem
 
 End Class

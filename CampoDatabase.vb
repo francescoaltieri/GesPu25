@@ -16,5 +16,8 @@
     Public Property TabellaElenco As String
     Public Property ChiaveElenco As String
     Public Property DescrizioneChiave As String
+    Public Property AbilitaZoom As Boolean
+    Public Property AbilitaModifica As Boolean
+
 End Class
 
