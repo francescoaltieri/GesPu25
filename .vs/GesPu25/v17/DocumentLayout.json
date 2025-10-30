@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
       "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
     },
@@ -17,7 +25,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
@@ -25,7 +33,32 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "GesPu25.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
+              "RelativeDocumentMoniker": "GesPu25.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
+              "RelativeToolTip": "GesPu25.vb",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2025-10-30T14:39:40.458Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "GesPu25.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
+              "RelativeDocumentMoniker": "GesPu25.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb [Progettazione]",
+              "RelativeToolTip": "GesPu25.vb [Progettazione]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2025-10-30T14:38:53.76Z",
+              "EditorCaption": " [Progettazione]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
               "Title": "Application.cs",
               "DocumentMoniker": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\.vsdbgsrc\\a53e1b5c1cf9fa505f493e939a42a9bc3cf52297460c3eb4603273b999312b51\\Application.cs",
               "RelativeDocumentMoniker": "..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\a53e1b5c1cf9fa505f493e939a42a9bc3cf52297460c3eb4603273b999312b51\\Application.cs",
@@ -38,13 +71,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "FormDinamico.vb",
               "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
               "RelativeDocumentMoniker": "FormDinamico.vb",
               "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
               "RelativeToolTip": "FormDinamico.vb",
-              "ViewState": "AgIAAJECAAAAAAAAAAAAANUCAAAlAAAAAAAAAA==",
+              "ViewState": "AgIAAMECAAAAAAAAAAAqwPMCAAAUAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
               "WhenOpened": "2025-10-29T10:25:31.49Z",
               "EditorCaption": ""

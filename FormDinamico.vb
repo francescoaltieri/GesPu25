@@ -636,37 +636,94 @@ Public Class DynamicDataForm
     End Function
 
     Private Function PrelevaValoreJoin(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As Object
-        Dim tabellaPadre = joinRow("TabellaPadre").ToString()
-        Dim campoDaPrelevare = joinRow("CampoDaPrelevare").ToString()
+        ' Validazioni iniziali
+        If joinRow Is Nothing Then
+            Trace.TraceWarning("PrelevaValoreJoin: joinRow è Nothing")
+            Return Nothing
+        End If
 
-        Dim condizioni As New List(Of String)
-        Dim parametri As New Dictionary(Of String, Object)
+        If chiaviFiglia Is Nothing OrElse chiaviFiglia.Count = 0 Then
+            Trace.TraceWarning("PrelevaValoreJoin: chiaviFiglia è Nothing o vuoto")
+            Return Nothing
+        End If
+
+        Dim tabellaPadre As String = ""
+        Dim campoDaPrelevare As String = ""
+
+        Try
+            tabellaPadre = Convert.ToString(joinRow("TabellaPadre"))
+            campoDaPrelevare = Convert.ToString(joinRow("CampoDaPrelevare"))
+        Catch ex As Exception
+            Trace.TraceError($"PrelevaValoreJoin: mancata lettura colonne joinRow: {ex.Message}")
+            Return Nothing
+        End Try
+
+        If String.IsNullOrWhiteSpace(tabellaPadre) OrElse String.IsNullOrWhiteSpace(campoDaPrelevare) Then
+            Trace.TraceWarning("PrelevaValoreJoin: tabellaPadre o campoDaPrelevare vuoti")
+            Return Nothing
+        End If
+
+        ' Validazione nome tabella e nomi colonne (solo lettere, numeri, underscore e punto)
+        If Not Regex.IsMatch(tabellaPadre, "^[\w\.]+$") OrElse Not Regex.IsMatch(campoDaPrelevare, "^[\w]+$") Then
+            Trace.TraceError($"PrelevaValoreJoin: nome tabella o campo non valido: {tabellaPadre}.{campoDaPrelevare}")
+            Return Nothing
+        End If
+
+        Dim condizioni As New List(Of String)()
+        Dim parametri As New Dictionary(Of String, Object)()
 
         For i = 1 To 3
             Dim nomeColonna = $"ChiavePadre{i}"
             If joinRow.Table.Columns.Contains(nomeColonna) Then
-                Dim chiavePadre = joinRow(nomeColonna).ToString()
+                Dim chiavePadre = Convert.ToString(joinRow(nomeColonna))
                 If Not String.IsNullOrWhiteSpace(chiavePadre) AndAlso chiaviFiglia.ContainsKey($"ChiaveFiglia{i}") Then
-                    condizioni.Add($"{chiavePadre} = @param{i}")
-                    parametri.Add($"@param{i}", chiaviFiglia($"ChiaveFiglia{i}"))
+                    ' Validare anche il nome della colonna padre
+                    If Not Regex.IsMatch(chiavePadre, "^[\w]+$") Then
+                        Trace.TraceWarning($"PrelevaValoreJoin: nome colonna padre non valido: {chiavePadre}")
+                        Continue For
+                    End If
+
+                    Dim paramName = $"@param{i}"
+                    condizioni.Add($"{chiavePadre} = {paramName}")
+                    parametri.Add(paramName, chiaviFiglia($"ChiaveFiglia{i}"))
                 End If
             End If
         Next
 
-        If condizioni.Count = 0 Then Return Nothing
+        If condizioni.Count = 0 Then
+            Trace.TraceInformation("PrelevaValoreJoin: nessuna condizione costruita, restituisco Nothing")
+            Return Nothing
+        End If
 
-        Dim query = $"SELECT {campoDaPrelevare} FROM {tabellaPadre} WHERE {String.Join(" AND ", condizioni)}"
+        Dim query As String = $"SELECT {campoDaPrelevare} FROM [{tabellaPadre}] WHERE {String.Join(" AND ", condizioni)}"
 
-        Using conn As New SqlConnection(ConnString)
-            Using cmd As New SqlCommand(query, conn)
-                For Each kvp In parametri
-                    cmd.Parameters.AddWithValue(kvp.Key, kvp.Value)
-                Next
-                conn.Open()
-                Return cmd.ExecuteScalar()
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.CommandTimeout = 30
+                    For Each kvp In parametri
+                        ' Se il valore è Nothing usiamo DBNull.Value
+                        Dim val = If(kvp.Value, DBNull.Value)
+                        cmd.Parameters.AddWithValue(kvp.Key, val)
+                    Next
+
+                    conn.Open()
+                    Dim result = cmd.ExecuteScalar()
+                    Return If(result Is DBNull.Value, Nothing, result)
+                End Using
             End Using
-        End Using
+
+        Catch ex As SqlException
+            Trace.TraceError($"PrelevaValoreJoin - SqlException su query '{query}': {ex.Message}")
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore SQL recuperando join da {tabellaPadre}: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
+            Return Nothing
+        Catch ex As Exception
+            Trace.TraceError($"PrelevaValoreJoin - Exception: {ex.Message}")
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore imprevisto recuperando join: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
+            Return Nothing
+        End Try
     End Function
+
 
     Private Sub ModificaDati(sender As Object, e As EventArgs)
 
