@@ -49,7 +49,6 @@ Module GestioneStatoForm
         End Try
     End Sub
 
-
     Public Sub SalvaStato(form As Form)
         Dim statoFinestra = form.WindowState.ToString()
         Dim posizione = If(form.WindowState = FormWindowState.Normal, form.Location, form.RestoreBounds.Location)
@@ -101,9 +100,6 @@ Module GestioneStatoForm
             MDIMessageBox.Show($"Errore imprevisto durante il salvataggio dello stato del form '{form.Name}': {ex.Message}", form.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
-
-
-
 
 End Module
 

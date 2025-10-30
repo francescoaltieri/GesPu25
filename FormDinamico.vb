@@ -1,5 +1,4 @@
 ﻿Imports System.ComponentModel
-'Imports System.Data.SqlClient
 Imports System.IO
 Imports System.Text
 Imports System.Text.RegularExpressions
@@ -13,6 +12,7 @@ Imports PdfSharp.Drawing.Layout
 Imports PdfSharp.Events
 Imports PdfSharp.Pdf
 Imports WMPLib
+Imports System.Diagnostics
 
 Public Class DynamicDataForm
     Inherits Form
@@ -25,7 +25,7 @@ Public Class DynamicDataForm
     Private isModifica As Boolean
     Private pannelloSinistro As TableLayoutPanel
     Private nomeTabellaCorrente As String
-    Private ModalitaCorrente As String = "Nessuna"
+    Private ModalitaCorrente As String = "nessuna"
     Private lblModalita As Label
     Private lampeggioAttivo As Boolean = False
     Private Shared visualFormsAttivi As New Dictionary(Of String, VisualMediaForm)
@@ -33,6 +33,13 @@ Public Class DynamicDataForm
     Private splitContainer As SplitContainer
     Private colonneModificate As Boolean = False
     Private isInAvvioForm As Boolean = True
+
+    ' Ottimizzazioni: cache lookup e regex precompilate
+    Private lookupCache As New Dictionary(Of String, DataTable)(StringComparer.OrdinalIgnoreCase)
+    Private regexCache As New Dictionary(Of String, Regex)(StringComparer.OrdinalIgnoreCase)
+
+    ' Flag per soppressione eventi UI quando aggiornamento massivo
+    Private isUpdatingControls As Boolean = False
 
     Public Property FiltroIniziale As String
 
@@ -58,41 +65,41 @@ Public Class DynamicDataForm
         GestioneStatoForm.CaricaStato(Me)
 
         splitContainer = New SplitContainer With {
-        .Dock = DockStyle.Fill,
-        .Orientation = Orientation.Vertical,
-        .FixedPanel = FixedPanel.None
-}
+            .Dock = DockStyle.Fill,
+            .Orientation = Orientation.Vertical,
+            .FixedPanel = FixedPanel.None
+        }
         Me.Controls.Add(splitContainer)
 
         ' Pannello sinistro con campi e bottoni
         Dim layoutSinistroInterno As New TableLayoutPanel With {
-        .Dock = DockStyle.Fill,
-        .RowCount = 2,
-        .ColumnCount = 1
-    }
+            .Dock = DockStyle.Fill,
+            .RowCount = 2,
+            .ColumnCount = 1
+        }
         layoutSinistroInterno.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
         layoutSinistroInterno.RowStyles.Add(New RowStyle(SizeType.AutoSize))
 
         pannelloSinistro = New TableLayoutPanel With {
-        .Dock = DockStyle.Top,
-        .AutoSize = True,
-        .AutoScroll = True,
-        .ColumnCount = 2,
-        .Padding = New Padding(20),
-        .GrowStyle = TableLayoutPanelGrowStyle.AddRows
-    }
+            .Dock = DockStyle.Top,
+            .AutoSize = True,
+            .AutoScroll = True,
+            .ColumnCount = 2,
+            .Padding = New Padding(20),
+            .GrowStyle = TableLayoutPanelGrowStyle.AddRows
+        }
         pannelloSinistro.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
         pannelloSinistro.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
 
         lblModalita = New Label With {
-        .Text = "",
-        .AutoSize = True,
-        .Font = New Font("Verdana", 10, FontStyle.Bold),
-        .ForeColor = Color.DarkGreen,
-        .Dock = DockStyle.Top,
-        .Padding = New Padding(5),
-        .TextAlign = ContentAlignment.TopLeft
-    }
+            .Text = "",
+            .AutoSize = True,
+            .Font = New Font("Verdana", 8, FontStyle.Bold),
+            .ForeColor = Color.DarkGreen,
+            .Dock = DockStyle.Top,
+            .Padding = New Padding(5),
+            .TextAlign = ContentAlignment.TopLeft
+        }
         pannelloSinistro.Controls.Add(lblModalita)
         pannelloSinistro.SetColumnSpan(lblModalita, 2)
 
@@ -103,13 +110,12 @@ Public Class DynamicDataForm
             End If
 
             Dim lbl As New Label With {
-            .Text = GetEtichetta(nomeTabella, campi(i).Nome),
-            .AutoSize = True,
-            .Anchor = AnchorStyles.Left,
-            .Margin = New Padding(5)
-        }
+                .Text = GetEtichetta(nomeTabella, campi(i).Nome),
+                .AutoSize = True,
+                .Anchor = AnchorStyles.Left,
+                .Margin = New Padding(5)
+            }
             Dim ctrl As Control = CreaControllo(campi(i))
-            'ctrl.Width = 250
             ctrl.Anchor = AnchorStyles.Left
             ctrl.Margin = New Padding(5)
             campoInputs.Add(campi(i).Nome, ctrl)
@@ -119,19 +125,19 @@ Public Class DynamicDataForm
         Next
 
         Dim panelBottoniContenitore As New FlowLayoutPanel With {
-        .Dock = DockStyle.Fill,
-        .FlowDirection = FlowDirection.LeftToRight,
-        .AutoSize = True,
-        .Padding = New Padding(10),
-        .Margin = New Padding(0),
-        .WrapContents = True
-    }
+            .Dock = DockStyle.Fill,
+            .FlowDirection = FlowDirection.LeftToRight,
+            .AutoSize = True,
+            .Padding = New Padding(10),
+            .Margin = New Padding(0),
+            .WrapContents = True
+        }
 
         panelBottoni = New FlowLayoutPanel With {
-        .FlowDirection = FlowDirection.LeftToRight,
-        .AutoSize = True,
-        .Margin = New Padding(0)
-    }
+            .FlowDirection = FlowDirection.LeftToRight,
+            .AutoSize = True,
+            .Margin = New Padding(0)
+        }
         panelBottoniContenitore.Controls.Add(panelBottoni)
 
         AggiungiBottone("Inserisci", AddressOf InserisciDati)
@@ -146,15 +152,15 @@ Public Class DynamicDataForm
         AggiungiBottone("Rimuovi filtro", Sub()
                                               Dim dt As DataTable = TryCast(dgvDati.DataSource, DataTable)
                                               If dt IsNot Nothing Then dt.DefaultView.RowFilter = ""
-                                              lblModalita.Text = ""
+                                              lblModalita.Text = "In Attesa..."
                                               lblModalita.ForeColor = Color.DarkGreen
                                           End Sub)
 
         panelBottoniDinamici = New FlowLayoutPanel With {
-        .FlowDirection = FlowDirection.LeftToRight,
-        .AutoSize = True,
-        .Margin = New Padding(0, 5, 0, 0)
-    }
+            .FlowDirection = FlowDirection.LeftToRight,
+            .AutoSize = True,
+            .Margin = New Padding(0, 5, 0, 0)
+        }
         panelBottoniContenitore.Controls.Add(panelBottoniDinamici)
 
         layoutSinistroInterno.Controls.Add(pannelloSinistro, 0, 0)
@@ -163,14 +169,14 @@ Public Class DynamicDataForm
 
         ' Griglia dati
         dgvDati = New DataGridView With {
-        .Dock = DockStyle.Fill,
-        .AllowUserToAddRows = False,
-        .ReadOnly = True,
-        .Name = nomeTabellaCorrente,
-        .ScrollBars = ScrollBars.Both,
-        .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-        .AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None
-    }
+            .Dock = DockStyle.Fill,
+            .AllowUserToAddRows = False,
+            .ReadOnly = True,
+            .Name = nomeTabellaCorrente,
+            .ScrollBars = ScrollBars.Both,
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+            .AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None
+        }
         With dgvDati
             .ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True
             .ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
@@ -197,9 +203,8 @@ Public Class DynamicDataForm
 
         For Each ctrl As Control In campoInputs.Values
             If TypeOf ctrl Is FlowLayoutPanel Then
-                ' Se il pannello contiene il pulsante Visualizza, mantieni il pannello Enabled
                 Dim hasVisualBtn = ctrl.Controls.OfType(Of Button)().Any(Function(b) String.Equals(b.Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase))
-                ctrl.Enabled = True ' garantisce che i figli possano essere effettivamente abilitati
+                ctrl.Enabled = True
 
                 For Each innerCtrl As Control In ctrl.Controls
                     If TypeOf innerCtrl Is Button AndAlso String.Equals(CType(innerCtrl, Button).Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase) Then
@@ -216,6 +221,15 @@ Public Class DynamicDataForm
         UniformaDimensioniBottoni()
         ApplicaAutorizzazioni(NomeUtenteCorrente)
         PulisciCampi()
+        DisabilitaPulsante("Salva", True)
+        DisabilitaPulsante("Annulla", True)
+
+        ' Precompila regex cache per i nomi campo presenti
+        For Each kvp In campoInputs
+            If Not regexCache.ContainsKey(kvp.Key) Then
+                regexCache(kvp.Key) = New Regex($"\b{Regex.Escape(kvp.Key)}\b", RegexOptions.IgnoreCase Or RegexOptions.Compiled)
+            End If
+        Next
 
     End Sub
 
@@ -223,15 +237,14 @@ Public Class DynamicDataForm
         If dgvDati Is Nothing Then Return
 
         AddHandler dgvDati.ColumnWidthChanged, Sub(s, e)
+                                                   If isInAvvioForm Then Return
                                                    colonneModificate = True
-                                                   SalvaConfigurazioneGriglia()
                                                End Sub
 
         AddHandler dgvDati.ColumnDisplayIndexChanged, Sub(s, e)
+                                                          If isInAvvioForm Then Return
                                                           colonneModificate = True
-                                                          SalvaConfigurazioneGriglia()
                                                       End Sub
-
     End Sub
 
     Private Sub dgvDati_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs)
@@ -295,10 +308,10 @@ Public Class DynamicDataForm
         End Using
         Return convalide
     End Function
+
     Private Sub dgvDati_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
         If dgvDati.Columns.Count > 0 Then
             ApplicaVisualizzazioneColonne()
-            ' Posticipa l'applicazione della configurazione per garantire layout completo
             Me.BeginInvoke(New MethodInvoker(Sub()
                                                  ApplicaConfigurazioneGriglia(dgvDati)
                                                  NascondiColonneSensibili()
@@ -325,13 +338,52 @@ Public Class DynamicDataForm
         End If
 
         ' Carica i dati con eventuale filtro
-        CaricaDatiTabella(Me.Name)
+        CaricaDatiTabellaAsync(Me.Name)
 
         Me.BeginInvoke(New MethodInvoker(Sub()
                                              isInAvvioForm = False
                                              Me.Refresh()
+                                             UpdateButtonsByModalita()
                                          End Sub))
 
+    End Sub
+
+    Private Sub CaricaDatiTabellaAsync(nomeTabella As String)
+        Dim filtro = FiltroIniziale
+        Task.Run(Sub()
+                     Dim dt As New DataTable()
+                     Try
+                         Using conn As New SqlConnection(ConnString)
+                             Using cmd As New SqlCommand($"SELECT * FROM [{nomeTabella}]" & If(String.IsNullOrWhiteSpace(filtro), "", $" WHERE {filtro}"), conn)
+                                 conn.Open()
+                                 Using adapter As New SqlDataAdapter(cmd)
+                                     adapter.Fill(dt)
+                                 End Using
+                             End Using
+                         End Using
+                     Catch ex As Exception
+                         Dim msg = ex.Message
+                         Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore caricamento dati: " & msg, Me.MdiParent, MessageBoxButtons.OK)))
+                         Return
+                     End Try
+
+                     Me.BeginInvoke(New MethodInvoker(Sub()
+                                                          dgvDati.DataSource = dt
+                                                      End Sub))
+                 End Sub)
+    End Sub
+
+    Private Sub DynamicDataForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
+        GestioneStatoForm.SalvaStato(Me)
+
+        If colonneModificate Then
+            Try
+                SalvaConfigurazioneGrigliaBatched(dgvDati)
+                colonneModificate = False
+            Catch ex As Exception
+                System.Diagnostics.Trace.TraceError($"Errore salvando configurazione griglia alla chiusura: {ex.Message}")
+            End Try
+        End If
     End Sub
 
     Private Sub FormDinamico_Resize(sender As Object, e As EventArgs) Handles Me.Resize
@@ -342,11 +394,7 @@ Public Class DynamicDataForm
         Dim risposta = MDIMessageBox.Show("Vuoi annullare l’operazione corrente?", Me.MdiParent, MessageBoxButtons.YesNo, MessageBoxIcon.Question)
 
         If risposta = DialogResult.Yes Then
-            ' Reset modalità e interfaccia
-            ModalitaCorrente = "nessuna"
-            lblModalita.Text = ""
 
-            ' Disattiva controlli input (escluso "Visualizza")
             For Each ctrl As Control In campoInputs.Values
                 If TypeOf ctrl Is FlowLayoutPanel Then
                     For Each innerCtrl As Control In ctrl.Controls
@@ -364,12 +412,13 @@ Public Class DynamicDataForm
             CaricaDatiTabella(Me.Name)
             DisabilitaPulsante("Salva", True)
             lampeggioAttivo = False
-            lblModalita.ForeColor = Color.DarkGreen ' Colore neutro
+            lblModalita.ForeColor = Color.DarkGreen
             DisabilitaPulsante("Annulla", True)
             ModalitaCorrente = "nessuna"
-            lblModalita.Text = ""
+            lblModalita.Text = "In Attesa..."
             PulisciCampi()
             ResetLabelDescrizioni()
+            UpdateButtonsByModalita()
 
         End If
     End Sub
@@ -379,32 +428,25 @@ Public Class DynamicDataForm
             Dim nomeCampo As String = kvp.Key
             Dim ctrl As Control = kvp.Value
 
-            ' Recupera definizione del campo
             Dim campo As CampoDatabase = campiDefiniti.FirstOrDefault(Function(c) c.Nome = nomeCampo)
             If campo Is Nothing Then Continue For
 
-            ' Blocca sempre i campi calcolati
             If nomeCampo.StartsWith("Calc_") Then
                 ctrl.Enabled = False
                 Continue For
             End If
 
-            ' Verifica se è campo join
             Dim joinRow = RecuperaJoinPerCampo(nomeTabellaCorrente, nomeCampo)
             Dim isJoin = joinRow IsNot Nothing
 
-            ' Recupera AbilitaModifica da sys_CampiJoin se è join
             Dim joinModificabile As Boolean = True
             If isJoin AndAlso joinRow.Table.Columns.Contains("AbilitaModifica") Then
                 joinModificabile = Convert.ToBoolean(joinRow("AbilitaModifica"))
             End If
 
-            ' Blocca se è Identity, Chiave, o Join non modificabile
             Dim isBloccato As Boolean = campo.IsIdentity OrElse campo.IsChiave OrElse (isJoin AndAlso Not joinModificabile)
 
-            ' Applica abilitazione/disabilitazione
             If TypeOf ctrl Is FlowLayoutPanel Then
-                ' Se esiste un pulsante Visualizza, mantieni il pannello abilitato
                 Dim flow = CType(ctrl, FlowLayoutPanel)
                 Dim hasVisualBtn = flow.Controls.OfType(Of Button)().Any(Function(b) String.Equals(b.Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase))
                 If hasVisualBtn Then flow.Enabled = True
@@ -441,7 +483,6 @@ Public Class DynamicDataForm
         Dim larghezzaMassima As Integer = 0
         Dim altezzaMassima As Integer = 0
 
-        ' Calcola la dimensione massima tra tutti i bottoni
         For Each ctrl As Control In panelBottoni.Controls
             If TypeOf ctrl Is Button Then
                 Dim btn As Button = CType(ctrl, Button)
@@ -450,7 +491,6 @@ Public Class DynamicDataForm
             End If
         Next
 
-        ' Applica la dimensione a tutti i bottoni
         For Each ctrl As Control In panelBottoni.Controls
             If TypeOf ctrl Is Button Then
                 Dim btn As Button = CType(ctrl, Button)
@@ -461,23 +501,80 @@ Public Class DynamicDataForm
         Next
     End Sub
 
+    Private Sub FocusSulPrimoCampoEditabile()
+        Me.BeginInvoke(New MethodInvoker(Sub()
+                                             Try
+                                                 Dim primo As Control = Nothing
+
+                                                 ' Ordina secondo l'ordine dei controlli nel pannello sinistro
+                                                 For i = 0 To pannelloSinistro.RowCount - 1
+                                                     For Each c As Control In pannelloSinistro.GetControlFromPosition(1, i)?.Controls
+                                                         ' ignora se nulla
+                                                     Next
+                                                 Next
+
+                                                 ' Scorri i controlli nel TableLayoutPanel rispettando l'ordine di aggiunta
+                                                 For Each ctrl As Control In pannelloSinistro.Controls
+                                                     If ctrl Is lblModalita Then Continue For
+                                                     ' Il controllo reale è nella seconda colonna (index 1) quando è stato aggiunto
+                                                     If Not ctrl.Enabled Then Continue For
+
+                                                     ' Se è FlowLayoutPanel, cerca il primo TextBox interno
+                                                     If TypeOf ctrl Is FlowLayoutPanel Then
+                                                         Dim innerTxt = ctrl.Controls.OfType(Of TextBox)().FirstOrDefault(Function(t) t.Enabled AndAlso t.Visible)
+                                                         If innerTxt IsNot Nothing Then
+                                                             primo = innerTxt
+                                                             Exit For
+                                                         End If
+
+                                                         Dim innerCombo = ctrl.Controls.OfType(Of ComboBox)().FirstOrDefault(Function(cb) cb.Enabled AndAlso cb.Visible)
+                                                         If innerCombo IsNot Nothing Then
+                                                             primo = innerCombo
+                                                             Exit For
+                                                         End If
+                                                     Else
+                                                         ' Controlli supportati direttamente
+                                                         If (TypeOf ctrl Is TextBox OrElse TypeOf ctrl Is ComboBox OrElse TypeOf ctrl Is DateTimePicker OrElse TypeOf ctrl Is CheckBox) AndAlso ctrl.Enabled AndAlso ctrl.Visible Then
+                                                             primo = ctrl
+                                                             Exit For
+                                                         End If
+                                                     End If
+                                                 Next
+
+                                                 If primo IsNot Nothing Then
+                                                     primo.Focus()
+                                                     ' Se è TextBox, seleziona tutto il testo per comodità
+                                                     If TypeOf primo Is TextBox Then
+                                                         CType(primo, TextBox).SelectAll()
+                                                     ElseIf TypeOf primo Is ComboBox Then
+                                                         CType(primo, ComboBox).DroppedDown = False
+                                                     End If
+                                                 End If
+                                             Catch ex As Exception
+                                                 Trace.TraceWarning($"FocusSulPrimoCampoEditabile errore: {ex.Message}")
+                                             End Try
+                                         End Sub))
+    End Sub
+
+
     Private Sub InserisciDati(sender As Object, e As EventArgs)
 
         isModifica = False
+        PulisciCampi()
         AbilitaCampi(True)
         ResetLabelDescrizioni()
-        DisabilitaPulsante("Salva", False)
+        'DisabilitaPulsante("Salva", False)
 
         ModalitaCorrente = "inserimento"
         lblModalita.Text = "Inserimento in corso..."
-        DisabilitaPulsante("Annulla", False)
+        'DisabilitaPulsante("Annulla", False)
+        UpdateButtonsByModalita()
 
         For Each campo In campiDefiniti
             If Not campoInputs.ContainsKey(campo.Nome) Then Continue For
             Dim ctrl = campoInputs(campo.Nome)
             If ctrl Is Nothing Then Continue For
 
-            ' Se il campo è già valorizzato, non sovrascriverlo
             Dim valoreCorrente As String = ""
             Select Case True
                 Case TypeOf ctrl Is ComboBox
@@ -493,7 +590,6 @@ Public Class DynamicDataForm
 
             Dim campoPrecompilato = Not String.IsNullOrWhiteSpace(valoreCorrente)
 
-            ' Pulizia solo se non precompilato
             If Not campoPrecompilato Then
                 Select Case True
                     Case TypeOf ctrl Is TextBox
@@ -517,9 +613,11 @@ Public Class DynamicDataForm
                 End Select
             End If
 
-            ' Gestione campo Identity
             ctrl.Enabled = Not campo.IsIdentity
         Next
+
+        FocusSulPrimoCampoEditabile()
+
     End Sub
 
     Private Function RecuperaJoinPerCampo(nomeTabella As String, nomeCampo As String) As DataRow
@@ -537,12 +635,10 @@ Public Class DynamicDataForm
         Return Nothing
     End Function
 
-
     Private Function PrelevaValoreJoin(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As Object
         Dim tabellaPadre = joinRow("TabellaPadre").ToString()
         Dim campoDaPrelevare = joinRow("CampoDaPrelevare").ToString()
 
-        ' Costruzione dinamica della clausola WHERE
         Dim condizioni As New List(Of String)
         Dim parametri As New Dictionary(Of String, Object)
 
@@ -582,7 +678,8 @@ Public Class DynamicDataForm
         DisabilitaPulsante("Salva", False)
         ModalitaCorrente = "modifica"
         lblModalita.Text = "Modifica in corso..."
-        DisabilitaPulsante("Annulla", False)
+        'DisabilitaPulsante("Annulla", False)
+        UpdateButtonsByModalita()
 
         isModifica = True
         AbilitaCampi(True)
@@ -626,25 +723,39 @@ Public Class DynamicDataForm
             End If
         Next
 
-    End Sub
-
-    Private Sub SalvaDati(sender As Object, e As EventArgs)
-        If isModifica Then
-            SalvaModifica()
-        Else
-            SalvaInserimento()
-        End If
-
-        DisabilitaCampi()
-        CaricaDatiTabella(Me.Name)
-        DisabilitaPulsante("Salva", True)
-        lblModalita.ForeColor = Color.DarkGreen ' Colore neutro
-
-        ModalitaCorrente = "nessuna"
-        lblModalita.Text = ""
-        DisabilitaPulsante("Annulla", True)
+        FocusSulPrimoCampoEditabile()
 
     End Sub
+
+    Private Async Sub SalvaDati(sender As Object, e As EventArgs)
+        Dim sw As New Stopwatch()
+        sw.Start()
+        Try
+            ToggleUIForSaving(True)
+            If isModifica Then
+                Await SalvaModificaAsync()
+            Else
+                Await SalvaInserimentoAsync()
+            End If
+            Me.BeginInvoke(New MethodInvoker(Sub()
+                                                 DisabilitaCampi()
+                                                 CaricaDatiTabella(Me.Name)
+                                                 DisabilitaPulsante("Salva", True)
+                                                 lblModalita.ForeColor = Color.DarkGreen
+                                                 ModalitaCorrente = "nessuna"
+                                                 lblModalita.Text = ""
+                                                 DisabilitaPulsante("Annulla", True)
+                                                 UpdateButtonsByModalita()
+                                             End Sub))
+        Catch ex As Exception
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore durante il salvataggio: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
+        Finally
+            ToggleUIForSaving(False)
+            sw.Stop()
+            Trace.TraceInformation($"SalvaDati durata totale: {sw.ElapsedMilliseconds} ms. ModalitaModifica={isModifica}")
+        End Try
+    End Sub
+
 
     Private Sub CancellaDati(sender As Object, e As EventArgs)
         If dgvDati.SelectedRows.Count = 0 Then
@@ -654,7 +765,6 @@ Public Class DynamicDataForm
 
         campiDefiniti = RecuperaCampiDa(Me.Name)
 
-        ' Trova la chiave primaria
         Dim campoChiave = campiDefiniti.FirstOrDefault(Function(c) c.IsChiave)
         If campoChiave Is Nothing Then
             MDIMessageBox.Show("Nessuna chiave primaria definita.", Me.MdiParent, MessageBoxButtons.OK)
@@ -683,9 +793,10 @@ Public Class DynamicDataForm
                 End Using
 
                 CaricaDatiTabella(Me.Name)
+                PulisciCampi()
 
             Catch ex As SqlException
-                If ex.Number = 547 Then ' Violazione vincolo FK
+                If ex.Number = 547 Then
                     MDIMessageBox.Show("Impossibile cancellare il record: è referenziato da altre tabelle.", Me.MdiParent, MessageBoxButtons.OK)
                 Else
                     MDIMessageBox.Show("Errore SQL durante la cancellazione: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
@@ -708,157 +819,231 @@ Public Class DynamicDataForm
         Next
     End Sub
 
-    Private Sub SalvaInserimento()
-        Dim campiBit As String() = {"CanView", "CanInsert", "CanUpdate", "CanDelete"}
+    Private Function GetSqlDbTypePerCampo(campo As CampoDatabase) As SqlDbType
+        If campo Is Nothing OrElse String.IsNullOrWhiteSpace(campo.Tipo) Then
+            Return SqlDbType.NVarChar
+        End If
 
-        ' Recupera formule e tipi
+        Select Case campo.Tipo.ToLower().Trim()
+            Case "int", "integer" : Return SqlDbType.Int
+            Case "bit", "boolean" : Return SqlDbType.Bit
+            Case "datetime", "date", "smalldatetime" : Return SqlDbType.DateTime
+            Case "decimal", "numeric", "money" : Return SqlDbType.Decimal
+            Case "float", "double" : Return SqlDbType.Float
+            Case "uniqueidentifier" : Return SqlDbType.UniqueIdentifier
+            Case "varbinary", "image" : Return SqlDbType.VarBinary
+            Case Else
+                Return SqlDbType.NVarChar
+        End Select
+    End Function
+
+
+    Private Async Function SalvaInserimentoAsync() As Task
+        Dim sw As New Stopwatch()
+        sw.Start()
+
+        ' Prepara calcoli e valori locali
         Dim campiCalcolati = RecuperaCampiCalcolati()
         Dim formule = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.Formula)
         Dim tipiValore = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.TipoValore)
-
-        ' Calcola i valori
         Dim valoriCalcolati = CalcolaValoriCampiCalcolati(formule, tipiValore)
 
-        ' Aggiorna i controlli con i valori calcolati
-        For Each kvp In valoriCalcolati
-            If campoInputs.ContainsKey(kvp.Key) Then
-                Dim ctrl = campoInputs(kvp.Key)
-                If TypeOf ctrl Is TextBox Then
-                    CType(ctrl, TextBox).Text = kvp.Value?.ToString()
-                End If
-            End If
-        Next
+        Dim colonne = campiDefiniti.Where(Function(c) Not c.IsIdentity).Select(Function(c) c.Nome).ToList()
+        If colonne.Count = 0 Then Return
 
-        ' Costruisci query di inserimento
-        Dim colonne = campiDefiniti.
-        Where(Function(c) Not c.IsIdentity).
-        Select(Function(c) c.Nome).ToList()
+        Dim query As String = $"INSERT INTO [{Me.Name}] ({String.Join(",", colonne)}) VALUES ({String.Join(",", colonne.Select(Function(n) "@" & n))})"
 
-        Dim query As String = $"INSERT INTO [{Me.Name}] ({String.Join(",", colonne)}) " &
-                          $"VALUES ({String.Join(",", colonne.Select(Function(n) "@" & n))})"
+        Dim errorList As New List(Of String)
 
-        Try
-            Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand(query, conn)
+        Using conn As New SqlConnection(ConnString)
+            Await conn.OpenAsync()
+            Using tx = conn.BeginTransaction()
+                Using cmd As New SqlCommand(query, conn, tx)
+                    cmd.CommandTimeout = 120
+
+                    ' Prepara parametri tipizzati
                     For Each nomeCampo In colonne
-                        Dim input = campoInputs(nomeCampo)
-                        Dim valore = EstraiValoreDaControllo(nomeCampo, input)
-                        cmd.Parameters.AddWithValue("@" & nomeCampo, valore)
+                        Dim campoDef = campiDefiniti.FirstOrDefault(Function(c) String.Equals(c.Nome, nomeCampo, StringComparison.OrdinalIgnoreCase))
+                        Dim sqlType = If(campoDef IsNot Nothing, GetSqlDbTypePerCampo(campoDef), SqlDbType.NVarChar)
+                        Dim size As Integer = 0
+                        If campoDef IsNot Nothing AndAlso sqlType = SqlDbType.NVarChar Then
+                            Dim l As Integer = 0
+                            If Integer.TryParse(Convert.ToString(campoDef.Lunghezza), l) Then size = Math.Min(Math.Max(l, 0), 4000)
+                        End If
+
+                        If size > 0 Then
+                            cmd.Parameters.Add("@" & nomeCampo, sqlType, size)
+                        Else
+                            cmd.Parameters.Add("@" & nomeCampo, sqlType)
+                        End If
                     Next
 
-                    conn.Open()
-                    cmd.ExecuteNonQuery()
+                    ' Imposta valori parametri
+                    For Each nomeCampo In colonne
+                        Dim valore As Object = Nothing
+                        If valoriCalcolati.ContainsKey(nomeCampo) Then
+                            valore = valoriCalcolati(nomeCampo)
+                        Else
+                            Try
+                                valore = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
+                            Catch ex As Exception
+                                valore = DBNull.Value
+                                errorList.Add($"Errore prelevando '{nomeCampo}': {ex.Message}")
+                            End Try
+                        End If
+
+                        If valore Is Nothing Then
+                            cmd.Parameters("@" & nomeCampo).Value = DBNull.Value
+                        Else
+                            If TypeOf valore Is String AndAlso String.IsNullOrEmpty(CType(valore, String)) Then
+                                cmd.Parameters("@" & nomeCampo).Value = DBNull.Value
+                            ElseIf TypeOf valore Is Decimal OrElse TypeOf valore Is Double Then
+                                cmd.Parameters("@" & nomeCampo).Value = Convert.ToDecimal(valore, Globalization.CultureInfo.InvariantCulture)
+                            Else
+                                cmd.Parameters("@" & nomeCampo).Value = valore
+                            End If
+                        End If
+                    Next
+
+                    Try
+                        Await cmd.ExecuteNonQueryAsync()
+                        tx.Commit()
+                    Catch ex As Exception
+                        Try
+                            tx.Rollback()
+                        Catch
+                        End Try
+                        Throw
+                    End Try
                 End Using
             End Using
+        End Using
 
-        Catch exSql As SqlException
-            MDIMessageBox.Show($"Errore SQL: {exSql.Message}", Me.MdiParent, MessageBoxButtons.OK)
-        Catch ex As Exception
-            MDIMessageBox.Show($"Si è verificato un errore: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
-        End Try
-    End Sub
-    Private Sub SalvaModifica()
+        If errorList.Count > 0 Then
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show(String.Join(Environment.NewLine, errorList), Me.MdiParent, MessageBoxButtons.OK)))
+        End If
+
+        sw.Stop()
+        Trace.TraceInformation($"SalvaInserimentoAsync durata: {sw.ElapsedMilliseconds} ms.")
+    End Function
+
+
+    Private Async Function SalvaModificaAsync() As Task
+        Dim sw As New Stopwatch()
+        sw.Start()
 
         campiDefiniti = RecuperaCampiDa(Me.Name)
-        Dim convalide = RecuperaConvalideDaSys(Me.Name)
-
-        For Each campo In campiDefiniti
-            If convalide.ContainsKey(campo.Nome) Then
-                Dim r = convalide(campo.Nome)
-                campo.TipoConvalida = r("TipoConvalida").ToString()
-                campo.IntervalloMin = r("IntervalloMin").ToString()
-                campo.IntervalloMax = r("IntervalloMax").ToString()
-                campo.TabellaElenco = r("TabellaElenco").ToString()
-                campo.ChiaveElenco = r("ChiaveElenco").ToString()
-                campo.DescrizioneChiave = r("DescrizioneChiave").ToString()
-                campo.CampoVisuale = r("CampoVisuale").ToString()
-            End If
-        Next
-
         Dim campoChiave = campiDefiniti.FirstOrDefault(Function(c) c.IsChiave)
         If campoChiave Is Nothing OrElse dgvDati.SelectedRows.Count = 0 Then
-            MDIMessageBox.Show("Chiave primaria mancante o nessuna riga selezionata.", Me.MdiParent, MessageBoxButtons.OK)
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Chiave primaria mancante o nessuna riga selezionata.", Me.MdiParent, MessageBoxButtons.OK)))
             Return
         End If
 
         Dim valoreChiaveObj = dgvDati.SelectedRows(0).Cells(campoChiave.Nome).Value
         If valoreChiaveObj Is Nothing OrElse valoreChiaveObj Is DBNull.Value Then
-            MDIMessageBox.Show("Valore della chiave non trovato o nullo.", Me.MdiParent, MessageBoxButtons.OK)
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Valore della chiave non trovato o nullo.", Me.MdiParent, MessageBoxButtons.OK)))
             Return
         End If
+        Dim valoreChiave = valoreChiaveObj
 
-        Dim valoreChiave = valoreChiaveObj.ToString()
-        Dim campiBit As String() = {"CanView", "CanInsert", "CanUpdate", "CanDelete"}
-        Dim cripta As New CriptaHash()
-        Dim colonneValid As New List(Of String)
-
-        ' Recupera formule e tipi
         Dim campiCalcolati = RecuperaCampiCalcolati()
         Dim formule = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.Formula)
         Dim tipiValore = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.TipoValore)
-
-        ' Calcola i valori
         Dim valoriCalcolati = CalcolaValoriCampiCalcolati(formule, tipiValore)
 
-        ' Aggiorna i controlli con i valori calcolati
-        For Each kvp In valoriCalcolati
-            If campoInputs.ContainsKey(kvp.Key) Then
-                Dim ctrl = campoInputs(kvp.Key)
-                If TypeOf ctrl Is TextBox Then
-                    CType(ctrl, TextBox).Text = kvp.Value?.ToString()
-                End If
-            End If
-        Next
-
-        ' Costruzione lista colonne da aggiornare
+        Dim colonneValid As New List(Of String)
         For Each campo In campiDefiniti
             If campo.IsChiave OrElse campo.IsIdentity Then Continue For
-
             Dim input = campoInputs(campo.Nome)
             Dim isPassword = campo.Nome.ToLower().Contains("password")
-
-            ' Salta password vuote
-            If isPassword AndAlso TypeOf input Is TextBox AndAlso String.IsNullOrWhiteSpace(input.Text) Then
+            If isPassword AndAlso TypeOf input Is TextBox AndAlso String.IsNullOrWhiteSpace(CType(input, TextBox).Text) Then
                 Continue For
             End If
-
             colonneValid.Add(campo.Nome)
         Next
 
+        If colonneValid.Count = 0 Then Return
+
         Dim query As String = $"UPDATE [{Name}] SET {String.Join(",", colonneValid.Select(Function(n) $"{n} = @{n}"))} WHERE {campoChiave.Nome} = @{campoChiave.Nome}"
 
-        Try
-            Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand(query, conn)
+        Dim errorList As New List(Of String)
+
+        Using conn As New SqlConnection(ConnString)
+            Await conn.OpenAsync()
+            Using tx = conn.BeginTransaction()
+                Using cmd As New SqlCommand(query, conn, tx)
+                    cmd.CommandTimeout = 120
+
+                    ' Prepara parametri tipizzati per colonne e per chiave
                     For Each nomeCampo In colonneValid
-                        Dim input = campoInputs(nomeCampo)
+                        Dim campoDef = campiDefiniti.FirstOrDefault(Function(c) String.Equals(c.Nome, nomeCampo, StringComparison.OrdinalIgnoreCase))
+                        Dim sqlType = If(campoDef IsNot Nothing, GetSqlDbTypePerCampo(campoDef), SqlDbType.NVarChar)
+                        Dim size As Integer = 0
+                        If campoDef IsNot Nothing AndAlso sqlType = SqlDbType.NVarChar Then
+                            Dim l As Integer = 0
+                            If Integer.TryParse(Convert.ToString(campoDef.Lunghezza), l) Then size = Math.Min(Math.Max(l, 0), 4000)
+                        End If
+
+                        If size > 0 Then
+                            cmd.Parameters.Add("@" & nomeCampo, sqlType, size)
+                        Else
+                            cmd.Parameters.Add("@" & nomeCampo, sqlType)
+                        End If
+                    Next
+
+                    ' parametro per la chiave
+                    Dim keySqlType = GetSqlDbTypePerCampo(campoChiave)
+                    cmd.Parameters.Add("@" & campoChiave.Nome, keySqlType).Value = valoreChiave
+
+                    ' Imposta valori parametri
+                    For Each nomeCampo In colonneValid
                         Dim valoreCampo As Object
                         If valoriCalcolati.ContainsKey(nomeCampo) Then
                             valoreCampo = valoriCalcolati(nomeCampo)
                         Else
-                            valoreCampo = EstraiValoreDaControllo(nomeCampo, input)
+                            Try
+                                valoreCampo = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
+                            Catch ex As Exception
+                                valoreCampo = DBNull.Value
+                                errorList.Add($"Errore prelevando '{nomeCampo}': {ex.Message}")
+                            End Try
                         End If
-                        cmd.Parameters.AddWithValue("@" & nomeCampo, valoreCampo)
+
+                        If valoreCampo Is Nothing Then
+                            cmd.Parameters("@" & nomeCampo).Value = DBNull.Value
+                        Else
+                            If TypeOf valoreCampo Is String AndAlso String.IsNullOrEmpty(CType(valoreCampo, String)) Then
+                                cmd.Parameters("@" & nomeCampo).Value = DBNull.Value
+                            ElseIf TypeOf valoreCampo Is Decimal OrElse TypeOf valoreCampo Is Double Then
+                                cmd.Parameters("@" & nomeCampo).Value = Convert.ToDecimal(valoreCampo, Globalization.CultureInfo.InvariantCulture)
+                            Else
+                                cmd.Parameters("@" & nomeCampo).Value = valoreCampo
+                            End If
+                        End If
                     Next
 
-                    cmd.Parameters.AddWithValue("@" & campoChiave.Nome, valoreChiave)
-                    conn.Open()
-                    cmd.ExecuteNonQuery()
+                    Try
+                        Await cmd.ExecuteNonQueryAsync()
+                        tx.Commit()
+                    Catch ex As Exception
+                        Try
+                            tx.Rollback()
+                        Catch
+                        End Try
+                        Throw
+                    End Try
                 End Using
             End Using
+        End Using
 
-            MDIMessageBox.Show("Modifica salvata correttamente.", Me.MdiParent, MessageBoxButtons.OK)
+        If errorList.Count > 0 Then
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show(String.Join(Environment.NewLine, errorList), Me.MdiParent, MessageBoxButtons.OK)))
+        End If
 
-        Catch ex As SqlException
-            If ex.Number = 547 Then
-                MDIMessageBox.Show("Impossibile salvare: il record viola vincoli di integrità referenziale.", Me.MdiParent, MessageBoxButtons.OK)
-            Else
-                MDIMessageBox.Show("Errore SQL durante il salvataggio: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
-            End If
-        Catch ex As Exception
-            MDIMessageBox.Show("Errore imprevisto: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
-        End Try
-    End Sub
+        sw.Stop()
+        Trace.TraceInformation($"SalvaModificaAsync durata: {sw.ElapsedMilliseconds} ms.")
+    End Function
+
 
     Private Function EstraiValoreDaControllo(nomeCampo As String, input As Control) As Object
         Dim campiBit As String() = {"CanView", "CanInsert", "CanUpdate", "CanDelete"}
@@ -907,7 +1092,7 @@ Public Class DynamicDataForm
 
             Case TypeOf input Is DateTimePicker
                 Dim dtp = CType(input, DateTimePicker)
-                Dim tag = dtp.Tag.ToString()
+                Dim tag = If(dtp.Tag, "").ToString()
                 If tag.EndsWith("|NULL") OrElse dtp.CustomFormat = " " Then
                     Return DBNull.Value
                 End If
@@ -1001,30 +1186,34 @@ Public Class DynamicDataForm
            Not String.IsNullOrEmpty(campo.ChiaveElenco) AndAlso
            Not String.IsNullOrEmpty(campo.CampoVisuale) Then
 
-            Dim dt = RecuperaTabella(campo.TabellaElenco)
+            Dim dt = RecuperaTabellaCached(campo.TabellaElenco)
 
             Dim txt = New TextBox With {
-        .Width = 100,
-        .Tag = campo.Nome
-    }
+                .Width = 100,
+                .Tag = campo.Nome
+            }
 
             Dim lblDescrizione = New Label With {
-        .Width = 200,
-        .AutoSize = False,
-        .TextAlign = ContentAlignment.MiddleLeft,
-        .ForeColor = Color.DarkSlateGray,
-        .Padding = New Padding(5, 3, 0, 0),
-        .Text = "..."
-    }
+                .Width = 200,
+                .AutoSize = False,
+                .TextAlign = ContentAlignment.MiddleLeft,
+                .ForeColor = Color.DarkSlateGray,
+                .Padding = New Padding(5, 3, 0, 0),
+                .Text = "..."
+            }
 
             AddHandler txt.Leave, Sub()
                                       Dim codice = txt.Text.Trim()
                                       If String.IsNullOrEmpty(codice) Then
                                           lblDescrizione.Text = "..."
                                       Else
-                                          Dim riga = dt.Select($"{campo.ChiaveElenco} = '{codice.Replace("'", "''")}'").FirstOrDefault()
-                                          If riga IsNot Nothing AndAlso dt.Columns.Contains(campo.CampoVisuale) Then
-                                              lblDescrizione.Text = riga(campo.CampoVisuale).ToString()
+                                          If dt IsNot Nothing AndAlso dt.Columns.Contains(campo.ChiaveElenco) Then
+                                              Dim riga = dt.Select($"{campo.ChiaveElenco} = '{codice.Replace("'", "''")}'").FirstOrDefault()
+                                              If riga IsNot Nothing AndAlso dt.Columns.Contains(campo.CampoVisuale) Then
+                                                  lblDescrizione.Text = riga(campo.CampoVisuale).ToString()
+                                              Else
+                                                  lblDescrizione.Text = "..."
+                                              End If
                                           Else
                                               lblDescrizione.Text = "..."
                                           End If
@@ -1046,9 +1235,9 @@ Public Class DynamicDataForm
                                       End Sub
 
             Dim pannello = New FlowLayoutPanel With {
-        .AutoSize = True,
-        .FlowDirection = FlowDirection.LeftToRight
-    }
+                .AutoSize = True,
+                .FlowDirection = FlowDirection.LeftToRight
+            }
             pannello.Controls.Add(txt)
             pannello.Controls.Add(lblDescrizione)
 
@@ -1064,15 +1253,68 @@ Public Class DynamicDataForm
         Return ctrl
     End Function
 
-    Private Function RecuperaTabella(nomeTabella As String) As DataTable
+    ' Recupero tabella con caching per evitare roundtrips ripetuti
+    Private Function RecuperaTabellaCached(nomeTabella As String) As DataTable
+        If String.IsNullOrWhiteSpace(nomeTabella) Then Return New DataTable()
+        If lookupCache.ContainsKey(nomeTabella) Then Return lookupCache(nomeTabella)
+
         Dim dt As New DataTable()
-        Using conn As New SqlConnection(ConnString)
-            Dim query = $"SELECT * FROM [{nomeTabella}]"
-            Using cmd As New SqlCommand(query, conn)
-                Dim da As New SqlDataAdapter(cmd)
-                da.Fill(dt)
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand($"SELECT * FROM [{nomeTabella}]", conn)
+                    conn.Open()
+                    Using da As New SqlDataAdapter(cmd)
+                        da.Fill(dt)
+                    End Using
+                End Using
             End Using
-        End Using
+            lookupCache(nomeTabella) = dt
+        Catch ex As Exception
+            Trace.TraceError($"Errore recupero tabella {nomeTabella}: {ex.Message}")
+        End Try
+        Return dt
+    End Function
+
+    Private Function RecuperaTabella(nomeTabella As String, Optional throwOnError As Boolean = False) As DataTable
+        Dim dt As New DataTable()
+
+        If String.IsNullOrWhiteSpace(nomeTabella) OrElse Not System.Text.RegularExpressions.Regex.IsMatch(nomeTabella, "^[\w\.]+$") Then
+            Dim msg As String = $"Nome tabella non valido: {nomeTabella}"
+            System.Diagnostics.Trace.TraceError(msg)
+            If throwOnError Then
+                Throw New ArgumentException(msg, NameOf(nomeTabella))
+            End If
+            Return dt
+        End If
+
+        Dim query As String = $"SELECT * FROM [{nomeTabella}]"
+
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.CommandTimeout = 30
+                    Using da As New SqlDataAdapter(cmd)
+                        da.Fill(dt)
+                    End Using
+                End Using
+            End Using
+        Catch ex As SqlException
+            System.Diagnostics.Trace.TraceError($"Errore SQL recuperando la tabella {nomeTabella}: {ex.Message}")
+            If throwOnError Then
+                Throw
+            End If
+        Catch ex As InvalidOperationException
+            System.Diagnostics.Trace.TraceError($"Errore di connessione o comando non valido per {nomeTabella}: {ex.Message}")
+            If throwOnError Then
+                Throw
+            End If
+        Catch ex As Exception
+            System.Diagnostics.Trace.TraceError($"Errore generico recuperando {nomeTabella}: {ex.Message}")
+            If throwOnError Then
+                Throw
+            End If
+        End Try
+
         Return dt
     End Function
 
@@ -1106,7 +1348,7 @@ Public Class DynamicDataForm
         Dim valido = minOk AndAlso maxOk
         ApplicaFeedbackVisivo(inputControl, valido)
         If Not valido Then
-            MDIMessageBox.Show($"Il valore '{valore}' per il campo '{campo.Nome}' è fuori dall'intervallo consentito ({campo.IntervalloMin} - {campo.IntervalloMax}).", Me.MdiParent, MessageBoxButtons.OK)
+            Me.BeginInvoke(Sub() MDIMessageBox.Show($"Il valore '{valore}' per il campo '{campo.Nome}' è fuori dall'intervallo consentito ({campo.IntervalloMin} - {campo.IntervalloMax}).", Me.MdiParent, MessageBoxButtons.OK))
         End If
     End Sub
 
@@ -1127,50 +1369,50 @@ Public Class DynamicDataForm
                     Dim valido = (count > 0)
                     ApplicaFeedbackVisivo(inputControl, valido)
                     If Not valido Then
-                        MDIMessageBox.Show($"Il valore '{valore}' non è valido per il campo '{campo.Nome}'.", Me.MdiParent, MessageBoxButtons.OK)
+                        Me.BeginInvoke(Sub() MDIMessageBox.Show($"Il valore '{valore}' non è valido per il campo '{campo.Nome}'.", Me.MdiParent, MessageBoxButtons.OK))
                     End If
                 End Using
             End Using
         Catch ex As Exception
             inputControl.BackColor = Color.LightPink
-            MDIMessageBox.Show("Errore durante la convalida: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+            Me.BeginInvoke(Sub() MDIMessageBox.Show("Errore durante la convalida: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK))
         End Try
     End Sub
 
     Private Sub ApriSelezioneElenco(campo As CampoDatabase, inputControl As Control)
         Dim form = New Form With {
-        .Text = $"Seleziona valore per {campo.Nome}",
-        .Size = New Size(800, 500),
-        .StartPosition = FormStartPosition.CenterParent
-    }
+            .Text = $"Seleziona valore per {campo.Nome}",
+            .Size = New Size(800, 500),
+            .StartPosition = FormStartPosition.CenterParent
+        }
 
         Dim dtOriginale As New DataTable()
 
         Dim griglia = New DataGridView With {
-        .Dock = DockStyle.Fill,
-        .ReadOnly = True,
-        .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-        .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
-        .AllowUserToAddRows = False,
-        .AllowUserToDeleteRows = False
-    }
+            .Dock = DockStyle.Fill,
+            .ReadOnly = True,
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
+            .AllowUserToAddRows = False,
+            .AllowUserToDeleteRows = False
+        }
 
         Dim btnMostraTutti As New Button With {
-        .Text = "Mostra tutti",
-        .Dock = DockStyle.Fill,
-        .Height = 30
-    }
+            .Text = "Mostra tutti",
+            .Dock = DockStyle.Fill,
+            .Height = 30
+        }
         AddHandler btnMostraTutti.Click, Sub(s, e)
                                              griglia.DataSource = dtOriginale
                                          End Sub
 
         Dim layout = New TableLayoutPanel With {
-        .Dock = DockStyle.Fill,
-        .RowCount = 2,
-        .ColumnCount = 1
-    }
-        layout.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' Pulsante
-        layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) ' Griglia
+            .Dock = DockStyle.Fill,
+            .RowCount = 2,
+            .ColumnCount = 1
+        }
+        layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+        layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
         layout.Controls.Add(btnMostraTutti, 0, 0)
         layout.Controls.Add(griglia, 0, 1)
         form.Controls.Add(layout)
@@ -1182,7 +1424,6 @@ Public Class DynamicDataForm
                                                     Dim valoreTesto As String = If(valoreCellaObj Is Nothing OrElse TypeOf valoreCellaObj Is DBNull, "", valoreCellaObj.ToString().Trim())
 
                                                     If colonnaCliccata.Equals(campo.ChiaveElenco, StringComparison.OrdinalIgnoreCase) Then
-                                                        ' Se è la colonna chiave → seleziona e chiudi
                                                         If TypeOf inputControl Is TextBox Then
                                                             CType(inputControl, TextBox).Text = valoreTesto
                                                         ElseIf TypeOf inputControl Is ComboBox Then
@@ -1190,7 +1431,6 @@ Public Class DynamicDataForm
                                                         End If
                                                         form.Close()
                                                     Else
-                                                        ' Altrimenti → filtro su tutte le colonne
                                                         valoreTesto = valoreTesto.Replace("'", "''")
                                                         Dim colonnaTipo = dtOriginale.Columns(colonnaCliccata).DataType
                                                         Dim filtro As String
@@ -1200,7 +1440,7 @@ Public Class DynamicDataForm
                                                                 filtro = $"[{colonnaCliccata}] = {valoreTesto}"
                                                             Else
                                                                 filtro = "1=0"
-                                                                MDIMessageBox.Show("Valore non numerico su colonna numerica → nessuna corrispondenza", Me.MdiParent, MessageBoxButtons.OK)
+                                                                Me.BeginInvoke(Sub() MDIMessageBox.Show("Valore non numerico su colonna numerica → nessuna corrispondenza", Me.MdiParent, MessageBoxButtons.OK))
                                                             End If
                                                         Else
                                                             filtro = $"CONVERT([{colonnaCliccata}], System.String) LIKE '%{valoreTesto}%'"
@@ -1231,24 +1471,23 @@ Public Class DynamicDataForm
         form.ShowDialog(Me)
     End Sub
 
-
     Private Function CreaDatePickerConGestioneVuoto(campo As CampoDatabase) As Control
         Dim dtp As New DateTimePicker()
         dtp.Format = DateTimePickerFormat.Custom
-        dtp.CustomFormat = " " ' campo visivamente vuoto
+        dtp.CustomFormat = " "
         dtp.Width = 140
         dtp.Tag = campo.Nome
 
         AddHandler dtp.ValueChanged, Sub()
                                          dtp.CustomFormat = "dd/MM/yyyy"
-                                         dtp.Tag = campo.Nome ' rimuove eventuale flag di cancellazione
+                                         dtp.Tag = campo.Nome
                                      End Sub
 
         Dim menu As New ContextMenuStrip()
         menu.Items.Add("Cancella data", Nothing, Sub()
-                                                     dtp.CustomFormat = " "               ' Nasconde la data
-                                                     dtp.Value = dtp.MaxDate              ' Imposta una data fittizia non selezionabile
-                                                     dtp.Tag = campo.Nome & "|NULL"       ' Flag per salvataggio
+                                                     dtp.CustomFormat = " "
+                                                     dtp.Value = dtp.MaxDate
+                                                     dtp.Tag = campo.Nome & "|NULL"
                                                  End Sub)
         dtp.ContextMenuStrip = menu
 
@@ -1262,11 +1501,11 @@ Public Class DynamicDataForm
 
         If campo.Nome.ToLower().Contains("password") Then
             Dim txt = New TextBox() With {
-            .Width = campo.Lunghezza,
-            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-            .UseSystemPasswordChar = True,
-            .Margin = New Padding(5)
-        }
+                .Width = campo.Lunghezza,
+                .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+                .UseSystemPasswordChar = True,
+                .Margin = New Padding(5)
+            }
             AddHandler txt.KeyDown, AddressOf TextBoxPassword_KeyDown
             AddHandler txt.MouseDown, AddressOf TextBoxPassword_MouseDown
             Return txt
@@ -1274,28 +1513,28 @@ Public Class DynamicDataForm
 
         If isCampoLungo Then
             Return New TextBox() With {
-            .Width = campo.Lunghezza,
-            .Height = 100,
-            .Multiline = True,
-            .ScrollBars = ScrollBars.Vertical,
-            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-            .Margin = New Padding(5)
-        }
+                .Width = campo.Lunghezza,
+                .Height = 100,
+                .Multiline = True,
+                .ScrollBars = ScrollBars.Vertical,
+                .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+                .Margin = New Padding(5)
+            }
         End If
 
         Return New TextBox() With {
-        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-        .Margin = New Padding(5)
-    }
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .Margin = New Padding(5)
+        }
     End Function
 
     Private Function CreaLabelErrore(testo As String) As Control
         Return New Label() With {
-        .Text = testo,
-        .ForeColor = Color.Red,
-        .AutoSize = True,
-        .Margin = New Padding(5)
-    }
+            .Text = testo,
+            .ForeColor = Color.Red,
+            .AutoSize = True,
+            .Margin = New Padding(5)
+        }
     End Function
 
     Private Function CreaTextBoxIdentity(campo As CampoDatabase) As TextBox
@@ -1309,12 +1548,12 @@ Public Class DynamicDataForm
 
     Private Function CreaComboDaTabella(campo As CampoDatabase) As Control
         Dim combo As New ComboBox With {
-        .DropDownStyle = ComboBoxStyle.DropDownList,
-        .Width = campo.Lunghezza,
-        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-        .Tag = campo,
-        .Margin = New Padding(5)
-    }
+            .DropDownStyle = ComboBoxStyle.DropDownList,
+            .Width = campo.Lunghezza,
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .Tag = campo,
+            .Margin = New Padding(5)
+        }
 
         Try
             Using conn As New SqlConnection(ConnString)
@@ -1346,11 +1585,11 @@ Public Class DynamicDataForm
     Private Function CreaDatePicker(valoreCampo As Object) As Control
         Dim campo As New CampoDatabase
         Dim dtPicker As New DateTimePicker With {
-        .Width = campo.Lunghezza,
-        .Format = DateTimePickerFormat.Short,
-        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-        .Margin = New Padding(5)
-    }
+            .Width = campo.Lunghezza,
+            .Format = DateTimePickerFormat.Short,
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .Margin = New Padding(5)
+        }
 
         If Not IsDBNull(valoreCampo) AndAlso valoreCampo IsNot Nothing Then
             dtPicker.Value = CDate(valoreCampo)
@@ -1364,55 +1603,55 @@ Public Class DynamicDataForm
 
     Private Function CreaCheckBox() As Control
         Return New CheckBox() With {
-        .Text = "",
-        .AutoSize = True,
-        .Anchor = AnchorStyles.Left,
-        .Margin = New Padding(5)
-    }
+            .Text = "",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .Margin = New Padding(5)
+        }
     End Function
 
     Private Function CreaTextBoxNumerico() As Control
         Dim campo As New CampoDatabase
         Return New TextBox() With {
-        .Width = campo.Lunghezza,
-        .MaximumSize = New Size(125, 0),
-        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-        .TextAlign = HorizontalAlignment.Right,
-        .Margin = New Padding(5)
-    }
+            .Width = campo.Lunghezza,
+            .MaximumSize = New Size(125, 0),
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .TextAlign = HorizontalAlignment.Right,
+            .Margin = New Padding(5)
+        }
     End Function
 
     Private Function CreaNumericUpDown() As Control
         Dim campo As New CampoDatabase
         Return New NumericUpDown() With {
-        .Width = campo.Lunghezza,
-        .Maximum = 1000000,
-        .Minimum = 0,
-        .DecimalPlaces = 2,
-        .Increment = 0.01D,
-        .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-        .TextAlign = HorizontalAlignment.Right,
-        .Margin = New Padding(5)
-    }
+            .Width = campo.Lunghezza,
+            .Maximum = 1000000,
+            .Minimum = 0,
+            .DecimalPlaces = 2,
+            .Increment = 0.01D,
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .TextAlign = HorizontalAlignment.Right,
+            .Margin = New Padding(5)
+        }
     End Function
 
     Private Function CreaPannelloMultimediale() As Control
         Dim pannello As New FlowLayoutPanel With {
-        .AutoSize = True,
-        .FlowDirection = FlowDirection.LeftToRight
-    }
+            .AutoSize = True,
+            .FlowDirection = FlowDirection.LeftToRight
+        }
 
         Dim txtFileName As New TextBox With {
-        .Width = 250,
-        .Text = ""
-    }
+            .Width = 250,
+            .Text = ""
+        }
         pannello.Controls.Add(txtFileName)
 
         Dim btnView As New Button With {
-        .Text = "Visualizza",
-        .AutoSize = True,
-        .Enabled = True
-    }
+            .Text = "Visualizza",
+            .AutoSize = True,
+            .Enabled = True
+        }
 
         AddHandler txtFileName.TextChanged, Sub()
                                                 btnView.Enabled = Not String.IsNullOrWhiteSpace(txtFileName.Text)
@@ -1516,14 +1755,13 @@ Public Class DynamicDataForm
                 End Using
             End Using
         Catch ex As Exception
-            MDIMessageBox.Show("Errore nel recupero del percorso ", Me.MdiParent, MessageBoxButtons.OK)
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel recupero del percorso: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
             Return ""
         End Try
 
-        MDIMessageBox.Show("Nella Tabella Sys_Paramettri non è stato trovato nessun risultato", Me.MdiParent, MessageBoxButtons.OK)
+        Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Nella Tabella Sys_Parametri non è stato trovato nessun risultato", Me.MdiParent, MessageBoxButtons.OK)))
         Return ""
     End Function
-
 
     Private Sub TextBoxPassword_KeyDown(sender As Object, e As KeyEventArgs)
         If e.Control AndAlso (e.KeyCode = Keys.C OrElse e.KeyCode = Keys.V OrElse e.KeyCode = Keys.X) Then
@@ -1533,7 +1771,7 @@ Public Class DynamicDataForm
 
     Private Sub TextBoxPassword_MouseDown(sender As Object, e As MouseEventArgs)
         If e.Button = MouseButtons.Right Then
-            CType(sender, TextBox).ContextMenuStrip = New ContextMenuStrip() ' Menu vuoto = blocco tasto destro
+            CType(sender, TextBox).ContextMenuStrip = New ContextMenuStrip()
         End If
     End Sub
 
@@ -1575,7 +1813,7 @@ Public Class DynamicDataForm
 
                                                               Dim info = CType(CType(s, Button).Tag, Object)
                                                               Dim valoreCella = dgvDati.SelectedRows(0).Cells(info.CampoPadre).Value?.ToString()
-                                                              Dim valoreChiavePadre = If(valoreCella.Contains("-"), valoreCella.Split("-"c)(0).Trim(), valoreCella)
+                                                              Dim valoreChiavePadre = If(Not String.IsNullOrEmpty(valoreCella) AndAlso valoreCella.Contains("-"), valoreCella.Split("-"c)(0).Trim(), valoreCella)
 
                                                               If String.IsNullOrWhiteSpace(valoreChiavePadre) Then
                                                                   MDIMessageBox.Show("Il valore della chiave primaria selezionata è nullo o non valido.", Me.MdiParent, MessageBoxButtons.OK)
@@ -1623,7 +1861,7 @@ Public Class DynamicDataForm
                 End Using
             End Using
         Catch ex As Exception
-            MDIMessageBox.Show("Errore nel caricamento bottoni dinamici: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel caricamento bottoni dinamici: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
         End Try
     End Sub
 
@@ -1661,8 +1899,7 @@ Public Class DynamicDataForm
                     dgvDati.DataSource = dt
 
                     Dim dtCollegamenti As DataTable = EseguiQuery($"
-                        SELECT NomeCampo, TabellaCollegata, CampoValore, CampoVisuale
-                        FROM Sys_CollegamentiCampi
+                        SELECT NomeCampo FROM Sys_CollegamentiCampi
                         WHERE NomeTabella = '{nomeTabella}'")
 
                     For Each col As DataGridViewColumn In dgvDati.Columns
@@ -1673,7 +1910,7 @@ Public Class DynamicDataForm
                 End Using
             End Using
         Catch ex As Exception
-            MDIMessageBox.Show("Errore nel caricamento dei dati della tabella." & vbCrLf & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel caricamento dei dati della tabella." & vbCrLf & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
         End Try
     End Sub
 
@@ -1683,7 +1920,7 @@ Public Class DynamicDataForm
         Try
             Using conn As New SqlConnection(ConnString)
                 Using cmd As New SqlCommand(query, conn)
-                    cmd.CommandTimeout = 60 ' Timeout esteso per query complesse
+                    cmd.CommandTimeout = 60
                     conn.Open()
                     Using adapter As New SqlDataAdapter(cmd)
                         adapter.Fill(dt)
@@ -1691,25 +1928,28 @@ Public Class DynamicDataForm
                 End Using
             End Using
         Catch ex As SqlException
-            MDIMessageBox.Show("Errore SQL: " & ex.Message & vbCrLf & "Query: " & query, Nothing, MessageBoxButtons.OK)
+            Trace.TraceError("Errore SQL: " & ex.Message & " Query: " & query)
         Catch ex As Exception
-            MDIMessageBox.Show("Errore generico: " & ex.Message, Nothing, MessageBoxButtons.OK)
+            Trace.TraceError("Errore generico: " & ex.Message)
         End Try
 
         Return dt
     End Function
 
     Private Sub dgvDati_SelectionChanged(sender As Object, e As EventArgs)
+        If isUpdatingControls Then Return
         If dgvDati.SelectedRows.Count = 0 Then Exit Sub
 
-        ' Carica i dati nei controlli principali
         CaricaDatiNeiControlli(dgvDati.SelectedRows(0))
-
     End Sub
 
     Private Sub dgvDati_CellClick(sender As Object, e As DataGridViewCellEventArgs)
         If e.RowIndex < 0 Then Return
+        If isUpdatingControls Then Return
         CaricaDatiNeiControlli(dgvDati.Rows(e.RowIndex))
+        ModalitaCorrente = "visualizzazione"
+        lblModalita.Text = "Visualizzazione in corso..."
+        UpdateButtonsByModalita()
     End Sub
 
     Private Function GetEtichetta(nomeTabella As String, nomeColonna As String) As String
@@ -1770,7 +2010,14 @@ Public Class DynamicDataForm
 
                 If isAdmin Then
                     For Each ctrl As Control In panelBottoni.Controls
-                        If TypeOf ctrl Is Button Then CType(ctrl, Button).Enabled = True
+                        If TypeOf ctrl Is Button Then
+                            Dim btn As Button = CType(ctrl, Button)
+                            If String.Equals(btn.Text, "Salva", StringComparison.OrdinalIgnoreCase) Then
+                                btn.Enabled = False
+                            Else
+                                btn.Enabled = True
+                            End If
+                        End If
                     Next
                     Return
                 End If
@@ -1803,7 +2050,7 @@ Public Class DynamicDataForm
                 End Using
             End Using
         Catch ex As Exception
-            MDIMessageBox.Show($"Errore nel controllo autorizzazioni: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore nel controllo autorizzazioni: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
         End Try
     End Sub
 
@@ -1867,262 +2114,61 @@ Public Class DynamicDataForm
         End Using
     End Sub
 
-    Private Sub CaricaDatiNeiControlli(riga As DataGridViewRow)
+    Private Sub SalvaConfigurazioneGrigliaBatched(dgvdati As DataGridView)
+        If dgvdati Is Nothing OrElse dgvdati.Columns.Count = 0 Then Return
 
-        Dim dtCollegamenti As DataTable = EseguiQuery($"
-        SELECT NomeCampo FROM Sys_CollegamentiCampi
-        WHERE NomeTabella = '{nomeTabellaCorrente}'")
+        Dim nomeDbgrid As String = dgvdati.Name
 
-        Dim campiCollegati As HashSet(Of String) = New HashSet(Of String)(
-        dtCollegamenti.AsEnumerable().Select(Function(r) r("NomeCampo").ToString()))
-
-        For Each campo In campoInputs.Keys
-            If Not dgvDati.Columns.Contains(campo) Then Continue For
-
-            Dim valoreObj = riga.Cells(campo).Value
-            Dim valoreRaw = If(valoreObj IsNot DBNull.Value AndAlso valoreObj IsNot Nothing, valoreObj.ToString(), "")
-            Dim valore = If(campiCollegati.Contains(campo) AndAlso valoreRaw.Contains("-"),
-                        valoreRaw.Split("-"c)(0).Trim(),
-                        valoreRaw)
-
-            Dim ctrl = campoInputs(campo)
-            Dim isPassword As Boolean = campo.ToLower().Contains("password")
-
-            Select Case True
-                Case TypeOf ctrl Is TextBox
-                    CType(ctrl, TextBox).Text = If(isPassword, "", valore)
-
-                Case TypeOf ctrl Is CheckBox
-                    Dim booleano As Boolean
-                    If Boolean.TryParse(valore, booleano) Then
-                        CType(ctrl, CheckBox).Checked = booleano
-                    Else
-                        CType(ctrl, CheckBox).Checked = False
-                    End If
-
-                Case TypeOf ctrl Is ComboBox
-                    ImpostaValoreCombo(CType(ctrl, ComboBox), valore)
-
-                Case TypeOf ctrl Is DateTimePicker
-                    Dim dtPicker As DateTimePicker = CType(ctrl, DateTimePicker)
-                    Dim dt As DateTime
-                    If DateTime.TryParse(valore, dt) Then
-                        dtPicker.Format = DateTimePickerFormat.Short
-                        dtPicker.Value = dt
-                        dtPicker.Checked = True
-                    Else
-                        dtPicker.Format = DateTimePickerFormat.Custom
-                        dtPicker.CustomFormat = " "
-                        dtPicker.Checked = False
-                    End If
-
-                Case TypeOf ctrl Is FlowLayoutPanel
-                    Dim txt As TextBox = ctrl.Controls.OfType(Of TextBox).FirstOrDefault()
-                    Dim lbl As Label = ctrl.Controls.OfType(Of Label).FirstOrDefault()
-
-                    If txt IsNot Nothing Then txt.Text = valore
-
-                    Dim campoDef As CampoDatabase = TrovaDefinizioneCampo(campo)
-
-                    If lbl IsNot Nothing Then
-
-                        If campoDef IsNot Nothing AndAlso
-                           campoDef.TipoConvalida?.Trim().ToUpper() = "E" AndAlso
-                           Not String.IsNullOrEmpty(campoDef.TabellaElenco) AndAlso
-                           Not String.IsNullOrEmpty(campoDef.ChiaveElenco) AndAlso
-                           Not String.IsNullOrEmpty(campoDef.CampoVisuale) Then
-
-                            Try
-                                Dim dt = RecuperaTabella(campoDef.TabellaElenco)
-                                If dt IsNot Nothing AndAlso dt.Columns.Contains(campoDef.ChiaveElenco) Then
-                                    Dim rigaDescrizione = dt.Select($"{campoDef.ChiaveElenco} = '{valore.Replace("'", "''")}'").FirstOrDefault()
-                                    lbl.Text = If(rigaDescrizione IsNot Nothing AndAlso dt.Columns.Contains(campoDef.CampoVisuale),
-                                                  rigaDescrizione(campoDef.CampoVisuale).ToString(),
-                                                  "...")
-                                Else
-                                    lbl.Text = "..."
-                                End If
-                            Catch ex As Exception
-                                lbl.Text = "..."
-                                MDIMessageBox.Show($"Errore nel recupero descrizione per il campo '{campo}': {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
-                            End Try
-                        Else
-                            lbl.Text = "???"
-                        End If
-                    End If
-
-
-            End Select
+        Dim righe As New List(Of (NomeColonna As String, ColWidth As Integer, Visualizza As Integer))
+        For Each col As DataGridViewColumn In dgvdati.Columns
+            righe.Add((col.Name, col.Width, If(col.Visible, 1, 0)))
         Next
-
-    End Sub
-
-    Private Function TrovaDefinizioneCampo(nomeCampo As String) As CampoDatabase
-        If String.IsNullOrWhiteSpace(nomeCampo) Then
-            MDIMessageBox.Show("Il nome del campo è vuoto o nullo.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Return Nothing
-        End If
-
-        For Each campo As CampoDatabase In campiDefiniti
-            If campo IsNot Nothing AndAlso
-           Not String.IsNullOrWhiteSpace(campo.Nome) AndAlso
-           campo.Nome.Trim().Equals(nomeCampo.Trim(), StringComparison.OrdinalIgnoreCase) Then
-                Return campo
-            End If
-        Next
-
-        MDIMessageBox.Show($"Il campo '{nomeCampo}' non è stato trovato nella definizione dei campi.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)
-        Return Nothing
-    End Function
-
-    Private Sub ImpostaValoreCombo(combo As ComboBox, valore As Object)
-        If combo.DataSource Is Nothing OrElse combo.ValueMember Is Nothing Then
-            combo.SelectedIndex = -1
-            Return
-        End If
-
-        Dim esiste = combo.Items.Cast(Of DataRowView).Any(Function(r) r(combo.ValueMember).ToString() = valore.ToString())
-
-        If esiste Then
-            combo.SelectedValue = valore
-        Else
-            combo.SelectedIndex = -1
-        End If
-    End Sub
-
-    Private Sub DynamicDataForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
-        GestioneStatoForm.SalvaStato(Me)
-        If colonneModificate Then
-            SalvaConfigurazioneGriglia()
-        End If
-    End Sub
-
-    Private Sub EsportaPDF(sender As Object, e As EventArgs)
-        Try
-            Dim document As New PdfDocument()
-            document.Info.Title = $"Esportazione dati: {Me.Name}"
-
-            Dim page As PdfPage = document.AddPage()
-            page.Orientation = PageOrientation.Landscape
-            Dim gfx As XGraphics = XGraphics.FromPdfPage(page)
-            Dim font As New XFont("Arial", 8, XFontStyleEx.Regular)
-            Dim fontBold As New XFont("Arial", 8, XFontStyleEx.Bold)
-            Dim formatter As New XTextFormatter(gfx)
-
-            Dim margin As Double = 40
-            Dim topOffset As Double = 60
-            Dim lineHeight As Double = 20
-            Dim pageHeight As Double = page.Height.Point
-            Dim usableWidth As Double = page.Width.Point - (2 * margin)
-
-            Dim colonne = dgvDati.Columns.Cast(Of DataGridViewColumn).Where(Function(c) c.Visible).ToList()
-            Dim colCount = colonne.Count
-            If colCount = 0 Then
-                MDIMessageBox.Show("Nessuna colonna visibile da esportare.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Information)
-                Return
-            End If
-
-            Dim colWidth As Double = usableWidth / colCount
-
-            gfx.DrawString($"Esportazione dati: {Me.Name}", New XFont("Arial", 11, XFontStyleEx.Bold), XBrushes.Black, New XPoint(margin, topOffset))
-            topOffset += 30
-
-            For i = 0 To colCount - 1
-                Dim header = SpaziaPrimaDelleMaiuscole(colonne(i).HeaderText)
-                Dim rect As New XRect(margin + (i * colWidth), topOffset, colWidth, lineHeight)
-                formatter.DrawString(header, fontBold, XBrushes.DarkBlue, rect, XStringFormats.TopLeft)
-            Next
-            topOffset += lineHeight
-
-            For Each row As DataGridViewRow In dgvDati.Rows
-                If topOffset + (lineHeight * 2) > pageHeight - margin Then
-                    ' Nuova pagina
-                    page = document.AddPage()
-                    page.Orientation = PageOrientation.Landscape
-                    gfx = XGraphics.FromPdfPage(page)
-                    formatter = New XTextFormatter(gfx)
-                    topOffset = margin
-
-                    ' Intestazioni ripetute
-                    For i = 0 To colCount - 1
-                        Dim header = SpaziaPrimaDelleMaiuscole(colonne(i).HeaderText)
-                        Dim rect As New XRect(margin + (i * colWidth), topOffset, colWidth, lineHeight)
-                        formatter.DrawString(header, fontBold, XBrushes.DarkBlue, rect, XStringFormats.TopLeft)
-                    Next
-                    topOffset += lineHeight
-                End If
-
-                For i = 0 To colCount - 1
-                    Dim valore = RipulisciStringa(row.Cells(colonne(i).Name).Value?.ToString())
-                    Dim rect As New XRect(margin + (i * colWidth), topOffset, colWidth, lineHeight * 2)
-                    If row.Index Mod 2 = 0 Then gfx.DrawRectangle(XBrushes.LightGray, rect)
-                    formatter.DrawString(valore, font, XBrushes.Black, rect, XStringFormats.TopLeft)
-                Next
-                topOffset += lineHeight * 2
-
-            Next
-
-            Dim filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{Me.Name}_Esportazione.pdf")
-            document.Save(filePath)
-
-            MDIMessageBox.Show($"PDF esportato con successo:\n{filePath}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Information)
-
-        Catch ex As Exception
-            MDIMessageBox.Show("Errore durante l'esportazione PDF: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-    Private Sub SalvaConfigurazioneGriglia()
-        If isInAvvioForm OrElse dgvDati Is Nothing OrElse dgvDati.Columns.Count = 0 Then Exit Sub
-
-        Dim nomeDbgrid As String = dgvDati.Name
 
         Using conn As New SqlConnection(ConnString)
             conn.Open()
+            Using tx = conn.BeginTransaction()
+                Try
+                    Using cmdDel As New SqlCommand("DELETE FROM Sys_VisualizzaInDbgrid WHERE NomeTabella = @NomeTabella AND NomeDbgrid = @NomeDbgrid", conn, tx)
+                        cmdDel.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
+                        cmdDel.Parameters.AddWithValue("@NomeDbgrid", nomeDbgrid)
+                        cmdDel.ExecuteNonQuery()
+                    End Using
 
-            For Each col As DataGridViewColumn In dgvDati.Columns
-                Dim nomeColonna As String = col.Name
-                Dim colWidth As Integer = col.Width
-                Dim visibile As Boolean = col.Visible
-
-                Dim cmdCheck As New SqlCommand("
-                SELECT COUNT(*) FROM Sys_VisualizzaInDbgrid 
-                WHERE NomeTabella = @NomeTabella AND NomeColonna = @NomeColonna AND NomeDbgrid = @NomeDbgrid", conn)
-                cmdCheck.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
-                cmdCheck.Parameters.AddWithValue("@NomeColonna", nomeColonna)
-                cmdCheck.Parameters.AddWithValue("@NomeDbgrid", nomeDbgrid)
-
-                Dim esiste As Boolean = Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0
-
-                If esiste Then
-                    Dim cmdUpdate As New SqlCommand("
-                    UPDATE Sys_VisualizzaInDbgrid 
-                    SET ColWidth = @ColWidth, VisualizzaInDbgrid = @VisualizzaInDbgrid 
-                    WHERE NomeTabella = @NomeTabella AND NomeColonna = @NomeColonna AND NomeDbgrid = @NomeDbgrid", conn)
-                    cmdUpdate.Parameters.AddWithValue("@ColWidth", colWidth)
-                    cmdUpdate.Parameters.AddWithValue("@VisualizzaInDbgrid", If(visibile, 1, 0))
-                    cmdUpdate.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
-                    cmdUpdate.Parameters.AddWithValue("@NomeColonna", nomeColonna)
-                    cmdUpdate.Parameters.AddWithValue("@NomeDbgrid", nomeDbgrid)
-                    cmdUpdate.ExecuteNonQuery()
-                Else
-                    Dim cmdInsert As New SqlCommand("
+                    Using cmdIns As New SqlCommand("
                     INSERT INTO Sys_VisualizzaInDbgrid (NomeTabella, NomeColonna, NomeDbgrid, ColWidth, VisualizzaInDbgrid)
-                    VALUES (@NomeTabella, @NomeColonna, @NomeDbgrid, @ColWidth, @VisualizzaInDbgrid)", conn)
-                    cmdInsert.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
-                    cmdInsert.Parameters.AddWithValue("@NomeColonna", nomeColonna)
-                    cmdInsert.Parameters.AddWithValue("@NomeDbgrid", nomeDbgrid)
-                    cmdInsert.Parameters.AddWithValue("@ColWidth", colWidth)
-                    cmdInsert.Parameters.AddWithValue("@VisualizzaInDbgrid", If(visibile, 1, 0))
-                    cmdInsert.ExecuteNonQuery()
-                End If
-            Next
+                    VALUES (@NomeTabella, @NomeColonna, @NomeDbgrid, @ColWidth, @VisualizzaInDbgrid)", conn, tx)
+
+                        cmdIns.Parameters.Add("@NomeTabella", SqlDbType.NVarChar, 200)
+                        cmdIns.Parameters.Add("@NomeColonna", SqlDbType.NVarChar, 200)
+                        cmdIns.Parameters.Add("@NomeDbgrid", SqlDbType.NVarChar, 200)
+                        cmdIns.Parameters.Add("@ColWidth", SqlDbType.Int)
+                        cmdIns.Parameters.Add("@VisualizzaInDbgrid", SqlDbType.Int)
+
+                        For Each r In righe
+                            cmdIns.Parameters("@NomeTabella").Value = nomeTabellaCorrente
+                            cmdIns.Parameters("@NomeColonna").Value = r.NomeColonna
+                            cmdIns.Parameters("@NomeDbgrid").Value = nomeDbgrid
+                            cmdIns.Parameters("@ColWidth").Value = r.ColWidth
+                            cmdIns.Parameters("@VisualizzaInDbgrid").Value = r.Visualizza
+                            cmdIns.ExecuteNonQuery()
+                        Next
+                    End Using
+
+                    tx.Commit()
+                Catch ex As Exception
+                    Try
+                        tx.Rollback()
+                    Catch
+                    End Try
+                    Throw
+                End Try
+            End Using
         End Using
     End Sub
 
     Private Sub ApplicaConfigurazioneGriglia(dgv As DataGridView)
         If dgv Is Nothing OrElse dgv.Columns.Count = 0 Then Exit Sub
 
-        ' Evita layout durante l'applicazione
         dgv.SuspendLayout()
         dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
 
@@ -2147,19 +2193,16 @@ Public Class DynamicDataForm
                 End While
                 reader.Close()
 
-                ' 1) Applica visibilità e trova le colonne target per nome (opera su Name, case-insensitive)
                 Dim mapConfig = listaConfig.ToDictionary(Function(c) c.Nome, Function(c) (c.Width, c.Visible), StringComparer.OrdinalIgnoreCase)
                 For Each col As DataGridViewColumn In dgv.Columns
                     If mapConfig.ContainsKey(col.Name) Then
                         Dim cfg = mapConfig(col.Name)
                         col.Visible = cfg.Visible
                     Else
-                        ' se non trovato nel DB, lascia come è o imposta visibile
                         col.Visible = True
                     End If
                 Next
 
-                ' 2) Per le colonne con larghezza salvata (>0) applica direttamente Width
                 For Each cfg In listaConfig
                     Dim col = dgv.Columns.Cast(Of DataGridViewColumn)().FirstOrDefault(Function(c) String.Equals(c.Name, cfg.Nome, StringComparison.OrdinalIgnoreCase))
                     If col Is Nothing Then Continue For
@@ -2170,12 +2213,10 @@ Public Class DynamicDataForm
                             col.Width = cfg.Width
                         End If
                     Catch ex As Exception
-                        ' log ma non bloccare
-                        MDIMessageBox.Show($"Errore su colonna '{cfg.Nome}' (apply saved width): {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+                        Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore su colonna '{cfg.Nome}' (apply saved width): {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
                     End Try
                 Next
 
-                ' 3) Per le colonne senza larghezza salvata: esegui AutoResize su ciascuna colonna visibile singolarmente e fissa il valore
                 For Each cfg In listaConfig
                     If cfg.Width > 0 Then Continue For
 
@@ -2183,14 +2224,12 @@ Public Class DynamicDataForm
                     If col Is Nothing OrElse Not col.Visible Then Continue For
 
                     Try
-                        ' Auto resize per colonna usando AllCells per ottenere la larghezza corretta
                         dgv.AutoResizeColumn(col.Index, DataGridViewAutoSizeColumnMode.AllCells)
                         Dim computed = col.Width
                         col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
                         col.Width = computed
                     Catch ex As Exception
-                        ' non interrompere l'applicazione, segnala
-                        MDIMessageBox.Show($"Errore nel calcolo larghezza per '{cfg.Nome}': {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                        Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore nel calcolo larghezza per '{cfg.Nome}': {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
                     End Try
                 Next
             End Using
@@ -2273,7 +2312,7 @@ Public Class DynamicDataForm
 
             Dim tipiAmmessi As String() = {"numero", "stringa", "data", "booleano", "raw", "testo"}
             If Not tipiAmmessi.Contains(tipoValore) Then
-                tipoValore = "Numero"
+                tipoValore = "numero"
             End If
 
             Try
@@ -2285,8 +2324,11 @@ Public Class DynamicDataForm
 
                     Dim valoreStringa As String
                     If valore Is Nothing OrElse valore Is DBNull.Value Then
-                        valoreStringa = If(tipoValore = "stringa", """ """, "0")
-                        MDIMessageBox.Show($"[Campo calcolato] Il campo '{nome}' è nullo. Usato valore '{valoreStringa}'.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+                        If tipoValore = "stringa" Then
+                            valoreStringa = """" & "" & """"
+                        Else
+                            valoreStringa = "0"
+                        End If
                     ElseIf TypeOf valore Is DateTime Then
                         valoreStringa = $"""{CDate(valore).ToString("yyyy-MM-dd")}"""
                     ElseIf tipoValore = "stringa" Then
@@ -2295,7 +2337,13 @@ Public Class DynamicDataForm
                         valoreStringa = Convert.ToString(valore, Globalization.CultureInfo.InvariantCulture)
                     End If
 
-                    Dim regex As New Regex($"\b{Regex.Escape(nome)}\b", RegexOptions.IgnoreCase)
+                    Dim regex As Regex = Nothing
+                    If regexCache.ContainsKey(nome) Then
+                        regex = regexCache(nome)
+                    Else
+                        regex = New Regex($"\b{Regex.Escape(nome)}\b", RegexOptions.IgnoreCase Or RegexOptions.Compiled)
+                        regexCache(nome) = regex
+                    End If
                     espressione = regex.Replace(espressione, valoreStringa)
                 Next
 
@@ -2305,18 +2353,17 @@ Public Class DynamicDataForm
                     If IsNumeric(risultato) Then
                         risultato = Convert.ToDouble(risultato, Globalization.CultureInfo.InvariantCulture)
                     Else
-                        MDIMessageBox.Show($"[Campo calcolato] Il risultato di '{nomeCampo}' non è numerico: {risultato}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
                         risultato = Nothing
                     End If
                 ElseIf tipoValore = "stringa" Then
                     risultato = ValutaEspressioneStringa(espressione)
                 Else
-                    risultato = espressione ' fallback
+                    risultato = espressione
                 End If
 
                 risultati(nomeCampo) = risultato
             Catch ex As Exception
-                MDIMessageBox.Show($"[Campo calcolato] Errore nel calcolo di '{nomeCampo}': {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Trace.TraceError($"[Campo calcolato] Errore nel calcolo di '{nomeCampo}': {ex.Message}")
                 risultati(nomeCampo) = Nothing
             End Try
         Next
@@ -2332,10 +2379,381 @@ Public Class DynamicDataForm
             dt.Rows.Add(row)
             Return row("Expr").ToString()
         Catch ex As Exception
-            MDIMessageBox.Show($"[StringEval] Errore: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Trace.TraceError($"[StringEval] Errore: {ex.Message}")
             Return ""
         End Try
     End Function
+
+    ' Helpers UI per lock durante salvataggio
+    Private Sub ToggleUIForSaving(saving As Boolean)
+        Me.BeginInvoke(New MethodInvoker(Sub()
+                                             For Each c As Control In panelBottoni.Controls
+                                                 c.Enabled = Not saving
+                                             Next
+                                             For Each c As Control In panelBottoniDinamici.Controls
+                                                 c.Enabled = Not saving
+                                             Next
+                                             If saving Then
+                                                 lblModalita.Text = "Salvataggio in corso..."
+                                                 lblModalita.ForeColor = Color.Orange
+                                             Else
+                                                 lblModalita.Text = ""
+                                                 lblModalita.ForeColor = Color.DarkGreen
+                                             End If
+                                         End Sub))
+    End Sub
+
+    Private Sub EsportaPDF(sender As Object, e As EventArgs)
+        Try
+            Dim document As New PdfDocument()
+            document.Info.Title = $"Esportazione dati: {Me.Name}"
+
+            Dim page As PdfPage = document.AddPage()
+            page.Orientation = PageOrientation.Landscape
+            Dim gfx As XGraphics = XGraphics.FromPdfPage(page)
+            Dim font As New XFont("Arial", 8, XFontStyleEx.Regular)
+            Dim fontBold As New XFont("Arial", 8, XFontStyleEx.Bold)
+            Dim formatter As New XTextFormatter(gfx)
+
+            Dim margin As Double = 40
+            Dim topOffset As Double = 60
+            Dim lineHeight As Double = 20
+            Dim pageHeight As Double = page.Height.Point
+            Dim usableWidth As Double = page.Width.Point - (2 * margin)
+
+            Dim colonne = dgvDati.Columns.Cast(Of DataGridViewColumn).Where(Function(c) c.Visible).ToList()
+            Dim colCount = colonne.Count
+            If colCount = 0 Then
+                Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Nessuna colonna visibile da esportare.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Information)))
+                Return
+            End If
+
+            Dim colWidth As Double = usableWidth / colCount
+
+            gfx.DrawString($"Esportazione dati: {Me.Name}", New XFont("Arial", 11, XFontStyleEx.Bold), XBrushes.Black, New XPoint(margin, topOffset))
+            topOffset += 30
+
+            For i = 0 To colCount - 1
+                Dim header = colonne(i).HeaderText
+                Dim rect As New XRect(margin + (i * colWidth), topOffset, colWidth, lineHeight)
+                formatter.DrawString(header, fontBold, XBrushes.DarkBlue, rect, XStringFormats.TopLeft)
+            Next
+            topOffset += lineHeight
+
+            For Each row As DataGridViewRow In dgvDati.Rows
+                If topOffset + (lineHeight * 2) > pageHeight - margin Then
+                    page = document.AddPage()
+                    page.Orientation = PageOrientation.Landscape
+                    gfx = XGraphics.FromPdfPage(page)
+                    formatter = New XTextFormatter(gfx)
+                    topOffset = margin
+                    For i = 0 To colCount - 1
+                        Dim header = colonne(i).HeaderText
+                        Dim rect As New XRect(margin + (i * colWidth), topOffset, colWidth, lineHeight)
+                        formatter.DrawString(header, fontBold, XBrushes.DarkBlue, rect, XStringFormats.TopLeft)
+                    Next
+                    topOffset += lineHeight
+                End If
+
+                For i = 0 To colCount - 1
+                    Dim valore = If(row.Cells(colonne(i).Name).Value Is Nothing, "", row.Cells(colonne(i).Name).Value.ToString())
+                    Dim rect As New XRect(margin + (i * colWidth), topOffset, colWidth, lineHeight * 2)
+                    If row.Index Mod 2 = 0 Then gfx.DrawRectangle(XBrushes.LightGray, rect)
+                    formatter.DrawString(valore, font, XBrushes.Black, rect, XStringFormats.TopLeft)
+                Next
+                topOffset += lineHeight * 2
+            Next
+
+            Dim filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{Me.Name}_Esportazione.pdf")
+            document.Save(filePath)
+
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"PDF esportato con successo:{Environment.NewLine}{filePath}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Information)))
+        Catch ex As Exception
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore durante l'esportazione PDF: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)))
+        End Try
+    End Sub
+
+    Private Sub CaricaDatiNeiControlli(riga As DataGridViewRow)
+        If riga Is Nothing Then Return
+
+        Try
+            isUpdatingControls = True
+
+            Dim dtCollegamenti As DataTable = EseguiQuery($"
+            SELECT NomeCampo FROM Sys_CollegamentiCampi
+            WHERE NomeTabella = '{nomeTabellaCorrente}'")
+
+            Dim campiCollegati As New HashSet(Of String)(
+            dtCollegamenti.AsEnumerable().Select(Function(r) r("NomeCampo").ToString()),
+            StringComparer.OrdinalIgnoreCase)
+
+            For Each campoNome In campoInputs.Keys
+                If Not dgvDati.Columns.Contains(campoNome) Then Continue For
+
+                Dim valoreObj = riga.Cells(campoNome).Value
+                Dim valoreRaw = If(valoreObj IsNot DBNull.Value AndAlso valoreObj IsNot Nothing, valoreObj.ToString(), "")
+                Dim valore = If(campiCollegati.Contains(campoNome) AndAlso valoreRaw.Contains("-"c),
+                           valoreRaw.Split("-"c)(0).Trim(),
+                           valoreRaw)
+
+                Dim ctrl = campoInputs(campoNome)
+                Dim isPassword As Boolean = campoNome.ToLower().Contains("password")
+
+                Select Case True
+                    Case TypeOf ctrl Is TextBox
+                        Dim txt As TextBox = CType(ctrl, TextBox)
+                        txt.Text = If(isPassword, "", valore)
+
+                    Case TypeOf ctrl Is CheckBox
+                        Dim chk As CheckBox = CType(ctrl, CheckBox)
+                        Dim booleano As Boolean
+                        If Boolean.TryParse(valore, booleano) Then
+                            chk.Checked = booleano
+                        ElseIf IsNumeric(valore) Then
+                            chk.Checked = (Convert.ToInt32(valore) <> 0)
+                        Else
+                            chk.Checked = False
+                        End If
+
+                    Case TypeOf ctrl Is ComboBox
+                        ImpostaValoreCombo(CType(ctrl, ComboBox), valore)
+
+                    Case TypeOf ctrl Is DateTimePicker
+                        Dim dtPicker As DateTimePicker = CType(ctrl, DateTimePicker)
+                        Dim dt As DateTime
+                        If DateTime.TryParse(valore, dt) Then
+                            dtPicker.Format = DateTimePickerFormat.Short
+                            dtPicker.Value = dt
+                            dtPicker.Checked = True
+                        Else
+                            dtPicker.Format = DateTimePickerFormat.Custom
+                            dtPicker.CustomFormat = " "
+                            dtPicker.Checked = False
+                        End If
+
+                    Case TypeOf ctrl Is FlowLayoutPanel
+                        Dim txt As TextBox = ctrl.Controls.OfType(Of TextBox)().FirstOrDefault()
+                        Dim lbl As Label = ctrl.Controls.OfType(Of Label)().FirstOrDefault()
+
+                        If txt IsNot Nothing Then txt.Text = valore
+
+                        Dim campoDef As CampoDatabase = TrovaDefinizioneCampo(campoNome)
+
+                        If lbl IsNot Nothing Then
+                            If campoDef IsNot Nothing AndAlso
+                           Not String.IsNullOrEmpty(campoDef.TabellaElenco) AndAlso
+                           Not String.IsNullOrEmpty(campoDef.ChiaveElenco) AndAlso
+                           Not String.IsNullOrEmpty(campoDef.CampoVisuale) Then
+
+                                Try
+                                    Dim dtRef As DataTable = RecuperaTabellaCached(campoDef.TabellaElenco)
+                                    If dtRef IsNot Nothing AndAlso dtRef.Columns.Contains(campoDef.ChiaveElenco) Then
+                                        Dim filtro = $"{campoDef.ChiaveElenco} = '{valore.Replace("'", "''")}'"
+                                        Dim rows = dtRef.Select(filtro)
+                                        If rows.Length > 0 AndAlso dtRef.Columns.Contains(campoDef.CampoVisuale) Then
+                                            lbl.Text = rows(0)(campoDef.CampoVisuale).ToString()
+                                        Else
+                                            lbl.Text = "..."
+                                        End If
+                                    Else
+                                        lbl.Text = "..."
+                                    End If
+                                Catch ex As Exception
+                                    lbl.Text = "..."
+                                    Trace.TraceError($"Errore recupero descrizione per campo '{campoNome}': {ex.Message}")
+                                End Try
+                            Else
+                                lbl.Text = "..."
+                            End If
+                        End If
+
+                    Case Else
+                        ' fallback: prova a impostare Text se possibile
+                        Try
+                            ctrl.Text = valore
+                        Catch
+                        End Try
+                End Select
+            Next
+
+        Finally
+            isUpdatingControls = False
+        End Try
+    End Sub
+
+    Private Sub ImpostaValoreCombo(combo As ComboBox, valore As Object)
+        If combo Is Nothing Then Return
+
+        Try
+            ' Se non c'è DataSource o ValueMember, reset e esci
+            If combo.DataSource Is Nothing OrElse String.IsNullOrWhiteSpace(combo.ValueMember) Then
+                combo.SelectedIndex = -1
+                Return
+            End If
+
+            If valore Is Nothing OrElse Convert.IsDBNull(valore) Then
+                combo.SelectedIndex = -1
+                Return
+            End If
+
+            Dim stringVal As String = valore.ToString()
+
+            ' Se il DataSource è un DataView/DataTable, cerchiamo il tipo della colonna ValueMember
+            Dim targetType As Type = Nothing
+            Dim dt As DataTable = TryCast(TryCast(combo.DataSource, DataView)?.Table, DataTable)
+            If dt Is Nothing Then
+                dt = TryCast(combo.DataSource, DataTable)
+            End If
+
+            If dt IsNot Nothing AndAlso dt.Columns.Contains(combo.ValueMember) Then
+                targetType = dt.Columns(combo.ValueMember).DataType
+            End If
+
+            ' Scorri gli elementi per trovare una corrispondenza (evita eccezioni di bind)
+            Dim found As Boolean = False
+            For Each itemObj In combo.Items
+                Dim drv = TryCast(itemObj, DataRowView)
+                If drv IsNot Nothing Then
+                    Dim cell = drv(combo.ValueMember)
+                    If cell IsNot Nothing AndAlso Not IsDBNull(cell) AndAlso cell.ToString() = stringVal Then
+                        found = True
+                        Exit For
+                    End If
+                Else
+                    ' se l'item è semplice (lista di valori), confronta ToString()
+                    If itemObj IsNot Nothing AndAlso itemObj.ToString() = stringVal Then
+                        found = True
+                        Exit For
+                    End If
+                End If
+            Next
+
+            If Not found Then
+                combo.SelectedIndex = -1
+                Return
+            End If
+
+            ' Prova a convertire al tipo target quando noto
+            If targetType IsNot Nothing Then
+                Try
+                    Dim converted = Convert.ChangeType(stringVal, targetType, Globalization.CultureInfo.InvariantCulture)
+                    combo.SelectedValue = converted
+                    Return
+                Catch
+                    ' fallback: assegna direttamente la stringa (spesso funziona per binding)
+                    Try
+                        combo.SelectedValue = stringVal
+                        Return
+                    Catch
+                    End Try
+                End Try
+            Else
+                ' Se non conosciamo il tipo target, assegna direttamente
+                combo.SelectedValue = stringVal
+            End If
+
+        Catch ex As Exception
+            Trace.TraceError($"ImpostaValoreCombo error: {ex.Message}")
+            Try
+                combo.SelectedIndex = -1
+            Catch
+            End Try
+        End Try
+    End Sub
+
+    Private Sub UpdateButtonsByModalita()
+        ' ModalitaCorrente expected values: "nessuna", "inserimento", "modifica"
+        Dim modo = If(String.IsNullOrWhiteSpace(ModalitaCorrente), "nessuna", ModalitaCorrente.ToLowerInvariant())
+
+        ' Default: tutti abilitati tranne Salva e Annulla
+        Dim canInsert As Boolean = True
+        Dim canEdit As Boolean = True
+        Dim canDelete As Boolean = True
+        Dim salvaEnabled As Boolean = False
+        Dim annullaEnabled As Boolean = False
+
+        Select Case modo
+            Case "inserimento"
+                salvaEnabled = True
+                annullaEnabled = True
+                canInsert = True
+                canEdit = False
+                canDelete = False
+            Case "modifica"
+                salvaEnabled = True
+                annullaEnabled = True
+                canInsert = False
+                canEdit = True
+                canDelete = False
+            Case "nessuna"
+                salvaEnabled = False
+                annullaEnabled = False
+                canInsert = True
+                canEdit = False
+                canDelete = False
+            Case "visualizzazione"
+                salvaEnabled = False
+                annullaEnabled = False
+                canInsert = True
+                canEdit = True
+                canDelete = True
+            Case Else ' "nessuna" o altri
+                salvaEnabled = False
+                annullaEnabled = False
+                canInsert = True
+                canEdit = True
+                canDelete = True
+        End Select
+
+        ' Applica alle UI (Invoke-safe)
+        Me.BeginInvoke(New MethodInvoker(Sub()
+                                             For Each ctrl As Control In panelBottoni.Controls
+                                                 If TypeOf ctrl Is Button Then
+                                                     Dim btn = CType(ctrl, Button)
+                                                     Select Case btn.Text.ToLowerInvariant()
+                                                         Case "inserisci"
+                                                             btn.Enabled = canInsert
+                                                         Case "modifica"
+                                                             btn.Enabled = canEdit
+                                                         Case "cancella"
+                                                             btn.Enabled = canDelete
+                                                         Case "salva"
+                                                             btn.Enabled = salvaEnabled
+                                                         Case "annulla"
+                                                             btn.Enabled = annullaEnabled
+                                                         Case Else
+                                                             ' lascia gli altri pulsanti dinamici com'è
+                                                     End Select
+                                                 End If
+                                             Next
+                                         End Sub))
+    End Sub
+
+
+    Private Function TrovaDefinizioneCampo(nomeCampo As String) As CampoDatabase
+        If String.IsNullOrWhiteSpace(nomeCampo) Then
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Il nome del campo è vuoto o nullo.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)))
+            Return Nothing
+        End If
+
+        If campiDefiniti Is Nothing OrElse campiDefiniti.Count = 0 Then
+            Trace.TraceWarning($"TrovaDefinizioneCampo: lista campiDefiniti vuota; richiesta per '{nomeCampo}'")
+            Return Nothing
+        End If
+
+        For Each campo As CampoDatabase In campiDefiniti
+            If campo IsNot Nothing AndAlso
+           Not String.IsNullOrWhiteSpace(campo.Nome) AndAlso
+           campo.Nome.Trim().Equals(nomeCampo.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                Return campo
+            End If
+        Next
+
+        Trace.TraceWarning($"TrovaDefinizioneCampo: campo '{nomeCampo}' non trovato nella definizione dei campi per la tabella {Me.Name}")
+        Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Il campo '{nomeCampo}' non è stato trovato nella definizione dei campi.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)))
+        Return Nothing
+    End Function
+
 
 End Class
 
