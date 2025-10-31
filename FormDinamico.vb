@@ -41,6 +41,17 @@ Public Class DynamicDataForm
     ' Flag per soppressione eventi UI quando aggiornamento massivo
     Private isUpdatingControls As Boolean = False
 
+    ' Cache per comandi parametrizzati per questa form
+    Private cachedInsertCommand As SqlCommand = Nothing
+    Private cachedUpdateCommand As SqlCommand = Nothing
+    Private cachedInsertColumns As List(Of String) = Nothing
+    Private cachedUpdateColumns As List(Of String) = Nothing
+
+    ' Campi (dichiarazioni Private)
+    Private overlayPanel As Panel = Nothing
+    Private overlayLabel As Label = Nothing
+    Private overlaySpinner As ProgressBar = Nothing
+
     Public Property FiltroIniziale As String
 
     Public Sub New(campi As List(Of CampoDatabase), nomeTabella As String)
@@ -231,6 +242,72 @@ Public Class DynamicDataForm
             End If
         Next
 
+        InitBusyOverlay()
+
+    End Sub
+
+    ' Inizializzazione overlay: chiamare da New subito dopo la costruzione dei controlli principali
+    Private Sub InitBusyOverlay()
+        overlayPanel = New Panel With {
+        .Dock = DockStyle.Fill,
+        .BackColor = Color.FromArgb(120, Color.LightGray),
+        .Visible = False
+    }
+
+        overlayLabel = New Label With {
+        .AutoSize = False,
+        .TextAlign = ContentAlignment.MiddleCenter,
+        .Dock = DockStyle.Top,
+        .Height = 40,
+        .Font = New Font("Segoe UI", 10, FontStyle.Bold),
+        .ForeColor = Color.Black,
+        .Text = "Salvataggio in corso..."
+    }
+
+        overlaySpinner = New ProgressBar With {
+        .Style = ProgressBarStyle.Marquee,
+        .MarqueeAnimationSpeed = 30,
+        .Height = 18,
+        .Dock = DockStyle.Top
+    }
+
+        ' Layout semplice verticale
+        Dim inner As New TableLayoutPanel With {
+        .Dock = DockStyle.None,
+        .AutoSize = True,
+        .BackColor = Color.Transparent,
+        .ColumnCount = 1,
+        .RowCount = 2
+    }
+        inner.Controls.Add(overlayLabel, 0, 0)
+        inner.Controls.Add(overlaySpinner, 0, 1)
+        inner.Padding = New Padding(10)
+
+        ' Centro il pannello interno
+        inner.Location = New Point((Me.ClientSize.Width - inner.PreferredSize.Width) \ 2, (Me.ClientSize.Height - inner.PreferredSize.Height) \ 2)
+        overlayPanel.Controls.Add(inner)
+
+        ' Aggiungilo sopra gli altri controlli (splitContainer è stato aggiunto in New)
+        Me.Controls.Add(overlayPanel)
+        overlayPanel.BringToFront()
+
+        AddHandler Me.Resize, Sub()
+                                  If overlayPanel IsNot Nothing AndAlso overlayPanel.Visible Then
+                                      inner.Location = New Point((Me.ClientSize.Width - inner.PreferredSize.Width) \ 2, (Me.ClientSize.Height - inner.PreferredSize.Height) \ 2)
+                                  End If
+                              End Sub
+    End Sub
+
+    ' Mostra / Nascondi overlay
+    Private Sub ShowBusyOverlay(onOff As Boolean, Optional message As String = "Salvataggio in corso...")
+        If overlayPanel Is Nothing Then Return
+
+        Me.BeginInvoke(New MethodInvoker(Sub()
+                                             overlayLabel.Text = message
+                                             overlayPanel.Visible = onOff
+                                             overlayPanel.BringToFront()
+                                             Me.Cursor = If(onOff, Cursors.WaitCursor, Cursors.Default)
+                                         End Sub))
     End Sub
 
     Private Sub InizializzaEventiGriglia()
@@ -313,13 +390,68 @@ Public Class DynamicDataForm
         If dgvDati.Columns.Count > 0 Then
             ApplicaVisualizzazioneColonne()
             Me.BeginInvoke(New MethodInvoker(Sub()
+
                                                  ApplicaConfigurazioneGriglia(dgvDati)
                                                  NascondiColonneSensibili()
+                                                 AllineaColonneNumeriche(dgvDati)
+
                                              End Sub))
         Else
             Debug.WriteLine("Le colonne della griglia non sono ancora disponibili.")
         End If
+
+        For Each col As DataGridViewColumn In dgvDati.Columns
+            Try
+                col.HeaderText = GetEtichetta(Me.Name, col.Name)
+            Catch ex As Exception
+                Trace.TraceWarning($"Impossibile impostare header per {col.Name}: {ex.Message}")
+            End Try
+        Next
+
     End Sub
+
+    Private Sub AllineaColonneNumeriche(dgv As DataGridView)
+        If dgv Is Nothing OrElse dgv.DataSource Is Nothing Then Return
+
+        Dim dt As DataTable = TryCast(dgv.DataSource, DataTable)
+        For Each col As DataGridViewColumn In dgv.Columns
+            Try
+                ' Allineamento delle celle: destra per i tipi numerici, sinistra per gli altri
+                Dim isNumericColumn As Boolean = False
+
+                If dt IsNot Nothing AndAlso dt.Columns.Contains(col.Name) Then
+                    Dim dataType As Type = dt.Columns(col.Name).DataType
+                    If dataType Is GetType(Integer) OrElse dataType Is GetType(Long) _
+                   OrElse dataType Is GetType(Short) OrElse dataType Is GetType(Decimal) _
+                   OrElse dataType Is GetType(Double) OrElse dataType Is GetType(Single) _
+                   OrElse dataType Is GetType(Byte) Then
+
+                        isNumericColumn = True
+                    End If
+                Else
+                    ' fallback: inferenza dal nome del campo
+                    Dim nome = col.Name.ToLowerInvariant()
+                    If nome.EndsWith("id") OrElse nome.Contains("quant") OrElse nome.Contains("prezzo") OrElse nome.Contains("importo") Then
+                        isNumericColumn = True
+                    End If
+                End If
+
+                If isNumericColumn Then
+                    col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+                Else
+                    col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft
+                End If
+
+                ' Forza l'intestazione sempre centrata (indipendentemente dal tipo di colonna)
+                col.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
+
+            Catch ex As Exception
+                Trace.TraceWarning($"AllineaColonneNumeriche: errore su colonna {col.Name}: {ex.Message}")
+            End Try
+        Next
+    End Sub
+
+
 
     Private Sub NascondiColonneSensibili()
         For Each col As DataGridViewColumn In dgvDati.Columns
@@ -371,6 +503,7 @@ Public Class DynamicDataForm
                                                           dgvDati.DataSource = dt
                                                       End Sub))
                  End Sub)
+
     End Sub
 
     Private Sub DynamicDataForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
@@ -409,7 +542,7 @@ Public Class DynamicDataForm
             Next
 
             DisabilitaCampi()
-            CaricaDatiTabella(Me.Name)
+            CaricaDatiTabellaAsync(Me.Name)
             DisabilitaPulsante("Salva", True)
             lampeggioAttivo = False
             lblModalita.ForeColor = Color.DarkGreen
@@ -787,32 +920,75 @@ Public Class DynamicDataForm
     Private Async Sub SalvaDati(sender As Object, e As EventArgs)
         Dim sw As New Stopwatch()
         sw.Start()
+
         Try
+            ' UI: disabilita pulsanti e mostra overlay
             ToggleUIForSaving(True)
+            ShowBusyOverlay(True, "Salvataggio in corso...")
+
             If isModifica Then
                 Await SalvaModificaAsync()
             Else
                 Await SalvaInserimentoAsync()
             End If
+
+            ' Dopo il salvataggio, ricarico i dati in background per non bloccare l'UI thread
+            Dim dt As DataTable = Nothing
+            Try
+                dt = Await Task.Run(Function()
+                                        Dim tmp As New DataTable()
+                                        Try
+                                            Using conn As New SqlConnection(ConnString)
+                                                Dim query = $"SELECT * FROM [{Me.Name}]" & If(String.IsNullOrWhiteSpace(FiltroIniziale), "", $" WHERE {FiltroIniziale}")
+                                                Using cmd As New SqlCommand(query, conn)
+                                                    cmd.CommandTimeout = 60
+                                                    Using da As New SqlDataAdapter(cmd)
+                                                        da.Fill(tmp)
+                                                    End Using
+                                                End Using
+                                            End Using
+                                        Catch ex As Exception
+                                            Trace.TraceError($"Errore ricarica dati background: {ex.Message}")
+                                        End Try
+                                        Return tmp
+                                    End Function)
+            Catch ex As Exception
+                Trace.TraceError($"Task.Run ricarica error: {ex.Message}")
+            End Try
+
+            ' Aggiornamenti UI minimi sul thread UI
             Me.BeginInvoke(New MethodInvoker(Sub()
-                                                 DisabilitaCampi()
-                                                 CaricaDatiTabella(Me.Name)
-                                                 DisabilitaPulsante("Salva", True)
-                                                 lblModalita.ForeColor = Color.DarkGreen
-                                                 ModalitaCorrente = "nessuna"
-                                                 lblModalita.Text = ""
-                                                 DisabilitaPulsante("Annulla", True)
-                                                 UpdateButtonsByModalita()
+                                                 Try
+                                                     If dt IsNot Nothing AndAlso dt.Columns.Count > 0 Then
+                                                         dgvDati.DataSource = dt
+                                                     Else
+                                                         ' fallback: ricarica sincrona se dt vuoto (rare)
+                                                         CaricaDatiTabellaAsync(Me.Name)
+                                                     End If
+
+                                                     DisabilitaCampi()
+                                                     DisabilitaPulsante("Salva", True)
+                                                     lblModalita.ForeColor = Color.DarkGreen
+                                                     ModalitaCorrente = "nessuna"
+                                                     lblModalita.Text = ""
+                                                     DisabilitaPulsante("Annulla", True)
+                                                     UpdateButtonsByModalita()
+                                                 Catch ex As Exception
+                                                     Trace.TraceError($"Errore aggiornamento UI dopo save: {ex.Message}")
+                                                 End Try
                                              End Sub))
+
         Catch ex As Exception
             Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore durante il salvataggio: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
         Finally
+            ' Nascondi overlay e riabilita UI
+            ShowBusyOverlay(False)
             ToggleUIForSaving(False)
+
             sw.Stop()
             Trace.TraceInformation($"SalvaDati durata totale: {sw.ElapsedMilliseconds} ms. ModalitaModifica={isModifica}")
         End Try
     End Sub
-
 
     Private Sub CancellaDati(sender As Object, e As EventArgs)
         If dgvDati.SelectedRows.Count = 0 Then
@@ -849,7 +1025,7 @@ Public Class DynamicDataForm
                     End Using
                 End Using
 
-                CaricaDatiTabella(Me.Name)
+                CaricaDatiTabellaAsync(Me.Name)
                 PulisciCampi()
 
             Catch ex As SqlException
@@ -894,85 +1070,146 @@ Public Class DynamicDataForm
         End Select
     End Function
 
+    Private Function BuildPreparedInsertCommand(conn As SqlConnection, tx As SqlTransaction, tableName As String, columns As List(Of String)) As SqlCommand
+        Dim query As String = $"INSERT INTO [{tableName}] ({String.Join(",", columns)}) VALUES ({String.Join(",", columns.Select(Function(n) "@" & n))})"
+        Dim cmd As New SqlCommand(query, conn, tx)
+        cmd.CommandTimeout = 120
+
+        For Each nomeCampo In columns
+            Dim campoDef = campiDefiniti.FirstOrDefault(Function(c) String.Equals(c.Nome, nomeCampo, StringComparison.OrdinalIgnoreCase))
+            Dim sqlType = If(campoDef IsNot Nothing, GetSqlDbTypePerCampo(campoDef), SqlDbType.NVarChar)
+            Dim size As Integer = 0
+            If campoDef IsNot Nothing AndAlso sqlType = SqlDbType.NVarChar Then
+                Dim l As Integer = 0
+                If Integer.TryParse(Convert.ToString(campoDef.Lunghezza), l) Then size = Math.Min(Math.Max(l, 0), 4000)
+            End If
+
+            Dim param As SqlParameter
+            If size > 0 Then
+                param = cmd.Parameters.Add("@" & nomeCampo, sqlType, size)
+            Else
+                param = cmd.Parameters.Add("@" & nomeCampo, sqlType)
+            End If
+            param.Value = DBNull.Value
+        Next
+
+        Try
+            cmd.Prepare()
+        Catch
+            ' Prepare può fallire per alcuni provider/tipi: ignoriamo ma parametri sono già creati
+        End Try
+
+        Return cmd
+    End Function
+
+    Private Function BuildPreparedUpdateCommand(conn As SqlConnection, tx As SqlTransaction, tableName As String, columns As List(Of String), keyCampo As CampoDatabase) As SqlCommand
+        Dim setPart = String.Join(",", columns.Select(Function(n) $"{n} = @{n}"))
+        Dim query As String = $"UPDATE [{tableName}] SET {setPart} WHERE {keyCampo.Nome} = @{keyCampo.Nome}"
+        Dim cmd As New SqlCommand(query, conn, tx)
+        cmd.CommandTimeout = 120
+
+        For Each nomeCampo In columns
+            Dim campoDef = campiDefiniti.FirstOrDefault(Function(c) String.Equals(c.Nome, nomeCampo, StringComparison.OrdinalIgnoreCase))
+            Dim sqlType = If(campoDef IsNot Nothing, GetSqlDbTypePerCampo(campoDef), SqlDbType.NVarChar)
+            Dim size As Integer = 0
+            If campoDef IsNot Nothing AndAlso sqlType = SqlDbType.NVarChar Then
+                Dim l As Integer = 0
+                If Integer.TryParse(Convert.ToString(campoDef.Lunghezza), l) Then size = Math.Min(Math.Max(l, 0), 4000)
+            End If
+
+            If size > 0 Then
+                cmd.Parameters.Add("@" & nomeCampo, sqlType, size).Value = DBNull.Value
+            Else
+                cmd.Parameters.Add("@" & nomeCampo, sqlType).Value = DBNull.Value
+            End If
+        Next
+
+        ' parametro per la chiave
+        Dim keySqlType = GetSqlDbTypePerCampo(keyCampo)
+        cmd.Parameters.Add("@" & keyCampo.Nome, keySqlType).Value = DBNull.Value
+
+        Try
+            cmd.Prepare()
+        Catch
+        End Try
+
+        Return cmd
+    End Function
 
     Private Async Function SalvaInserimentoAsync() As Task
-        Dim sw As New Stopwatch()
-        sw.Start()
+        Dim swTotal As New Stopwatch()
+        swTotal.Start()
 
-        ' Prepara calcoli e valori locali
+        ' 1) Calcoli cpu-bound prima di aprire la connessione
         Dim campiCalcolati = RecuperaCampiCalcolati()
         Dim formule = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.Formula)
         Dim tipiValore = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.TipoValore)
         Dim valoriCalcolati = CalcolaValoriCampiCalcolati(formule, tipiValore)
 
+        ' 2) colonne da inserire (cache semplice)
         Dim colonne = campiDefiniti.Where(Function(c) Not c.IsIdentity).Select(Function(c) c.Nome).ToList()
         If colonne.Count = 0 Then Return
 
-        Dim query As String = $"INSERT INTO [{Me.Name}] ({String.Join(",", colonne)}) VALUES ({String.Join(",", colonne.Select(Function(n) "@" & n))})"
+        ' 3) Leggi tutti i valori una sola volta
+        Dim valoriInput As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
+        For Each nomeCampo In colonne
+            Dim valore As Object = Nothing
+            If valoriCalcolati.ContainsKey(nomeCampo) Then
+                valore = valoriCalcolati(nomeCampo)
+            Else
+                Try
+                    valore = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
+                Catch ex As Exception
+                    valore = DBNull.Value
+                End Try
+            End If
+            If valore Is Nothing Then valore = DBNull.Value
+            valoriInput(nomeCampo) = valore
+        Next
 
         Dim errorList As New List(Of String)
 
         Using conn As New SqlConnection(ConnString)
             Await conn.OpenAsync()
+
             Using tx = conn.BeginTransaction()
-                Using cmd As New SqlCommand(query, conn, tx)
-                    cmd.CommandTimeout = 120
+                Try
+                    ' build/pool command cached (una sola volta per form in memoria)
+                    If cachedInsertCommand Is Nothing OrElse cachedInsertColumns Is Nothing OrElse Not Enumerable.SequenceEqual(cachedInsertColumns, colonne, StringComparer.OrdinalIgnoreCase) Then
+                        If cachedInsertCommand IsNot Nothing Then cachedInsertCommand.Dispose()
+                        cachedInsertCommand = BuildPreparedInsertCommand(conn, tx, Me.Name, colonne)
+                        cachedInsertColumns = New List(Of String)(colonne)
+                    Else
+                        ' riagganciare connection/transaction se il command era creato con altra connessione
+                        cachedInsertCommand.Connection = conn
+                        cachedInsertCommand.Transaction = tx
+                    End If
 
-                    ' Prepara parametri tipizzati
+                    ' assegna valori ai parametri (solo .Value)
                     For Each nomeCampo In colonne
-                        Dim campoDef = campiDefiniti.FirstOrDefault(Function(c) String.Equals(c.Nome, nomeCampo, StringComparison.OrdinalIgnoreCase))
-                        Dim sqlType = If(campoDef IsNot Nothing, GetSqlDbTypePerCampo(campoDef), SqlDbType.NVarChar)
-                        Dim size As Integer = 0
-                        If campoDef IsNot Nothing AndAlso sqlType = SqlDbType.NVarChar Then
-                            Dim l As Integer = 0
-                            If Integer.TryParse(Convert.ToString(campoDef.Lunghezza), l) Then size = Math.Min(Math.Max(l, 0), 4000)
-                        End If
-
-                        If size > 0 Then
-                            cmd.Parameters.Add("@" & nomeCampo, sqlType, size)
+                        Dim param = cachedInsertCommand.Parameters("@" & nomeCampo)
+                        Dim v = valoriInput(nomeCampo)
+                        If v Is Nothing Then
+                            param.Value = DBNull.Value
                         Else
-                            cmd.Parameters.Add("@" & nomeCampo, sqlType)
+                            param.Value = v
                         End If
                     Next
 
-                    ' Imposta valori parametri
-                    For Each nomeCampo In colonne
-                        Dim valore As Object = Nothing
-                        If valoriCalcolati.ContainsKey(nomeCampo) Then
-                            valore = valoriCalcolati(nomeCampo)
-                        Else
-                            Try
-                                valore = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
-                            Catch ex As Exception
-                                valore = DBNull.Value
-                                errorList.Add($"Errore prelevando '{nomeCampo}': {ex.Message}")
-                            End Try
-                        End If
+                    Dim swExec As New Stopwatch()
+                    swExec.Start()
+                    Await cachedInsertCommand.ExecuteNonQueryAsync()
+                    swExec.Stop()
+                    Trace.TraceInformation($"ExecuteNonQuery INSERT durata: {swExec.ElapsedMilliseconds} ms.")
 
-                        If valore Is Nothing Then
-                            cmd.Parameters("@" & nomeCampo).Value = DBNull.Value
-                        Else
-                            If TypeOf valore Is String AndAlso String.IsNullOrEmpty(CType(valore, String)) Then
-                                cmd.Parameters("@" & nomeCampo).Value = DBNull.Value
-                            ElseIf TypeOf valore Is Decimal OrElse TypeOf valore Is Double Then
-                                cmd.Parameters("@" & nomeCampo).Value = Convert.ToDecimal(valore, Globalization.CultureInfo.InvariantCulture)
-                            Else
-                                cmd.Parameters("@" & nomeCampo).Value = valore
-                            End If
-                        End If
-                    Next
-
+                    tx.Commit()
+                Catch ex As Exception
                     Try
-                        Await cmd.ExecuteNonQueryAsync()
-                        tx.Commit()
-                    Catch ex As Exception
-                        Try
-                            tx.Rollback()
-                        Catch
-                        End Try
-                        Throw
+                        tx.Rollback()
+                    Catch
                     End Try
-                End Using
+                    Throw
+                End Try
             End Using
         End Using
 
@@ -980,14 +1217,13 @@ Public Class DynamicDataForm
             Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show(String.Join(Environment.NewLine, errorList), Me.MdiParent, MessageBoxButtons.OK)))
         End If
 
-        sw.Stop()
-        Trace.TraceInformation($"SalvaInserimentoAsync durata: {sw.ElapsedMilliseconds} ms.")
+        swTotal.Stop()
+        Trace.TraceInformation($"SalvaInserimentoAsync totale: {swTotal.ElapsedMilliseconds} ms.")
     End Function
 
-
     Private Async Function SalvaModificaAsync() As Task
-        Dim sw As New Stopwatch()
-        sw.Start()
+        Dim swTotal As New Stopwatch()
+        swTotal.Start()
 
         campiDefiniti = RecuperaCampiDa(Me.Name)
         Dim campoChiave = campiDefiniti.FirstOrDefault(Function(c) c.IsChiave)
@@ -1001,13 +1237,14 @@ Public Class DynamicDataForm
             Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Valore della chiave non trovato o nullo.", Me.MdiParent, MessageBoxButtons.OK)))
             Return
         End If
-        Dim valoreChiave = valoreChiaveObj
 
+        ' 1) calcoli prima di aprire connessione
         Dim campiCalcolati = RecuperaCampiCalcolati()
         Dim formule = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.Formula)
         Dim tipiValore = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.TipoValore)
         Dim valoriCalcolati = CalcolaValoriCampiCalcolati(formule, tipiValore)
 
+        ' colonne da aggiornare (skip chiave/identity)
         Dim colonneValid As New List(Of String)
         For Each campo In campiDefiniti
             If campo.IsChiave OrElse campo.IsIdentity Then Continue For
@@ -1018,87 +1255,67 @@ Public Class DynamicDataForm
             End If
             colonneValid.Add(campo.Nome)
         Next
-
         If colonneValid.Count = 0 Then Return
 
-        Dim query As String = $"UPDATE [{Name}] SET {String.Join(",", colonneValid.Select(Function(n) $"{n} = @{n}"))} WHERE {campoChiave.Nome} = @{campoChiave.Nome}"
-
-        Dim errorList As New List(Of String)
+        ' 2) Leggi valori una sola volta
+        Dim valoriInput As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
+        For Each nomeCampo In colonneValid
+            Dim valore As Object = Nothing
+            If valoriCalcolati.ContainsKey(nomeCampo) Then
+                valore = valoriCalcolati(nomeCampo)
+            Else
+                Try
+                    valore = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
+                Catch ex As Exception
+                    valore = DBNull.Value
+                End Try
+            End If
+            If valore Is Nothing Then valore = DBNull.Value
+            valoriInput(nomeCampo) = valore
+        Next
 
         Using conn As New SqlConnection(ConnString)
             Await conn.OpenAsync()
             Using tx = conn.BeginTransaction()
-                Using cmd As New SqlCommand(query, conn, tx)
-                    cmd.CommandTimeout = 120
+                Try
+                    ' cached update command
+                    If cachedUpdateCommand Is Nothing OrElse cachedUpdateColumns Is Nothing OrElse Not Enumerable.SequenceEqual(cachedUpdateColumns, colonneValid, StringComparer.OrdinalIgnoreCase) Then
+                        If cachedUpdateCommand IsNot Nothing Then cachedUpdateCommand.Dispose()
+                        cachedUpdateCommand = BuildPreparedUpdateCommand(conn, tx, Me.Name, colonneValid, campoChiave)
+                        cachedUpdateColumns = New List(Of String)(colonneValid)
+                    Else
+                        cachedUpdateCommand.Connection = conn
+                        cachedUpdateCommand.Transaction = tx
+                    End If
 
-                    ' Prepara parametri tipizzati per colonne e per chiave
+                    ' assegna valori
                     For Each nomeCampo In colonneValid
-                        Dim campoDef = campiDefiniti.FirstOrDefault(Function(c) String.Equals(c.Nome, nomeCampo, StringComparison.OrdinalIgnoreCase))
-                        Dim sqlType = If(campoDef IsNot Nothing, GetSqlDbTypePerCampo(campoDef), SqlDbType.NVarChar)
-                        Dim size As Integer = 0
-                        If campoDef IsNot Nothing AndAlso sqlType = SqlDbType.NVarChar Then
-                            Dim l As Integer = 0
-                            If Integer.TryParse(Convert.ToString(campoDef.Lunghezza), l) Then size = Math.Min(Math.Max(l, 0), 4000)
-                        End If
-
-                        If size > 0 Then
-                            cmd.Parameters.Add("@" & nomeCampo, sqlType, size)
-                        Else
-                            cmd.Parameters.Add("@" & nomeCampo, sqlType)
-                        End If
+                        Dim param = cachedUpdateCommand.Parameters("@" & nomeCampo)
+                        param.Value = valoriInput(nomeCampo)
                     Next
 
-                    ' parametro per la chiave
-                    Dim keySqlType = GetSqlDbTypePerCampo(campoChiave)
-                    cmd.Parameters.Add("@" & campoChiave.Nome, keySqlType).Value = valoreChiave
+                    ' chiave
+                    cachedUpdateCommand.Parameters("@" & campoChiave.Nome).Value = valoreChiaveObj
 
-                    ' Imposta valori parametri
-                    For Each nomeCampo In colonneValid
-                        Dim valoreCampo As Object
-                        If valoriCalcolati.ContainsKey(nomeCampo) Then
-                            valoreCampo = valoriCalcolati(nomeCampo)
-                        Else
-                            Try
-                                valoreCampo = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
-                            Catch ex As Exception
-                                valoreCampo = DBNull.Value
-                                errorList.Add($"Errore prelevando '{nomeCampo}': {ex.Message}")
-                            End Try
-                        End If
+                    Dim swExec As New Stopwatch()
+                    swExec.Start()
+                    Await cachedUpdateCommand.ExecuteNonQueryAsync()
+                    swExec.Stop()
+                    Trace.TraceInformation($"ExecuteNonQuery UPDATE durata: {swExec.ElapsedMilliseconds} ms.")
 
-                        If valoreCampo Is Nothing Then
-                            cmd.Parameters("@" & nomeCampo).Value = DBNull.Value
-                        Else
-                            If TypeOf valoreCampo Is String AndAlso String.IsNullOrEmpty(CType(valoreCampo, String)) Then
-                                cmd.Parameters("@" & nomeCampo).Value = DBNull.Value
-                            ElseIf TypeOf valoreCampo Is Decimal OrElse TypeOf valoreCampo Is Double Then
-                                cmd.Parameters("@" & nomeCampo).Value = Convert.ToDecimal(valoreCampo, Globalization.CultureInfo.InvariantCulture)
-                            Else
-                                cmd.Parameters("@" & nomeCampo).Value = valoreCampo
-                            End If
-                        End If
-                    Next
-
+                    tx.Commit()
+                Catch ex As Exception
                     Try
-                        Await cmd.ExecuteNonQueryAsync()
-                        tx.Commit()
-                    Catch ex As Exception
-                        Try
-                            tx.Rollback()
-                        Catch
-                        End Try
-                        Throw
+                        tx.Rollback()
+                    Catch
                     End Try
-                End Using
+                    Throw
+                End Try
             End Using
         End Using
 
-        If errorList.Count > 0 Then
-            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show(String.Join(Environment.NewLine, errorList), Me.MdiParent, MessageBoxButtons.OK)))
-        End If
-
-        sw.Stop()
-        Trace.TraceInformation($"SalvaModificaAsync durata: {sw.ElapsedMilliseconds} ms.")
+        swTotal.Stop()
+        Trace.TraceInformation($"SalvaModificaAsync totale: {swTotal.ElapsedMilliseconds} ms.")
     End Function
 
 
@@ -1922,54 +2139,37 @@ Public Class DynamicDataForm
         End Try
     End Sub
 
-    Private Function IntestazioneMultilinea(nomeColonna As String) As String
-        If String.IsNullOrWhiteSpace(nomeColonna) Then Return ""
+    'Private Sub CaricaDatiTabella(nomeTabella As String)
+    'Dim query As String = $"SELECT * FROM [{nomeTabella}]"
+    'If Not String.IsNullOrWhiteSpace(FiltroIniziale) Then
+    'query &= $" WHERE {FiltroIniziale}"
+    'End If
 
-        Dim sb As New StringBuilder()
-        sb.Append(nomeColonna(0))
+    'Try
+    'Using conn As New SqlConnection(ConnString)
+    'Using cmd As New SqlCommand(query, conn)
+    'conn.Open()
+    'Dim adapter As New SqlDataAdapter(cmd)
+    'Dim dt As New DataTable()
+    'adapter.Fill(dt)
+    '
+    'dgvDati.DataSource = dt
 
-        For i = 1 To nomeColonna.Length - 1
-            Dim c = nomeColonna(i)
-            If Char.IsUpper(c) Then
-                sb.Append(vbCrLf)
-            End If
-            sb.Append(c)
-        Next
-
-        Return sb.ToString()
-    End Function
-
-    Private Sub CaricaDatiTabella(nomeTabella As String)
-        Dim query As String = $"SELECT * FROM [{nomeTabella}]"
-        If Not String.IsNullOrWhiteSpace(FiltroIniziale) Then
-            query &= $" WHERE {FiltroIniziale}"
-        End If
-
-        Try
-            Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand(query, conn)
-                    conn.Open()
-                    Dim adapter As New SqlDataAdapter(cmd)
-                    Dim dt As New DataTable()
-                    adapter.Fill(dt)
-
-                    dgvDati.DataSource = dt
-
-                    Dim dtCollegamenti As DataTable = EseguiQuery($"
-                        SELECT NomeCampo FROM Sys_CollegamentiCampi
-                        WHERE NomeTabella = '{nomeTabella}'")
-
-                    For Each col As DataGridViewColumn In dgvDati.Columns
-                        Dim nomeCampo = col.Name
-                        Dim etichetta = GetEtichetta(Me.Name, nomeCampo)
-                        col.HeaderText = etichetta
-                    Next
-                End Using
-            End Using
-        Catch ex As Exception
-            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel caricamento dei dati della tabella." & vbCrLf & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
-        End Try
-    End Sub
+    'Dim dtCollegamenti As DataTable = EseguiQuery($"
+    'Select Case NomeCampo FROM Sys_CollegamentiCampi
+    'WHERE NomeTabella = '{nomeTabella}'")
+    '
+    'For Each col As DataGridViewColumn In dgvDati.Columns
+    'Dim nomeCampo = col.Name
+    'Dim etichetta = GetEtichetta(Me.Name, nomeCampo)
+    'col.HeaderText = etichetta
+    'Next
+    'End Using
+    'End Using
+    'Catch ex As Exception
+    'Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel caricamento dei dati della tabella." & vbCrLf & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
+    'End Try
+    'End Sub
 
     Public Function EseguiQuery(query As String) As DataTable
         Dim dt As New DataTable()
@@ -2003,11 +2203,25 @@ Public Class DynamicDataForm
     Private Sub dgvDati_CellClick(sender As Object, e As DataGridViewCellEventArgs)
         If e.RowIndex < 0 Then Return
         If isUpdatingControls Then Return
-        CaricaDatiNeiControlli(dgvDati.Rows(e.RowIndex))
-        ModalitaCorrente = "visualizzazione"
-        lblModalita.Text = "Visualizzazione in corso..."
-        UpdateButtonsByModalita()
+
+        Try
+            ' Seleziona l'intera riga e imposta la CurrentCell sulla prima cella visibile della riga
+            dgvDati.ClearSelection()
+
+            Dim row As DataGridViewRow = dgvDati.Rows(e.RowIndex)
+            row.Selected = True
+
+            ' Carica i dati nei controlli utilizzando la riga selezionata
+            CaricaDatiNeiControlli(row)
+
+            ModalitaCorrente = "visualizzazione"
+            lblModalita.Text = "Visualizzazione in corso..."
+            UpdateButtonsByModalita()
+        Catch ex As Exception
+            Trace.TraceError("dgvDati_CellClick error: " & ex.Message)
+        End Try
     End Sub
+
 
     Private Function GetEtichetta(nomeTabella As String, nomeColonna As String) As String
         Dim etichetta As String = ""
@@ -2041,16 +2255,51 @@ Public Class DynamicDataForm
     End Function
 
     Private Function SpaziaMaiuscole(text As String) As String
-        If String.IsNullOrWhiteSpace(text) Then Return ""
+        If String.IsNullOrWhiteSpace(text) Then Return String.Empty
+
         Dim sb As New StringBuilder()
         sb.Append(text(0))
+
         For i = 1 To text.Length - 1
-            Dim c = text(i)
-            If Char.IsUpper(c) Then sb.Append(" ")
+            Dim c As Char = text(i)
+            Dim prev As Char = text(i - 1)
+
+            ' inserisci spazio solo se:
+            ' - il carattere corrente è maiuscolo
+            ' - e il precedente è minuscolo oppure è cifra
+            ' inoltre se precedente è underscore o spazio, tratta come separazione naturale
+            If Char.IsUpper(c) AndAlso (Char.IsLower(prev) OrElse Char.IsDigit(prev)) Then
+                sb.Append(" "c)
+            ElseIf prev = "_"c OrElse prev = " "c Then
+                ' sostituisci underscore/space con singolo spazio
+                If sb(sb.Length - 1) <> " "c Then sb.Append(" "c)
+                ' evita di duplicare l'underscore nel risultato (non aggiungere prev)
+            End If
+
             sb.Append(c)
         Next
-        Return sb.ToString()
+
+        Return sb.ToString().Trim()
     End Function
+
+    Private Function IntestazioneMultilinea(nomeColonna As String) As String
+        ' Se vuoi intestazioni multilinea per la griglia, puoi trasformare lo
+        ' spazio prodotto da SpaziaMaiuscole in newline limitando il numero di righe.
+        Dim testo = SpaziaMaiuscole(nomeColonna)
+        If String.IsNullOrWhiteSpace(testo) Then Return String.Empty
+
+        ' Se vuoi mantenere massimo 2 righe, spezza sul primo spazio centrale:
+        Dim parti = testo.Split(" "c).Where(Function(s) Not String.IsNullOrWhiteSpace(s)).ToArray()
+        If parti.Length <= 2 Then
+            Return testo
+        End If
+
+        ' crea due righe: prima parola + possibile seconda, resto nella seconda riga
+        Dim primaRiga = parti(0)
+        Dim secondaRiga = String.Join(" "c, parti.Skip(1))
+        Return primaRiga & vbCrLf & secondaRiga
+    End Function
+
 
     Private Sub ApplicaAutorizzazioni(nomeUtente As String)
         Try
@@ -2227,74 +2476,115 @@ Public Class DynamicDataForm
         If dgv Is Nothing OrElse dgv.Columns.Count = 0 Then Exit Sub
 
         dgv.SuspendLayout()
+        Dim originalAutoSizeMode = dgv.AutoSizeColumnsMode
         dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
 
         Try
+            Dim dtConfig As New DataTable()
             Using conn As New SqlConnection(ConnString)
-                conn.Open()
-
-                Dim cmd As New SqlCommand("
-                SELECT NomeColonna, ColWidth, VisualizzaInDbgrid 
-                FROM Sys_VisualizzaInDbgrid 
+                Using cmd As New SqlCommand("
+                SELECT NomeColonna, ColWidth, VisualizzaInDbgrid
+                FROM Sys_VisualizzaInDbgrid
                 WHERE NomeTabella = @NomeTabella AND NomeDbgrid = @NomeDbgrid", conn)
-                cmd.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
-                cmd.Parameters.AddWithValue("@NomeDbgrid", dgv.Name)
+                    cmd.Parameters.AddWithValue("@NomeTabella", nomeTabellaCorrente)
+                    cmd.Parameters.AddWithValue("@NomeDbgrid", dgv.Name)
+                    Using da As New SqlDataAdapter(cmd)
+                        da.Fill(dtConfig)
+                    End Using
+                End Using
+            End Using
 
-                Dim reader = cmd.ExecuteReader()
-                Dim listaConfig As New List(Of (Nome As String, Width As Integer, Visible As Boolean))
-                While reader.Read()
-                    Dim n As String = reader("NomeColonna").ToString()
-                    Dim w As Integer = If(IsDBNull(reader("ColWidth")), 0, Convert.ToInt32(reader("ColWidth")))
-                    Dim v As Boolean = If(IsDBNull(reader("VisualizzaInDbgrid")), True, Convert.ToBoolean(reader("VisualizzaInDbgrid")))
-                    listaConfig.Add((n, w, v))
-                End While
-                reader.Close()
+            ' Costruisco dizionario di configurazione (lookup O(1))
+            Dim configMap As New Dictionary(Of String, (Width As Integer, Visible As Boolean))(StringComparer.OrdinalIgnoreCase)
+            For Each r As DataRow In dtConfig.Rows
+                Dim name As String = If(r.IsNull("NomeColonna"), String.Empty, r("NomeColonna").ToString())
+                If String.IsNullOrWhiteSpace(name) Then Continue For
+                Dim w As Integer = 0
+                If Not r.IsNull("ColWidth") Then
+                    Integer.TryParse(r("ColWidth").ToString(), w)
+                End If
+                Dim v As Boolean = True
+                If Not r.IsNull("VisualizzaInDbgrid") Then
+                    Boolean.TryParse(r("VisualizzaInDbgrid").ToString(), v)
+                End If
+                configMap(name) = (w, v)
+            Next
 
-                Dim mapConfig = listaConfig.ToDictionary(Function(c) c.Nome, Function(c) (c.Width, c.Visible), StringComparer.OrdinalIgnoreCase)
-                For Each col As DataGridViewColumn In dgv.Columns
-                    If mapConfig.ContainsKey(col.Name) Then
-                        Dim cfg = mapConfig(col.Name)
-                        col.Visible = cfg.Visible
-                    Else
-                        col.Visible = True
-                    End If
-                Next
+            ' Prepara lookup colonne della griglia per accesso O(1)
+            Dim dgvColsByName As New Dictionary(Of String, DataGridViewColumn)(StringComparer.OrdinalIgnoreCase)
+            For Each col As DataGridViewColumn In dgv.Columns
+                dgvColsByName(col.Name) = col
+            Next
 
-                For Each cfg In listaConfig
-                    Dim col = dgv.Columns.Cast(Of DataGridViewColumn)().FirstOrDefault(Function(c) String.Equals(c.Name, cfg.Nome, StringComparison.OrdinalIgnoreCase))
-                    If col Is Nothing Then Continue For
+            ' 1) Applica visibilità per tutte le colonne (single pass)
+            For Each kvp In dgvColsByName
+                Dim col = kvp.Value
+                If configMap.ContainsKey(col.Name) Then
+                    col.Visible = configMap(col.Name).Visible
+                Else
+                    col.Visible = True
+                End If
+            Next
 
-                    Try
-                        If cfg.Width > 0 Then
+            ' 2) Applica larghezze salvate (solo per colonne con width > 0)
+            For Each cfg In configMap.Values
+                ' niente qui — usiamo l'iterazione sotto per ottenere anche la colonna
+            Next
+            For Each kvp In configMap
+                Dim colName = kvp.Key
+                Dim cfg = kvp.Value
+                Dim col As DataGridViewColumn = Nothing
+                If dgvColsByName.TryGetValue(colName, col) Then
+                    If cfg.Width > 0 Then
+                        Try
                             col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
                             col.Width = cfg.Width
-                        End If
-                    Catch ex As Exception
-                        Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore su colonna '{cfg.Nome}' (apply saved width): {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
-                    End Try
-                Next
+                        Catch ex As Exception
+                            ' Traccia l'errore ma non interrompere l'applicazione della configurazione
+                            Trace.TraceWarning($"ApplicaConfigurazioneGriglia: errore impostando width su '{colName}': {ex.Message}")
+                        End Try
+                    End If
+                End If
+            Next
 
-                For Each cfg In listaConfig
-                    If cfg.Width > 0 Then Continue For
+            ' 3) Per le colonne senza width salvata: raccogli i loro indici e calcola le larghezze con una singola misura minima
+            Dim colsToAutoSize As New List(Of Integer)
+            For Each col As DataGridViewColumn In dgv.Columns
+                Dim hasCfg = configMap.ContainsKey(col.Name)
+                If hasCfg Then
+                    If configMap(col.Name).Width <= 0 AndAlso col.Visible Then
+                        colsToAutoSize.Add(col.Index)
+                    End If
+                Else
+                    ' nessuna configurazione => dobbiamo autosize se visibile
+                    If col.Visible Then colsToAutoSize.Add(col.Index)
+                End If
+            Next
 
-                    Dim col = dgv.Columns.Cast(Of DataGridViewColumn)().FirstOrDefault(Function(c) String.Equals(c.Name, cfg.Nome, StringComparison.OrdinalIgnoreCase))
-                    If col Is Nothing OrElse Not col.Visible Then Continue For
-
+            If colsToAutoSize.Count > 0 Then
+                ' Per ridurre le chiamate, esegui AutoResizeColumnsOnce su tutti gli indici raccolti:
+                ' AutoResizeColumn è comunque chiamata per singola colonna: manteniamo le chiamate solo per quelle necessarie.
+                For Each idx In colsToAutoSize
                     Try
-                        dgv.AutoResizeColumn(col.Index, DataGridViewAutoSizeColumnMode.AllCells)
-                        Dim computed = col.Width
-                        col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
-                        col.Width = computed
+                        dgv.AutoResizeColumn(idx, DataGridViewAutoSizeColumnMode.AllCells)
+                        Dim c = dgv.Columns(idx)
+                        Dim computed = c.Width
+                        c.AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                        c.Width = computed
                     Catch ex As Exception
-                        Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore nel calcolo larghezza per '{cfg.Nome}': {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
+                        Trace.TraceWarning($"ApplicaConfigurazioneGriglia: errore autosize col index {idx}: {ex.Message}")
                     End Try
                 Next
-            End Using
+            End If
+
         Finally
+            dgv.AutoSizeColumnsMode = originalAutoSizeMode
             dgv.ResumeLayout()
-            dgv.Refresh()
+            ' Aggiornamento minimo della UI
+            dgv.Invalidate()
         End Try
     End Sub
+
 
     Private Sub PosizionaGrigliaDaSysForm()
 

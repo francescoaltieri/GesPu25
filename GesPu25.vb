@@ -82,11 +82,29 @@ Public Class GesPu25
         End If
 
         For Each f As Form In mdiParent.MdiChildren
-            If TypeOf f Is DynamicDataForm AndAlso f.Text.Contains(nomeTabella) Then
-                f.Activate()
-                Return
+            If TypeOf f Is DynamicDataForm Then
+                Dim ft As String = If(f.Text, "").Trim()
+                Dim target As String = If(nomeTabella, "").Trim()
+
+                ' esatto 
+                If String.Equals(ft, target, StringComparison.OrdinalIgnoreCase) Then
+                    f.Activate()
+                    Return
+                End If
+
+                ' formato "Modulo: Nomeform" (o simili "Chiave: Valore") -> prendi la parte dopo i due punti
+                Dim parts = ft.Split(New Char() {":"c}, 2)
+                If parts.Length = 2 Then
+                    Dim right = parts(1).Trim()
+                    If String.Equals(right, target, StringComparison.OrdinalIgnoreCase) Then
+                        f.Activate()
+                        Return
+                    End If
+                End If
+
             End If
         Next
+
 
         Dim campi = RecuperaCampiDa(nomeTabella)
         Dim nuovoForm As New DynamicDataForm(campi, nomeTabella)
@@ -276,6 +294,10 @@ Public Class GesPu25
 
     Private Sub ConvalidaCampiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConvalidaCampiToolStripMenuItem.Click
         ApriModuloConPermessi("Sys_ConvalidaCampi", Me)
+    End Sub
+
+    Private Sub AssegnazioniDiverseToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AssegnazioniDiverseToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_AssegnazioniLavD", Me)
     End Sub
 End Class
 
