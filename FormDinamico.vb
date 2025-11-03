@@ -1,8 +1,9 @@
 ﻿Imports System.ComponentModel
+Imports System.Diagnostics
 Imports System.IO
+Imports System.Runtime.InteropServices
 Imports System.Text
 Imports System.Text.RegularExpressions
-Imports System.Windows.Forms
 Imports AxWMPLib
 Imports GesPu25.ModuloCampiDinamici
 Imports Microsoft.Data.SqlClient
@@ -12,7 +13,8 @@ Imports PdfSharp.Drawing.Layout
 Imports PdfSharp.Events
 Imports PdfSharp.Pdf
 Imports WMPLib
-Imports System.Diagnostics
+Imports Excel = Microsoft.Office.Interop.Excel
+Imports Forms = System.Windows.Forms
 
 Public Class DynamicDataForm
     Inherits Form
@@ -26,7 +28,7 @@ Public Class DynamicDataForm
     Private pannelloSinistro As TableLayoutPanel
     Private nomeTabellaCorrente As String
     Private ModalitaCorrente As String = "nessuna"
-    Private lblModalita As Label
+    Private lblModalita As System.Windows.Forms.Label
     Private lampeggioAttivo As Boolean = False
     Private Shared visualFormsAttivi As New Dictionary(Of String, VisualMediaForm)
     Private panelBottoniDinamici As FlowLayoutPanel
@@ -49,7 +51,7 @@ Public Class DynamicDataForm
 
     ' Campi (dichiarazioni Private)
     Private overlayPanel As Panel = Nothing
-    Private overlayLabel As Label = Nothing
+    Private overlayLabel As System.Windows.Forms.Label = Nothing
     Private overlaySpinner As ProgressBar = Nothing
 
     Public Property FiltroIniziale As String
@@ -102,7 +104,7 @@ Public Class DynamicDataForm
         pannelloSinistro.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
         pannelloSinistro.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
 
-        lblModalita = New Label With {
+        lblModalita = New System.Windows.Forms.Label With {
             .Text = "",
             .AutoSize = True,
             .Font = New Font("Verdana", 8, FontStyle.Bold),
@@ -120,7 +122,7 @@ Public Class DynamicDataForm
                 pannelloSinistro.RowStyles.Add(New RowStyle(SizeType.AutoSize))
             End If
 
-            Dim lbl As New Label With {
+            Dim lbl As New System.Windows.Forms.Label With {
                 .Text = GetEtichetta(nomeTabella, campi(i).Nome),
                 .AutoSize = True,
                 .Anchor = AnchorStyles.Left,
@@ -158,7 +160,7 @@ Public Class DynamicDataForm
         AggiungiBottone("Cancella", AddressOf CancellaDati)
         AggiungiBottone("Annulla", AddressOf AnnullaOperazione)
         DisabilitaPulsante("Annulla", True)
-        AggiungiBottone("Esporta PDF", AddressOf EsportaPDF)
+        AggiungiBottone("Esporta", AddressOf EsportaTabella)
 
         AggiungiBottone("Rimuovi filtro", Sub()
                                               Dim dt As DataTable = TryCast(dgvDati.DataSource, DataTable)
@@ -184,7 +186,7 @@ Public Class DynamicDataForm
             .AllowUserToAddRows = False,
             .ReadOnly = True,
             .Name = nomeTabellaCorrente,
-            .ScrollBars = ScrollBars.Both,
+            .ScrollBars = System.Windows.Forms.ScrollBars.Both,
             .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
             .AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None
         }
@@ -214,11 +216,11 @@ Public Class DynamicDataForm
 
         For Each ctrl As Control In campoInputs.Values
             If TypeOf ctrl Is FlowLayoutPanel Then
-                Dim hasVisualBtn = ctrl.Controls.OfType(Of Button)().Any(Function(b) String.Equals(b.Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase))
+                Dim hasVisualBtn = ctrl.Controls.OfType(Of System.Windows.Forms.Button)().Any(Function(b) String.Equals(b.Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase))
                 ctrl.Enabled = True
 
                 For Each innerCtrl As Control In ctrl.Controls
-                    If TypeOf innerCtrl Is Button AndAlso String.Equals(CType(innerCtrl, Button).Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase) Then
+                    If TypeOf innerCtrl Is System.Windows.Forms.Button AndAlso String.Equals(CType(innerCtrl, System.Windows.Forms.Button).Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase) Then
                         innerCtrl.Enabled = True
                     Else
                         innerCtrl.Enabled = False
@@ -254,7 +256,7 @@ Public Class DynamicDataForm
         .Visible = False
     }
 
-        overlayLabel = New Label With {
+        overlayLabel = New System.Windows.Forms.Label With {
         .AutoSize = False,
         .TextAlign = ContentAlignment.MiddleCenter,
         .Dock = DockStyle.Top,
@@ -2139,38 +2141,6 @@ Public Class DynamicDataForm
         End Try
     End Sub
 
-    'Private Sub CaricaDatiTabella(nomeTabella As String)
-    'Dim query As String = $"SELECT * FROM [{nomeTabella}]"
-    'If Not String.IsNullOrWhiteSpace(FiltroIniziale) Then
-    'query &= $" WHERE {FiltroIniziale}"
-    'End If
-
-    'Try
-    'Using conn As New SqlConnection(ConnString)
-    'Using cmd As New SqlCommand(query, conn)
-    'conn.Open()
-    'Dim adapter As New SqlDataAdapter(cmd)
-    'Dim dt As New DataTable()
-    'adapter.Fill(dt)
-    '
-    'dgvDati.DataSource = dt
-
-    'Dim dtCollegamenti As DataTable = EseguiQuery($"
-    'Select Case NomeCampo FROM Sys_CollegamentiCampi
-    'WHERE NomeTabella = '{nomeTabella}'")
-    '
-    'For Each col As DataGridViewColumn In dgvDati.Columns
-    'Dim nomeCampo = col.Name
-    'Dim etichetta = GetEtichetta(Me.Name, nomeCampo)
-    'col.HeaderText = etichetta
-    'Next
-    'End Using
-    'End Using
-    'Catch ex As Exception
-    'Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel caricamento dei dati della tabella." & vbCrLf & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
-    'End Try
-    'End Sub
-
     Public Function EseguiQuery(query As String) As DataTable
         Dim dt As New DataTable()
 
@@ -2750,7 +2720,128 @@ Public Class DynamicDataForm
                                          End Sub))
     End Sub
 
-    Private Sub EsportaPDF(sender As Object, e As EventArgs)
+    Private Sub EsportaTabella(sender As Object, e As EventArgs)
+        Using chooser As New ExportChoiceForm()
+            ' Apri come dialog modale con owner (Me) per comportamento MDI corretto
+            Dim dr = chooser.ShowDialog(Me)
+            If dr = DialogResult.OK Then
+                Select Case chooser.SelectedExportType
+                    Case ExportType.PDF
+                        EsportaPDF()
+                    Case ExportType.Excel
+                        EsportaExcel()
+                    Case Else
+                        ' Nessuna azione
+                End Select
+            End If
+        End Using
+    End Sub
+
+
+
+    Private Sub ReleaseComObject(ByVal obj As Object)
+        Try
+            If obj IsNot Nothing Then Marshal.ReleaseComObject(obj)
+        Catch
+            ' ignoriamo errori di rilascio
+        Finally
+            obj = Nothing
+        End Try
+    End Sub
+
+    Public Sub EsportaExcel()
+
+        Cursor.Current = Cursors.WaitCursor
+        Application.DoEvents()
+
+        If Me.dgvDati Is Nothing Then
+            MessageBox.Show("DataGridView dgvdati non trovata.", "Esporta Excel", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim dgv As DataGridView = Me.dgvDati
+
+        ' Lista colonne visibili e relative intestazioni
+        Dim colIndexes As New List(Of Integer)
+        Dim colHeaders As New List(Of String)
+        For i As Integer = 0 To dgv.Columns.Count - 1
+            If dgv.Columns(i).Visible Then
+                colIndexes.Add(i)
+                colHeaders.Add(dgv.Columns(i).HeaderText)
+            End If
+        Next
+
+        If colIndexes.Count = 0 Then
+            MessageBox.Show("Nessuna colonna visibile da esportare.", "Esporta Excel", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Filter = "Excel Workbook|*.xlsx|Excel 97-2003|*.xls"
+            sfd.FileName = Me.Name
+            sfd.Title = "Salva esportazione Excel"
+            If sfd.ShowDialog() <> DialogResult.OK Then Return
+
+            Dim filePath As String = sfd.FileName
+
+            Dim excelApp As Excel.Application = Nothing
+            Dim workBook As Excel.Workbook = Nothing
+            Dim sheet As Excel.Worksheet = Nothing
+
+            Try
+                excelApp = New Excel.Application()
+                workBook = excelApp.Workbooks.Add()
+                sheet = CType(workBook.Sheets(1), Excel.Worksheet)
+
+                ' Intestazioni
+                For c As Integer = 0 To colHeaders.Count - 1
+                    sheet.Cells(1, c + 1) = colHeaders(c)
+                Next
+
+                ' Dati: scorre le righe della dgvdati, salta IsNewRow, rispetta visibilità riga
+                Dim outRow As Integer = 2
+                For Each row As DataGridViewRow In dgv.Rows
+                    If row.IsNewRow Then Continue For
+                    If Not row.Visible Then Continue For
+
+                    For c As Integer = 0 To colIndexes.Count - 1
+                        Dim val As Object = row.Cells(colIndexes(c)).Value
+                        sheet.Cells(outRow, c + 1) = If(val Is Nothing OrElse Convert.IsDBNull(val), String.Empty, val.ToString())
+                    Next
+                    outRow += 1
+                Next
+
+                sheet.Columns.AutoFit()
+
+                workBook.SaveAs(filePath)
+                workBook.Close(False)
+                excelApp.Quit()
+
+                MessageBox.Show("Esportazione completata: " & filePath, "Esporta Excel", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Catch ex As Exception
+                MessageBox.Show("Errore durante l'esportazione Excel: " & ex.Message, "Esporta Excel", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Finally
+                Try
+                    If sheet IsNot Nothing Then Marshal.ReleaseComObject(sheet)
+                    If workBook IsNot Nothing Then Marshal.ReleaseComObject(workBook)
+                    If excelApp IsNot Nothing Then Marshal.ReleaseComObject(excelApp)
+                Catch
+                Finally
+                    sheet = Nothing
+                    workBook = Nothing
+                    excelApp = Nothing
+                    GC.Collect()
+                    GC.WaitForPendingFinalizers()
+                End Try
+            End Try
+        End Using
+
+        Cursor.Current = Cursors.Default
+        Application.DoEvents()
+
+    End Sub
+
+    Private Sub EsportaPDF()
         Try
             Dim document As New PdfDocument()
             document.Info.Title = $"Esportazione dati: {Me.Name}"
@@ -2811,7 +2902,26 @@ Public Class DynamicDataForm
                 topOffset += lineHeight * 2
             Next
 
-            Dim filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{Me.Name}_Esportazione.pdf")
+            ' --- Chiedi all'utente dove salvare e con quale nome (default: Me.Name_Esportazione.pdf) ---
+            Dim defaultName As String = Me.Name & "_Esportazione.pdf"
+            For Each ch As Char In System.IO.Path.GetInvalidFileNameChars()
+                defaultName = defaultName.Replace(ch, "_"c)
+            Next
+
+            Dim filePath As String = Nothing
+            Using sfd As New SaveFileDialog()
+                sfd.Filter = "PDF File|*.pdf"
+                sfd.Title = "Salva PDF esportazione"
+                sfd.FileName = defaultName
+                sfd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                If sfd.ShowDialog() = DialogResult.OK Then
+                    filePath = sfd.FileName
+                Else
+                    ' Utente ha annullato
+                    Return
+                End If
+            End Using
+
             document.Save(filePath)
 
             Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"PDF esportato con successo:{Environment.NewLine}{filePath}", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Information)))
@@ -2819,6 +2929,7 @@ Public Class DynamicDataForm
             Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore durante l'esportazione PDF: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)))
         End Try
     End Sub
+
 
     Private Sub CaricaDatiNeiControlli(riga As DataGridViewRow)
         If riga Is Nothing Then Return

@@ -1888,3 +1888,5 @@ C:\Users\Administrator\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\refint\
 C:\Users\Administrator\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.pdb
 C:\Users\Administrator\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.genruntimeconfig.cache
 C:\Users\Administrator\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\ref\GesPu25.dll
+C:\Users\Administrator\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\Interop.Microsoft.Office.Interop.Excel.dll
+C:\Users\Administrator\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.ExportChoiceForm.resources

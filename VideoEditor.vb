@@ -155,39 +155,6 @@ Public Class VideoEditor
         Return 30.0 ' fallback
     End Function
 
-    'Public Sub SalvaNotaCompleta(index As Integer, nota As String, autore As String, data As DateTime)
-    '   FrameNote(index) = New FrameNota With {
-    '.Testo = nota,
-    '.Autore = autore,
-    '.Data = data
-    '}
-    'End Sub
-
-    'Public Function GetNotaPerFrame(index As Integer) As String
-    'If FrameNote.ContainsKey(index) Then Return FrameNote(index).Testo
-    'Return ""
-    'End Function
-
-    'Public Function GetAutorePerFrame(index As Integer) As String
-    'If FrameNote.ContainsKey(index) Then Return FrameNote(index).Autore
-    'Return ""
-    'End Function
-
-    'Public Function GetDataNotaPerFrame(index As Integer) As DateTime
-    'If FrameNote.ContainsKey(index) Then Return FrameNote(index).Data
-    'Return DateTime.MinValue
-    'End Function
-
-    'Public Function GetFrameAnnotati() As List(Of Integer)
-    'Return FrameNote.Keys.ToList()
-    'End Function
-
-    'Public Sub RimuoviNota(index As Integer)
-    'If FrameNote.ContainsKey(index) Then
-    '        FrameNote.Remove(index)
-    'End If
-    'End Sub
-
 End Class
 
 Public Class FrameNota

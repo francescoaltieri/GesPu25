@@ -203,8 +203,8 @@ Public Class VideoFBF
     End Sub
 
     Private Async Sub btnCaricaVideo_Click(sender As Object, e As EventArgs) Handles btnCaricaVideo.Click
-        Try
-            OpenFileDialog1.Filter = "Video Files|*.mp4;*.mov"
+        'Try
+        OpenFileDialog1.Filter = "Video Files|*.mp4;*.mov"
 
             If OpenFileDialog1.ShowDialog() <> DialogResult.OK Then Exit Sub
 
@@ -274,12 +274,12 @@ Public Class VideoFBF
             Me.Parametri = parametri
             Me.AggiornaRevisioneAttiva()
 
-        Catch ex As Exception
-            MessageBox.Show("Errore durante il caricamento: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            lblRevAttiva.Text = "Errore"
-        Finally
-            btnCaricaVideo.Enabled = True
-        End Try
+        'Catch ex As Exception
+        'MessageBox.Show("Errore durante il caricamento: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        'lblRevAttiva.Text = "Errore"
+        'Finally
+        'btnCaricaVideo.Enabled = True
+        'End Try
     End Sub
 
     Private Function OttieniPercorsoFrames() As String
@@ -636,7 +636,7 @@ Public Class VideoFBF
     End Sub
 
     Private Sub btnColorePennino_Click(sender As Object, e As EventArgs) Handles btnColorePennino.Click
-        If colorDialogPennino.ShowDialog() = DialogResult.OK Then
+        If colorDialogPennino.ShowDialog = DialogResult.OK Then
             colorePennino = colorDialogPennino.Color
             btnColorePennino.BackColor = colorePennino
         End If
@@ -789,9 +789,9 @@ Public Class VideoFBF
         End Using
     End Sub
 
-    Private Sub lstNote_KeyDown(sender As Object, e As KeyEventArgs) Handles lstNoteFrame.KeyDown
+    Private Sub lstNote_KeyDown(sender As Object, e As KeyEventArgs)
         If e.KeyCode = Keys.Delete Then
-            EliminaNotaSelezionata()
+            EliminaNotaSelezionata
         End If
     End Sub
 
@@ -824,7 +824,7 @@ Public Class VideoFBF
         End If
     End Sub
 
-    Private Sub lstNoteFrame_SelectedIndexChanged(sender As Object, e As EventArgs) Handles lstNoteFrame.SelectedIndexChanged
+    Private Sub lstNoteFrame_SelectedIndexChanged(sender As Object, e As EventArgs)
         If lstNoteFrame.SelectedItems.Count > 0 Then
             Dim info = lstNoteFrame.SelectedItems(0).Tag
             Dim frameIndex = info.FrameIndex

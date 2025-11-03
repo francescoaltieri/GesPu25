@@ -3,24 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\videoeditor.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:videoeditor.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\modulocampidinamici.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:modulocampidinamici.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
     }
   ],
   "DocumentGroupContainers": [
@@ -33,71 +25,44 @@
           "SelectedChildIndex": 3,
           "Children": [
             {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "ModuloCampiDinamici.vb",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\ModuloCampiDinamici.vb",
-              "RelativeDocumentMoniker": "ModuloCampiDinamici.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\ModuloCampiDinamici.vb",
-              "RelativeToolTip": "ModuloCampiDinamici.vb",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAABAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-10-31T15:22:35.79Z",
-              "IsPinned": true,
-              "EditorCaption": ""
-            },
-            {
               "$type": "Bookmark",
               "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "FormDinamico.vb [Progettazione]",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
-              "RelativeDocumentMoniker": "FormDinamico.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb [Progettazione]",
-              "RelativeToolTip": "FormDinamico.vb [Progettazione]",
+              "DocumentIndex": 1,
+              "Title": "VideoFBF.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoFBF.vb",
+              "RelativeDocumentMoniker": "VideoFBF.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoFBF.vb",
+              "RelativeToolTip": "VideoFBF.vb",
+              "ViewState": "AgIAAO0AAAAAAAAAAAAcwBMBAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-10-31T15:23:01.19Z",
+              "WhenOpened": "2025-11-03T16:09:43.184Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "VideoFBF.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoFBF.vb",
+              "RelativeDocumentMoniker": "VideoFBF.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoFBF.vb [Progettazione]",
+              "RelativeToolTip": "VideoFBF.vb [Progettazione]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2025-11-03T15:18:23.277Z",
               "EditorCaption": " [Progettazione]"
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "GesPu25.vb",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
-              "RelativeDocumentMoniker": "GesPu25.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
-              "RelativeToolTip": "GesPu25.vb",
-              "ViewState": "AgIAACQAAAAAAAAAAAAowGcAAAAAAAAAAAAAAA==",
+              "Title": "VideoEditor.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoEditor.vb",
+              "RelativeDocumentMoniker": "VideoEditor.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoEditor.vb*",
+              "RelativeToolTip": "VideoEditor.vb*",
+              "ViewState": "AgIAACsAAAAAAAAAAAAjwJsAAAAQAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-10-31T14:55:42.687Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "GesPu25.vb [Progettazione]",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
-              "RelativeDocumentMoniker": "GesPu25.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb [Progettazione]",
-              "RelativeToolTip": "GesPu25.vb [Progettazione]",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-10-31T14:55:32.788Z",
-              "EditorCaption": " [Progettazione]"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "FormDinamico.vb",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
-              "RelativeDocumentMoniker": "FormDinamico.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
-              "RelativeToolTip": "FormDinamico.vb",
-              "ViewState": "AgIAAFgBAAAAAAAAAADgv4sBAABIAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-10-29T10:25:31.49Z",
+              "WhenOpened": "2025-11-03T15:18:15.683Z",
               "EditorCaption": ""
             }
           ]

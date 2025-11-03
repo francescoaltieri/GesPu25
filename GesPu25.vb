@@ -113,6 +113,7 @@ Public Class GesPu25
         nuovoForm.Show()
 
         Cursor.Current = Cursors.Default
+        Application.DoEvents()
 
     End Sub
 

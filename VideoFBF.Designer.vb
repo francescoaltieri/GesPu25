@@ -43,8 +43,9 @@ Partial Class VideoFBF
         GroupBox2 = New GroupBox()
         btnColorePennino = New Button()
         btnCaricaRevisione = New Button()
-        lstNoteFrame = New ListBox()
         GroupBox3 = New GroupBox()
+        Label4 = New Label()
+        Label3 = New Label()
         lstUtentiCondivisi = New CheckedListBox()
         lblDataNota = New Label()
         lblAutore = New Label()
@@ -52,14 +53,15 @@ Partial Class VideoFBF
         lblRevAttiva = New Label()
         btnApprovazione = New Button()
         Label2 = New Label()
-        Label3 = New Label()
-        Label4 = New Label()
+        GroupBox4 = New GroupBox()
+        lstNoteFrame = New ListBox()
         CType(picFrame, ComponentModel.ISupportInitialize).BeginInit()
         CType(TrackFrame, ComponentModel.ISupportInitialize).BeginInit()
         GroupBox1.SuspendLayout()
         CType(numSpessorePennino, ComponentModel.ISupportInitialize).BeginInit()
         GroupBox2.SuspendLayout()
         GroupBox3.SuspendLayout()
+        GroupBox4.SuspendLayout()
         SuspendLayout()
         ' 
         ' btnCaricaVideo
@@ -180,7 +182,7 @@ Partial Class VideoFBF
         GroupBox1.Size = New Size(259, 225)
         GroupBox1.TabIndex = 18
         GroupBox1.TabStop = False
-        GroupBox1.Text = "Annotazioni"
+        GroupBox1.Text = "Note"
         ' 
         ' btnSalvaNote
         ' 
@@ -215,9 +217,9 @@ Partial Class VideoFBF
         GroupBox2.Controls.Add(btnColorePennino)
         GroupBox2.Controls.Add(Label1)
         GroupBox2.Controls.Add(numSpessorePennino)
-        GroupBox2.Location = New Point(1317, 226)
+        GroupBox2.Location = New Point(1317, 238)
         GroupBox2.Name = "GroupBox2"
-        GroupBox2.Size = New Size(259, 115)
+        GroupBox2.Size = New Size(259, 103)
         GroupBox2.TabIndex = 22
         GroupBox2.TabStop = False
         GroupBox2.Text = "Pennino"
@@ -241,17 +243,6 @@ Partial Class VideoFBF
         btnCaricaRevisione.Text = "Lavori in corso"
         btnCaricaRevisione.UseVisualStyleBackColor = True
         ' 
-        ' lstNoteFrame
-        ' 
-        lstNoteFrame.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Right
-        lstNoteFrame.BorderStyle = BorderStyle.None
-        lstNoteFrame.FormattingEnabled = True
-        lstNoteFrame.ItemHeight = 15
-        lstNoteFrame.Location = New Point(1317, 40)
-        lstNoteFrame.Name = "lstNoteFrame"
-        lstNoteFrame.Size = New Size(255, 180)
-        lstNoteFrame.TabIndex = 24
-        ' 
         ' GroupBox3
         ' 
         GroupBox3.Controls.Add(Label4)
@@ -266,12 +257,30 @@ Partial Class VideoFBF
         GroupBox3.TabStop = False
         GroupBox3.Text = "Autore e Condivisioni"
         ' 
+        ' Label4
+        ' 
+        Label4.AutoSize = True
+        Label4.Location = New Point(11, 50)
+        Label4.Name = "Label4"
+        Label4.Size = New Size(34, 15)
+        Label4.TabIndex = 4
+        Label4.Text = "Data:"
+        ' 
+        ' Label3
+        ' 
+        Label3.AutoSize = True
+        Label3.Location = New Point(11, 30)
+        Label3.Name = "Label3"
+        Label3.Size = New Size(46, 15)
+        Label3.TabIndex = 3
+        Label3.Text = "Autore:"
+        ' 
         ' lstUtentiCondivisi
         ' 
         lstUtentiCondivisi.FormattingEnabled = True
         lstUtentiCondivisi.Location = New Point(11, 68)
         lstUtentiCondivisi.Name = "lstUtentiCondivisi"
-        lstUtentiCondivisi.Size = New Size(242, 130)
+        lstUtentiCondivisi.Size = New Size(242, 112)
         lstUtentiCondivisi.TabIndex = 2
         ' 
         ' lblDataNota
@@ -334,35 +343,39 @@ Partial Class VideoFBF
         Label2.TabIndex = 29
         Label2.Text = "Lavorazione:"
         ' 
-        ' Label3
+        ' GroupBox4
         ' 
-        Label3.AutoSize = True
-        Label3.Location = New Point(11, 30)
-        Label3.Name = "Label3"
-        Label3.Size = New Size(46, 15)
-        Label3.TabIndex = 3
-        Label3.Text = "Autore:"
+        GroupBox4.Controls.Add(lstNoteFrame)
+        GroupBox4.Location = New Point(1317, 45)
+        GroupBox4.Name = "GroupBox4"
+        GroupBox4.Size = New Size(259, 187)
+        GroupBox4.TabIndex = 30
+        GroupBox4.TabStop = False
+        GroupBox4.Text = "Lista Annotazioni"
         ' 
-        ' Label4
+        ' lstNoteFrame
         ' 
-        Label4.AutoSize = True
-        Label4.Location = New Point(11, 50)
-        Label4.Name = "Label4"
-        Label4.Size = New Size(34, 15)
-        Label4.TabIndex = 4
-        Label4.Text = "Data:"
+        lstNoteFrame.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Right
+        lstNoteFrame.BorderStyle = BorderStyle.None
+        lstNoteFrame.FormattingEnabled = True
+        lstNoteFrame.ItemHeight = 15
+        lstNoteFrame.Location = New Point(11, 16)
+        lstNoteFrame.Name = "lstNoteFrame"
+        lstNoteFrame.Size = New Size(242, 165)
+        lstNoteFrame.TabIndex = 25
         ' 
         ' VideoFBF
         ' 
+        AllowDrop = True
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(1584, 833)
+        ClientSize = New Size(1585, 843)
+        Controls.Add(GroupBox4)
         Controls.Add(Label2)
         Controls.Add(btnApprovazione)
         Controls.Add(lblRevAttiva)
         Controls.Add(btnRetake)
         Controls.Add(GroupBox3)
-        Controls.Add(lstNoteFrame)
         Controls.Add(btnCaricaRevisione)
         Controls.Add(GroupBox2)
         Controls.Add(GroupBox1)
@@ -391,6 +404,7 @@ Partial Class VideoFBF
         GroupBox2.PerformLayout()
         GroupBox3.ResumeLayout(False)
         GroupBox3.PerformLayout()
+        GroupBox4.ResumeLayout(False)
         ResumeLayout(False)
         PerformLayout()
     End Sub
@@ -416,7 +430,6 @@ Partial Class VideoFBF
     Friend WithEvents btnColorePennino As Button
     Friend WithEvents btnSalvaNote As Button
     Friend WithEvents btnCaricaRevisione As Button
-    Friend WithEvents lstNoteFrame As ListBox
     Friend WithEvents GroupBox3 As GroupBox
     Friend WithEvents lblDataNota As Label
     Friend WithEvents lblAutore As Label
@@ -427,5 +440,7 @@ Partial Class VideoFBF
     Friend WithEvents lstUtentiCondivisi As CheckedListBox
     Friend WithEvents Label4 As Label
     Friend WithEvents Label3 As Label
+    Friend WithEvents GroupBox4 As GroupBox
+    Friend WithEvents lstNoteFrame As ListBox
 
 End Class
