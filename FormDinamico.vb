@@ -56,6 +56,26 @@ Public Class DynamicDataForm
 
     Public Property FiltroIniziale As String
 
+    ' Lista dei nomi campo considerati CampiPath (caricata da Sys_CampiPath)
+    Private campiPath As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+    ' ---------------------------
+    ' CAMPPI PER LA PAGINAZIONE
+    ' ---------------------------
+    Private pageIndex As Integer = 0            ' zero-based
+    Private pageSize As Integer = 50
+    Private totalRows As Integer = 0
+    Private totalPages As Integer = 0
+
+    ' Controlli paginazione
+    Private pnlPaging As FlowLayoutPanel = Nothing
+    Private btnFirst As Button = Nothing
+    Private btnPrev As Button = Nothing
+    Private btnNext As Button = Nothing
+    Private btnLast As Button = Nothing
+    Private lblPagingInfo As Label = Nothing
+    Private cbPageSize As ComboBox = Nothing
+
     Public Sub New(campi As List(Of CampoDatabase), nomeTabella As String)
         Me.Name = nomeTabella
         Me.Text = "Form Dinamico"
@@ -72,6 +92,13 @@ Public Class DynamicDataForm
         Next
 
         Me.nomeTabellaCorrente = nomeTabella
+
+        ' Carica definizione CampiPath da DB (tabella Sys_CampiPath)
+        Try
+            campiPath = RecuperaCampiPath()
+        Catch ex As Exception
+            Trace.TraceError($"Errore caricamento CampiPath: {ex.Message}")
+        End Try
 
         AddHandler Me.Load, AddressOf DynamicDataForm_Load
 
@@ -211,6 +238,9 @@ Public Class DynamicDataForm
 
         splitContainer.Panel2.Controls.Add(dgvDati)
 
+        ' INIZIALIZZA CONTROLLI DI PAGINAZIONE (aggiunti sotto la griglia)
+        InitPagingControls()
+
         ' Caricamenti iniziali
         CaricaBottoniDinamici()
 
@@ -247,6 +277,134 @@ Public Class DynamicDataForm
         InitBusyOverlay()
 
     End Sub
+
+    ' ---------------------------
+    ' INIZIALIZZAZIONE CONTROLLI PAGING
+    ' ---------------------------
+    Private Sub InitPagingControls()
+        pnlPaging = New FlowLayoutPanel With {
+            .AutoSize = True,
+            .FlowDirection = FlowDirection.LeftToRight,
+            .Padding = New Padding(5),
+            .Margin = New Padding(5)
+        }
+
+        btnFirst = New Button With {.Text = "<<", .AutoSize = True}
+        btnPrev = New Button With {.Text = "<", .AutoSize = True}
+        btnNext = New Button With {.Text = ">", .AutoSize = True}
+        btnLast = New Button With {.Text = ">>", .AutoSize = True}
+        lblPagingInfo = New Label With {.AutoSize = True, .Text = "Pagina 0/0", .Padding = New Padding(8, 6, 8, 6)}
+        cbPageSize = New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Width = 80}
+
+        cbPageSize.Items.AddRange(New Object() {10, 25, 50, 100, 250})
+        cbPageSize.SelectedItem = pageSize
+
+        AddHandler btnFirst.Click, Sub(s, e) If pageIndex <> 0 Then pageIndex = 0 : CaricaPaginaAsync()
+        AddHandler btnPrev.Click, Sub(s, e) If pageIndex > 0 Then pageIndex -= 1 : CaricaPaginaAsync()
+        AddHandler btnNext.Click, Sub(s, e) If pageIndex < totalPages - 1 Then pageIndex += 1 : CaricaPaginaAsync()
+        AddHandler btnLast.Click, Sub(s, e) If totalPages > 0 Then pageIndex = totalPages - 1 : CaricaPaginaAsync()
+        AddHandler cbPageSize.SelectedIndexChanged, Sub(s, e)
+                                                        Dim sel = cbPageSize.SelectedItem
+                                                        Dim newSize As Integer = pageSize
+                                                        If sel IsNot Nothing AndAlso Integer.TryParse(sel.ToString(), newSize) Then
+                                                            pageSize = Math.Max(1, newSize)
+                                                            pageIndex = 0
+                                                            CaricaPaginaAsync()
+                                                        End If
+                                                    End Sub
+
+        pnlPaging.Controls.Add(btnFirst)
+        pnlPaging.Controls.Add(btnPrev)
+        pnlPaging.Controls.Add(lblPagingInfo)
+        pnlPaging.Controls.Add(btnNext)
+        pnlPaging.Controls.Add(btnLast)
+        pnlPaging.Controls.Add(New Label With {.Text = "Righe per pagina:", .AutoSize = True, .Padding = New Padding(8, 6, 0, 0)})
+        pnlPaging.Controls.Add(cbPageSize)
+
+        ' Posiziona il pannello di paging sotto la griglia, nel Panel2
+        Dim container As New TableLayoutPanel With {.Dock = DockStyle.Bottom, .AutoSize = True, .RowCount = 1, .ColumnCount = 1}
+        container.Controls.Add(pnlPaging, 0, 0)
+        splitContainer.Panel2.Controls.Add(container)
+        pnlPaging.BringToFront()
+    End Sub
+
+    ' Metodo che carica una pagina (count + fetch)
+    Private Async Sub CaricaPaginaAsync()
+        Dim filtro = If(String.IsNullOrWhiteSpace(FiltroIniziale), "1=1", FiltroIniziale)
+        Dim tableName = Me.Name
+
+        ' Disabilita i controlli mentre carica
+        ToggleUIForSaving(True)
+        ShowBusyOverlay(True, "Caricamento dati pagina...")
+
+        Try
+            Dim dt As New DataTable()
+            Dim total As Integer = 0
+
+            Await Task.Run(Sub()
+                               Try
+                                   Using conn As New SqlConnection(ConnString)
+                                       conn.Open()
+
+                                       ' 1) total rows con filtro
+                                       Using cmdCount As New SqlCommand($"SELECT COUNT(*) FROM [{tableName}] WHERE {filtro}", conn)
+                                           total = Convert.ToInt32(cmdCount.ExecuteScalar())
+                                       End Using
+
+                                       ' calcoli pagine
+                                       Dim sz = Math.Max(pageSize, 1)
+                                       Dim offset = pageIndex * sz
+
+                                       ' ORDER BY richiesto per OFFSET/FETCH: sostituire ORDER BY (SELECT NULL) con ORDER BY [PrimaryKey] se disponibile
+                                       Dim sql = $"SELECT * FROM [{tableName}] WHERE {filtro} ORDER BY (SELECT NULL) OFFSET {offset} ROWS FETCH NEXT {sz} ROWS ONLY"
+
+                                       Using cmd As New SqlCommand(sql, conn)
+                                           Using da As New SqlDataAdapter(cmd)
+                                               da.Fill(dt)
+                                           End Using
+                                       End Using
+                                   End Using
+                               Catch ex As Exception
+                                   Trace.TraceError($"CaricaPaginaAsync errore: {ex.Message}")
+                               End Try
+                           End Sub)
+
+            ' Aggiorna stato paginazione e UI sul thread UI
+            Me.BeginInvoke(New MethodInvoker(Sub()
+                                                 totalRows = total
+                                                 totalPages = If(pageSize > 0, CInt(Math.Ceiling(totalRows / CSng(pageSize))), 0)
+                                                 If pageIndex >= totalPages AndAlso totalPages > 0 Then pageIndex = totalPages - 1
+
+                                                 dgvDati.DataSource = dt
+                                                 UpdatePagingUI()
+                                             End Sub))
+        Catch ex As Exception
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore caricamento dati: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
+        Finally
+            ShowBusyOverlay(False)
+            ToggleUIForSaving(False)
+        End Try
+    End Sub
+
+    Private Sub UpdatePagingUI()
+        lblPagingInfo.Text = $"Pagina {Math.Max(pageIndex + 1, 0)}/{Math.Max(totalPages, 0)}  (righe: {totalRows})"
+
+        btnFirst.Enabled = (pageIndex > 0)
+        btnPrev.Enabled = (pageIndex > 0)
+        btnNext.Enabled = (pageIndex < totalPages - 1)
+        btnLast.Enabled = (pageIndex < totalPages - 1)
+
+        ' Se non ci sono pagine, disabilita navigazione
+        If totalPages <= 1 Then
+            btnFirst.Enabled = False
+            btnPrev.Enabled = False
+            btnNext.Enabled = False
+            btnLast.Enabled = False
+        End If
+    End Sub
+
+    ' Fine paginazione
+    ' ---------------------------
 
     ' Inizializzazione overlay: chiamare da New subito dopo la costruzione dei controlli principali
     Private Sub InitBusyOverlay()
@@ -471,8 +629,9 @@ Public Class DynamicDataForm
             splitContainer.SplitterDistance = Me.Width / 2.5
         End If
 
-        ' Carica i dati con eventuale filtro
-        CaricaDatiTabellaAsync(Me.Name)
+        ' Carica i dati con eventuale filtro (ora usa paginazione)
+        pageIndex = 0
+        CaricaPaginaAsync()
 
         Me.BeginInvoke(New MethodInvoker(Sub()
                                              isInAvvioForm = False
@@ -482,6 +641,7 @@ Public Class DynamicDataForm
 
     End Sub
 
+    ' Metodo legacy mantenuto (per compatibilità) ma ora il caricamento principale usa CaricaPaginaAsync
     Private Sub CaricaDatiTabellaAsync(nomeTabella As String)
         Dim filtro = FiltroIniziale
         Task.Run(Sub()
@@ -544,7 +704,9 @@ Public Class DynamicDataForm
             Next
 
             DisabilitaCampi()
-            CaricaDatiTabellaAsync(Me.Name)
+            ' dopo annulla torniamo alla prima pagina
+            pageIndex = 0
+            CaricaPaginaAsync()
             DisabilitaPulsante("Salva", True)
             lampeggioAttivo = False
             lblModalita.ForeColor = Color.DarkGreen
@@ -1027,7 +1189,11 @@ Public Class DynamicDataForm
                     End Using
                 End Using
 
-                CaricaDatiTabellaAsync(Me.Name)
+                ' Dopo cancellazione ricarica la pagina corrente (se possibile)
+                If pageIndex > 0 AndAlso (totalRows - 1) <= pageIndex * pageSize Then
+                    pageIndex = Math.Max(0, pageIndex - 1)
+                End If
+                CaricaPaginaAsync()
                 PulisciCampi()
 
             Catch ex As SqlException
@@ -1048,7 +1214,7 @@ Public Class DynamicDataForm
             Dim ctrl = campoInputs(campo.Nome)
 
             If TypeOf ctrl Is FlowLayoutPanel Then
-                Dim lbl As Label = ctrl.Controls.OfType(Of Label).FirstOrDefault()
+                Dim lbl As Label = ctrl.Controls.OfType(Of Label)().FirstOrDefault()
                 If lbl IsNot Nothing Then lbl.Text = "..."
             End If
         Next
@@ -1322,7 +1488,8 @@ Public Class DynamicDataForm
 
 
     Private Function EstraiValoreDaControllo(nomeCampo As String, input As Control) As Object
-        Dim campiBit As String() = {"CanView", "CanInsert", "CanUpdate", "CanDelete"}
+        Dim campiBit As String() = {
+            "CanView", "CanInsert", "CanUpdate", "CanDelete"}
         Dim isPassword = nomeCampo.ToLower().Contains("password")
 
         Select Case True
@@ -1441,6 +1608,79 @@ Public Class DynamicDataForm
                 Case Else
                     ctrl = CreaLabelErrore($"Tipo campo '{campo.Tipo}' non gestito.")
             End Select
+        End If
+
+        ' CampoPath
+        If IsCampoPath(campo.Nome) Then
+            Dim pannello As New FlowLayoutPanel With {
+            .AutoSize = True,
+            .FlowDirection = FlowDirection.LeftToRight,
+            .Margin = New Padding(0),
+            .Padding = New Padding(0),
+            .WrapContents = True
+        }
+
+            Dim txtPath As New TextBox With {
+            .Width = larghezzaStimata - 100,
+            .Text = String.Empty,
+            .Tag = campo.Nome,
+            .ReadOnly = False,
+            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+            .Margin = New Padding(5)
+        }
+
+            Dim btnVisualizza As New Button With {
+            .Text = "Visualizza",
+            .AutoSize = True,
+            .Enabled = False,
+            .Margin = New Padding(5)
+        }
+
+            ' Click su Visualizza: apre il file se esiste
+            AddHandler btnVisualizza.Click, Sub(s, e)
+                                                Dim percorsoCompleto = txtPath.Text.Trim()
+                                                If String.IsNullOrWhiteSpace(percorsoCompleto) Then
+                                                    MDIMessageBox.Show("Percorso vuoto.", Me.MdiParent, MessageBoxButtons.OK)
+                                                    Return
+                                                End If
+
+                                                Try
+                                                    If File.Exists(percorsoCompleto) Then
+                                                        Process.Start(New ProcessStartInfo(percorsoCompleto) With {.UseShellExecute = True})
+                                                    Else
+                                                        MDIMessageBox.Show("File non trovato: " & percorsoCompleto, Me.MdiParent, MessageBoxButtons.OK)
+                                                    End If
+                                                Catch ex As Exception
+                                                    MDIMessageBox.Show("Impossibile aprire il file: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+                                                End Try
+                                            End Sub
+
+            ' DoubleClick sul TextBox: apre OpenFileDialog per selezionare file e imposta percorso nel textbox
+            AddHandler txtPath.DoubleClick, Sub(s, e)
+                                                Using ofd As New OpenFileDialog()
+                                                    ofd.CheckFileExists = True
+                                                    ofd.CheckPathExists = True
+                                                    ofd.Multiselect = False
+                                                    ofd.Title = $"Seleziona file per {campo.Nome}"
+                                                    Try
+                                                        Dim cur = txtPath.Text.Trim()
+                                                        If Not String.IsNullOrWhiteSpace(cur) Then
+                                                            Dim dir = Path.GetDirectoryName(cur)
+                                                            If Directory.Exists(dir) Then ofd.InitialDirectory = dir
+                                                        End If
+                                                    Catch
+                                                    End Try
+
+                                                    If ofd.ShowDialog(Me) = DialogResult.OK Then
+                                                        txtPath.Text = ofd.FileName
+                                                    End If
+                                                End Using
+                                            End Sub
+
+            pannello.Controls.Add(txtPath)
+            pannello.Controls.Add(btnVisualizza)
+
+            Return pannello
         End If
 
         If ctrl IsNot Nothing AndAlso Not TypeOf ctrl Is CheckBox AndAlso Not TypeOf ctrl Is Label Then
@@ -1976,6 +2216,27 @@ Public Class DynamicDataForm
                                       viewer.Show()
                                   End Sub
 
+        AddHandler txtFileName.DoubleClick, Sub(s, e)
+                                                Using ofd As New OpenFileDialog()
+                                                    ofd.CheckFileExists = True
+                                                    ofd.CheckPathExists = True
+                                                    ofd.Multiselect = False
+                                                    ofd.Title = "Seleziona file Immagine o Video"
+                                                    Try
+                                                        Dim cur = txtFileName.Text.Trim()
+                                                        If Not String.IsNullOrWhiteSpace(cur) Then
+                                                            Dim dir = Path.GetDirectoryName(cur)
+                                                            If Directory.Exists(dir) Then ofd.InitialDirectory = dir
+                                                        End If
+                                                    Catch
+                                                    End Try
+
+                                                    If ofd.ShowDialog(Me) = DialogResult.OK Then
+                                                        txtFileName.Text = ofd.FileName
+                                                    End If
+                                                End Using
+                                            End Sub
+
         pannello.Controls.Add(btnView)
         Return pannello
     End Function
@@ -2124,7 +2385,7 @@ Public Class DynamicDataForm
                                                                           CType(ctrl, TextBox).Text = valoreChiavePadre
 
                                                                       Case TypeOf ctrl Is FlowLayoutPanel
-                                                                          Dim txt = ctrl.Controls.OfType(Of TextBox).FirstOrDefault()
+                                                                          Dim txt = ctrl.Controls.OfType(Of TextBox)().FirstOrDefault()
                                                                           If txt IsNot Nothing Then txt.Text = valoreChiavePadre
                                                                   End Select
                                                               End If
@@ -3212,6 +3473,34 @@ Public Class DynamicDataForm
         Return Nothing
     End Function
 
+    ' Recupera lista campi Path da DB
+    Private Function RecuperaCampiPath() As HashSet(Of String)
+        Dim result As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Dim query As String = "SELECT NomeCampoPath FROM Sys_CampiPath"
+                Using cmd As New SqlCommand(query, conn)
+                    conn.Open()
+                    Using reader = cmd.ExecuteReader()
+                        While reader.Read()
+                            Dim nome As String = If(reader.IsDBNull(0), String.Empty, reader.GetString(0))
+                            If Not String.IsNullOrWhiteSpace(nome) Then
+                                result.Add(nome.Trim())
+                            End If
+                        End While
+                    End Using
+                End Using
+            End Using
+        Catch ex As Exception
+            Trace.TraceError($"RecuperaCampiPath errore: {ex.Message}")
+        End Try
+        Return result
+    End Function
+
+    Private Function IsCampoPath(nomeCampo As String) As Boolean
+        If String.IsNullOrWhiteSpace(nomeCampo) Then Return False
+        Return campiPath.Contains(nomeCampo)
+    End Function
 
 End Class
 
