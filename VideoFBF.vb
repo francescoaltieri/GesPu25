@@ -203,8 +203,11 @@ Public Class VideoFBF
     End Sub
 
     Private Async Sub btnCaricaVideo_Click(sender As Object, e As EventArgs) Handles btnCaricaVideo.Click
-        'Try
-        OpenFileDialog1.Filter = "Video Files|*.mp4;*.mov"
+        Dim previousUseWait As Boolean = Application.UseWaitCursor
+        Dim previousCursor As Cursor = Me.Cursor
+
+        Try
+            OpenFileDialog1.Filter = "Video Files|*.mp4;*.mov"
 
             If OpenFileDialog1.ShowDialog() <> DialogResult.OK Then Exit Sub
 
@@ -212,6 +215,13 @@ Public Class VideoFBF
             btnCaricaVideo.Enabled = False
             lblRevAttiva.Text = "Caricamento in corso..."
             Application.DoEvents()
+
+            ' --- IMPOSTA CURSORE DI ATTESA ---
+            Application.UseWaitCursor = True
+            Me.Cursor = Cursors.WaitCursor
+            Cursor.Current = Cursors.WaitCursor
+            Application.DoEvents()
+            ' ---------------------------------
 
             Dim videoPath = OpenFileDialog1.FileName
             Dim nomeVideo = Path.GetFileNameWithoutExtension(videoPath)
@@ -274,13 +284,19 @@ Public Class VideoFBF
             Me.Parametri = parametri
             Me.AggiornaRevisioneAttiva()
 
-        'Catch ex As Exception
-        'MessageBox.Show("Errore durante il caricamento: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        'lblRevAttiva.Text = "Errore"
-        'Finally
-        'btnCaricaVideo.Enabled = True
-        'End Try
+        Catch ex As Exception
+            MessageBox.Show("Errore durante il caricamento: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            lblRevAttiva.Text = "Errore"
+        Finally
+            ' Ripristina cursore e UI
+            Application.UseWaitCursor = previousUseWait
+            Me.Cursor = previousCursor
+            Cursor.Current = previousCursor
+            btnCaricaVideo.Enabled = True
+            Application.DoEvents()
+        End Try
     End Sub
+
 
     Private Function OttieniPercorsoFrames() As String
         Using conn As New SqlConnection(ConnString)

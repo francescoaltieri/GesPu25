@@ -160,6 +160,9 @@ Public Class GesPu25
             Return False
         End Try
     End Function
+    Private Sub GesPu25_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
+        GestioneStatoForm.SalvaStato(Me)
+    End Sub
 
     Private Sub VideoFbFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles VideoFbFToolStripMenuItem.Click
         Dim modulo As New VideoFBF()
@@ -185,6 +188,9 @@ Public Class GesPu25
     Private Sub GestioneGriglieToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles GestioneGriglieToolStripMenuItem.Click
         ApriModuloConPermessi("Sys_VisualizzainDbgrid", Me)
     End Sub
+    Private Sub GestioneUtentiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles GestioneUtentiToolStripMenuItem.Click
+        ApriModuloConPermessi("Sys_Utenti", Me)
+    End Sub
 
     Private Sub FornitoriToolStripMenuItem2_Click(sender As Object, e As EventArgs) Handles FornitoriToolStripMenuItem2.Click
         ApriModuloConPermessi("Tab_Fornitori", Me)
@@ -194,19 +200,16 @@ Public Class GesPu25
         ApriModuloConPermessi("Tab_EMail", Me)
     End Sub
 
+    Private Sub ConvalidaCampiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConvalidaCampiToolStripMenuItem.Click
+        ApriModuloConPermessi("Sys_ConvalidaCampi", Me)
+    End Sub
+
     Private Sub ContrattiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ContrattiToolStripMenuItem.Click
         ApriModuloConPermessi("Tab_Contratti", Me)
-    End Sub
-    Private Sub GesPu25_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
-        GestioneStatoForm.SalvaStato(Me)
     End Sub
 
     Private Sub EsciToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles EsciToolStripMenuItem.Click
         Application.Exit()
-    End Sub
-
-    Private Sub GestioneUtentiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles GestioneUtentiToolStripMenuItem.Click
-        ApriModuloConPermessi("Sys_Utenti", Me)
     End Sub
 
     Private Sub EpisodiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles EpisodiToolStripMenuItem.Click
@@ -244,6 +247,9 @@ Public Class GesPu25
     Private Sub LavorazioniNonIdentificateToolStripMenuItem_Click(sender As Object, e As EventArgs)
         ApriModuloConPermessi("Tab_LavNonIdentificate", Me)
     End Sub
+    Private Sub OggettiLavorazioneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiLavorazioneToolStripMenuItem.Click
+        ApriModuloConPermessi("Tab_OggettiLavorazione", Me)
+    End Sub
 
     Private Sub SceneAssegnateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SceneAssegnateToolStripMenuItem.Click
         ApriModuloConPermessi("Mov_Scene", Me)
@@ -277,28 +283,25 @@ Public Class GesPu25
         ApriModuloConPermessi("Mov_StoryboardScenePanel", Me)
     End Sub
 
-    Private Sub OggettiLavorazioneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiLavorazioneToolStripMenuItem.Click
-        ApriModuloConPermessi("Tab_OggettiLavorazione", Me)
+
+    Private Sub AssegnazioniToolStripMenuItem2_Click(sender As Object, e As EventArgs) Handles AssegnazioniToolStripMenuItem2.Click
+        ApriModuloConPermessi("Mov_Assegnazioni", Me)
     End Sub
 
     Private Sub AssegnazioniAnimazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AssegnazioniAnimazioniToolStripMenuItem.Click
         ApriModuloConPermessi("Mov_AssegnazioniLavA", Me)
     End Sub
 
-    Private Sub AssegnazioniToolStripMenuItem2_Click(sender As Object, e As EventArgs) Handles AssegnazioniToolStripMenuItem2.Click
-        ApriModuloConPermessi("Mov_Assegnazioni", Me)
+    Private Sub AssegnazioniDiverseToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AssegnazioniDiverseToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_AssegnazioniLavD", Me)
     End Sub
 
     Private Sub ConsegneAnimazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConsegneAnimazioniToolStripMenuItem.Click
         ApriModuloConPermessi("Mov_ConsegneLavA", Me)
     End Sub
 
-    Private Sub ConvalidaCampiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConvalidaCampiToolStripMenuItem.Click
-        ApriModuloConPermessi("Sys_ConvalidaCampi", Me)
-    End Sub
-
-    Private Sub AssegnazioniDiverseToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AssegnazioniDiverseToolStripMenuItem.Click
-        ApriModuloConPermessi("Mov_AssegnazioniLavD", Me)
+    Private Sub ConsegneDiverseToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConsegneDiverseToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_ConsegneLavD", Me)
     End Sub
 End Class
 

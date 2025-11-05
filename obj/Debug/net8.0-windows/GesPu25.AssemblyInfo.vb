@@ -16,7 +16,7 @@ Imports System.Reflection
 <Assembly: System.Reflection.AssemblyCompanyAttribute("GesPu25"),  _
  Assembly: System.Reflection.AssemblyConfigurationAttribute("Debug"),  _
  Assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0"),  _
- Assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+06cbe864395743a50b6cebf56dddf9807386f028"),  _
+ Assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bf1755c21a18df059d1212e395ff6972aa053e55"),  _
  Assembly: System.Reflection.AssemblyProductAttribute("GesPu25"),  _
  Assembly: System.Reflection.AssemblyTitleAttribute("GesPu25"),  _
  Assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0"),  _

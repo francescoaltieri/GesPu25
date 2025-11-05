@@ -143,7 +143,7 @@ Module ModuloCampiDinamici
                                 campo.CampoValore = If(IsDBNull(reader("CampoValore")), Nothing, reader("CampoValore").ToString())
                                 campo.CampoVisuale = If(IsDBNull(reader("CampoVisuale")), Nothing, reader("CampoVisuale").ToString())
                             Else
-                                MessageBox.Show("Collegamento ignorato: campo " & nomeCampo & " non trovato nella tabella " & nomeTabella, "Messaggio", MessageBoxButtons.OK)
+                                MDIMessageBox.Show($"Collegamento ignorato campo: {nomeCampo} non trovato nella tabella {nomeTabella}", GesPu25.MdiParent, MessageBoxButtons.OK)
                             End If
                         End While
                     End Using
@@ -152,7 +152,7 @@ Module ModuloCampiDinamici
             End Using
 
         Catch ex As Exception
-            MessageBox.Show("Errore nel recupero dei campi: " & ex.Message, "Errore", MessageBoxButtons.OK)
+            MDIMessageBox.Show($"Errore nel recupero dei campi: {ex.Message}", GesPu25.MdiParent, MessageBoxButtons.OK)
         End Try
 
         Return campi
