@@ -132,7 +132,8 @@ Public Class DynamicDataForm
             .AutoScroll = True,
             .ColumnCount = 2,
             .Padding = New Padding(20),
-            .GrowStyle = TableLayoutPanelGrowStyle.AddRows
+            .GrowStyle = TableLayoutPanelGrowStyle.AddRows,
+            .BorderStyle = BorderStyle.Fixed3D
         }
         pannelloSinistro.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
         pannelloSinistro.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
@@ -177,7 +178,8 @@ Public Class DynamicDataForm
             .AutoSize = True,
             .Padding = New Padding(10),
             .Margin = New Padding(0),
-            .WrapContents = False
+            .WrapContents = False,
+            .BorderStyle = BorderStyle.Fixed3D
         }
 
         ' pannello bottoni standard (orizzontale)
@@ -207,7 +209,6 @@ Public Class DynamicDataForm
         AggiungiBottone("Annulla", AddressOf AnnullaOperazione)
         DisabilitaPulsante("Annulla", True)
         AggiungiBottone("Esporta", AddressOf EsportaTabella)
-
         AggiungiBottone("Rimuovi filtro", Sub()
                                               Dim dt As DataTable = TryCast(dgvDati.DataSource, DataTable)
                                               If dt IsNot Nothing Then dt.DefaultView.RowFilter = ""
@@ -1496,7 +1497,7 @@ Public Class DynamicDataForm
 
     Private Function CreaControllo(campo As CampoDatabase) As Control
 
-        If campo Is Nothing Then Return CreaLabelErrore("Campo non valido.")
+        If campo Is Nothing Then Return CreaLabelErrore("Campo nothing.")
 
         Dim larghezzaBase As Integer = 100
         Dim larghezzaMassima As Integer = 450
@@ -1643,25 +1644,33 @@ Public Class DynamicDataForm
         End If
 
         If campo.TipoConvalida = "E" AndAlso
-           Not String.IsNullOrEmpty(campo.TabellaElenco) AndAlso
-           Not String.IsNullOrEmpty(campo.ChiaveElenco) AndAlso
-           Not String.IsNullOrEmpty(campo.CampoVisuale) Then
+   Not String.IsNullOrEmpty(campo.TabellaElenco) AndAlso
+   Not String.IsNullOrEmpty(campo.ChiaveElenco) AndAlso
+   Not String.IsNullOrEmpty(campo.CampoVisuale) Then
 
             Dim dt = RecuperaTabellaCached(campo.TabellaElenco)
 
+            ' Altezza standard campo (valore tipico TextBox single-line)
+            Dim fieldHeight As Integer = 23
+
             Dim txt = New TextBox With {
-                .Width = 100,
-                .Tag = campo.Nome
-            }
+        .Width = 100,
+        .Height = fieldHeight,
+        .Multiline = False,
+        .AutoSize = False,
+        .Tag = campo.Nome,
+        .Margin = New Padding(3, 3, 3, 3)
+    }
 
             Dim lblDescrizione = New Label With {
-                .Width = 200,
-                .AutoSize = False,
-                .TextAlign = ContentAlignment.MiddleLeft,
-                .ForeColor = Color.DarkSlateGray,
-                .Padding = New Padding(5, 3, 0, 0),
-                .Text = "..."
-            }
+        .Width = 200,
+        .Height = fieldHeight,
+        .AutoSize = False,
+        .TextAlign = ContentAlignment.MiddleLeft,
+        .ForeColor = Color.DarkSlateGray,
+        .Padding = New Padding(5, 0, 0, 0),
+        .Text = "..."
+    }
 
             AddHandler txt.Leave, Sub()
                                       Dim codice = txt.Text.Trim()
@@ -1695,15 +1704,29 @@ Public Class DynamicDataForm
                                           ValidazioneElenco(campo, CType(sender, Control))
                                       End Sub
 
+            ' Wrapper con dimensione fissa sull'altezza per evitare che il pannello riallinei le righe variando l'altezza dei campi
             Dim pannello = New FlowLayoutPanel With {
-                .AutoSize = True,
-                .FlowDirection = FlowDirection.LeftToRight
-            }
+        .AutoSize = False,
+        .FlowDirection = FlowDirection.LeftToRight,
+        .WrapContents = False,
+        .Height = fieldHeight + 6, ' lascia spazio per margin/padding
+        .Margin = New Padding(0),
+        .Padding = New Padding(0)
+    }
+
+            ' Allineo verticalmente i controlli per sicurezza
+            txt.Anchor = AnchorStyles.Left
+            lblDescrizione.Anchor = AnchorStyles.Left
+
             pannello.Controls.Add(txt)
             pannello.Controls.Add(lblDescrizione)
 
+            ' Associo il CampoDatabase anche al controllo interno txt
+            txt.Tag = campo
+
             Return pannello
         End If
+
 
         If campo.TipoConvalida = "I" Then
             AddHandler ctrl.Validated, Sub(sender, e)
@@ -1938,6 +1961,7 @@ Public Class DynamicDataForm
         dtp.CustomFormat = " "
         dtp.Width = 140
         dtp.Tag = campo.Nome
+        dtp.Anchor = AnchorStyles.Left
 
         AddHandler dtp.ValueChanged, Sub()
                                          dtp.CustomFormat = "dd/MM/yyyy"
@@ -2041,25 +2065,6 @@ Public Class DynamicDataForm
         End Try
 
         Return combo
-    End Function
-
-    Private Function CreaDatePicker(valoreCampo As Object) As Control
-        Dim campo As New CampoDatabase
-        Dim dtPicker As New DateTimePicker With {
-            .Width = campo.Lunghezza,
-            .Format = DateTimePickerFormat.Short,
-            .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
-            .Margin = New Padding(5)
-        }
-
-        If Not IsDBNull(valoreCampo) AndAlso valoreCampo IsNot Nothing Then
-            dtPicker.Value = CDate(valoreCampo)
-        Else
-            dtPicker.Format = DateTimePickerFormat.Custom
-            dtPicker.CustomFormat = " "
-        End If
-
-        Return dtPicker
     End Function
 
     Private Function CreaCheckBox() As Control

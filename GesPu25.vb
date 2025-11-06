@@ -303,5 +303,6 @@ Public Class GesPu25
     Private Sub ConsegneDiverseToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConsegneDiverseToolStripMenuItem.Click
         ApriModuloConPermessi("Mov_ConsegneLavD", Me)
     End Sub
+
 End Class
 

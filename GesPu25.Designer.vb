@@ -344,19 +344,19 @@ Partial Class GesPu25
         ' StoryboardToolStripMenuItem1
         ' 
         StoryboardToolStripMenuItem1.Name = "StoryboardToolStripMenuItem1"
-        StoryboardToolStripMenuItem1.Size = New Size(166, 22)
+        StoryboardToolStripMenuItem1.Size = New Size(180, 22)
         StoryboardToolStripMenuItem1.Text = "Storyboard"
         ' 
         ' SceneToolStripMenuItem
         ' 
         SceneToolStripMenuItem.Name = "SceneToolStripMenuItem"
-        SceneToolStripMenuItem.Size = New Size(166, 22)
+        SceneToolStripMenuItem.Size = New Size(180, 22)
         SceneToolStripMenuItem.Text = "Scene Storyboard"
         ' 
         ' PanelToolStripMenuItem
         ' 
         PanelToolStripMenuItem.Name = "PanelToolStripMenuItem"
-        PanelToolStripMenuItem.Size = New Size(166, 22)
+        PanelToolStripMenuItem.Size = New Size(180, 22)
         PanelToolStripMenuItem.Text = "Panel Scene"
         ' 
         ' AssegnazioniToolStripMenuItem1
