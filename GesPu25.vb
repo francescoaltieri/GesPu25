@@ -1,8 +1,5 @@
 ﻿Imports Microsoft.Data.SqlClient
-Imports PdfSharp.Pdf
-Imports PdfSharp.Drawing
 Imports PdfSharp.Fonts
-Imports System.Text.RegularExpressions
 
 Public Class GesPu25
     Private Sub GesPu25_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -192,6 +189,9 @@ Public Class GesPu25
         ApriModuloConPermessi("Sys_Utenti", Me)
     End Sub
 
+    Private Sub FileTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles FileTemplateToolStripMenuItem.Click
+        ApriModuloConPermessi("Sys_template", Me)
+    End Sub
     Private Sub FornitoriToolStripMenuItem2_Click(sender As Object, e As EventArgs) Handles FornitoriToolStripMenuItem2.Click
         ApriModuloConPermessi("Tab_Fornitori", Me)
     End Sub

@@ -1,29 +1,14 @@
-﻿Imports System.ComponentModel
-Imports System.Diagnostics
-Imports System.IO
+﻿Imports System.IO
 Imports System.Runtime.InteropServices
 Imports System.Text
 Imports System.Text.RegularExpressions
-
 Imports AxWMPLib
-
 Imports Microsoft.Data.SqlClient
-
 Imports PdfSharp
 Imports PdfSharp.Drawing
 Imports PdfSharp.Drawing.Layout
-Imports PdfSharp.Events
 Imports PdfSharp.Pdf
-Imports PdfSharp.Pdf.Content.Objects
-
-Imports Windows.Win32.System
-
-Imports WMPLib
-
-Imports GesPu25.ModuloCampiDinamici
-
 Imports Excel = Microsoft.Office.Interop.Excel
-Imports Forms = System.Windows.Forms
 
 Public Class DynamicDataForm
     Inherits Form
@@ -45,7 +30,7 @@ Public Class DynamicDataForm
     Private colonneModificate As Boolean = False
     Private isInAvvioForm As Boolean = True
 
-    ' Ottimizzazioni: cache lookup e regex precompilate
+    ' Cache lookup e regex precompilate
     Private lookupCache As New Dictionary(Of String, DataTable)(StringComparer.OrdinalIgnoreCase)
     Private regexCache As New Dictionary(Of String, Regex)(StringComparer.OrdinalIgnoreCase)
 
@@ -107,6 +92,7 @@ Public Class DynamicDataForm
         End Try
 
         AddHandler Me.Load, AddressOf DynamicDataForm_Load
+        AddHandler Me.ResizeEnd, AddressOf DynamicDataForm_Resize
 
         GestioneStatoForm.CaricaStato(Me)
 
@@ -145,7 +131,9 @@ Public Class DynamicDataForm
             .ForeColor = Color.DarkGreen,
             .Dock = DockStyle.Top,
             .Padding = New Padding(5),
-            .TextAlign = ContentAlignment.TopLeft
+            .TextAlign = ContentAlignment.TopLeft,
+            .AutoEllipsis = False,
+            .UseMnemonic = False
         }
         pannelloSinistro.Controls.Add(lblModalita)
         pannelloSinistro.SetColumnSpan(lblModalita, 2)
@@ -609,9 +597,6 @@ Public Class DynamicDataForm
         Next
     End Sub
 
-
-
-
     Private Sub NascondiColonneSensibili()
         For Each col As DataGridViewColumn In dgvDati.Columns
             If col.Name.ToLower().Contains("password") Then
@@ -630,6 +615,7 @@ Public Class DynamicDataForm
 
         pageIndex = 0
         CaricaPaginaAsync()
+        AggiornaMaxWidthModalita()
 
         Me.BeginInvoke(New MethodInvoker(Sub()
                                              isInAvvioForm = False
@@ -637,6 +623,18 @@ Public Class DynamicDataForm
                                              UpdateButtonsByModalita()
                                          End Sub))
 
+    End Sub
+
+    Private Sub DynamicDataForm_Resize(sender As Object, e As EventArgs)
+        AggiornaMaxWidthModalita()
+    End Sub
+    Private Sub AggiornaMaxWidthModalita()
+        Try
+            Dim padding As Integer = 40
+            Dim maxW = Math.Max(200, pannelloSinistro.ClientSize.Width - padding)
+            lblModalita.MaximumSize = New Size(maxW, 0)
+        Catch
+        End Try
     End Sub
 
     Private Sub CaricaDatiTabellaAsync(nomeTabella As String)
@@ -1264,6 +1262,7 @@ Public Class DynamicDataForm
     End Function
 
     Private Async Function SalvaInserimentoAsync() As Task
+
         Dim swTotal As New Stopwatch()
         swTotal.Start()
 
@@ -1340,7 +1339,6 @@ Public Class DynamicDataForm
         End If
 
         swTotal.Stop()
-        'MDIMessageBox.Show($"SalvaInserimentoAsync totale: {swTotal.ElapsedMilliseconds} ms.", Me.MdiParent, MessageBoxButtons.OK)
 
     End Function
 
@@ -1349,6 +1347,25 @@ Public Class DynamicDataForm
         swTotal.Start()
 
         campiDefiniti = RecuperaCampiDa(Me.Name)
+
+        Try
+            Dim convalide = RecuperaConvalideDaSys(Me.Name)
+            If convalide IsNot Nothing AndAlso convalide.Count > 0 Then
+                For Each campo In campiDefiniti
+                    If campo Is Nothing OrElse String.IsNullOrWhiteSpace(campo.Nome) Then Continue For
+                    If convalide.ContainsKey(campo.Nome) Then
+                        Try
+                            ApplicaConvalidaAlCampo(campo, convalide(campo.Nome))
+                        Catch ex As Exception
+                            MDIMessageBox.Show($"RiapplicaConvalide: errore su campo {campo.Nome}: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
+                        End Try
+                    End If
+                Next
+            End If
+        Catch ex As Exception
+            MDIMessageBox.Show($"RiapplicaConvalide: errore generale: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
+        End Try
+
         Dim campoChiave = campiDefiniti.FirstOrDefault(Function(c) c.IsChiave)
         If campoChiave Is Nothing OrElse dgvDati.SelectedRows.Count = 0 Then
             Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Chiave primaria mancante o nessuna riga selezionata.", Me.MdiParent, MessageBoxButtons.OK)))
@@ -1418,7 +1435,6 @@ Public Class DynamicDataForm
                     swExec.Start()
                     Await cachedUpdateCommand.ExecuteNonQueryAsync()
                     swExec.Stop()
-                    'MDIMessageBox.Show($"ExecuteNonQuery UPDATE durata: {swExec.ElapsedMilliseconds} ms.", Me.MdiParent, MessageBoxButtons.OK)
 
                     tx.Commit()
                 Catch ex As Exception
@@ -1432,7 +1448,6 @@ Public Class DynamicDataForm
         End Using
 
         swTotal.Stop()
-        'MDIMessageBox.Show($"SalvaModificaAsync totale: {swTotal.ElapsedMilliseconds} ms.", Me.MdiParent, MessageBoxButtons.OK)
 
     End Function
 
@@ -2340,28 +2355,6 @@ Public Class DynamicDataForm
         End Using
 
         Return etichetta
-    End Function
-
-    Private Function SpaziaMaiuscole(text As String) As String
-        If String.IsNullOrWhiteSpace(text) Then Return String.Empty
-
-        Dim sb As New StringBuilder()
-        sb.Append(text(0))
-
-        For i = 1 To text.Length - 1
-            Dim c As Char = text(i)
-            Dim prev As Char = text(i - 1)
-
-            If Char.IsUpper(c) AndAlso (Char.IsLower(prev) OrElse Char.IsDigit(prev)) Then
-                sb.Append(" "c)
-            ElseIf prev = "_"c OrElse prev = " "c Then
-                If sb(sb.Length - 1) <> " "c Then sb.Append(" "c)
-            End If
-
-            sb.Append(c)
-        Next
-
-        Return sb.ToString().Trim()
     End Function
 
     Private Function IntestazioneMultilinea(nomeColonna As String) As String
@@ -3416,15 +3409,13 @@ Public Class DynamicDataForm
     Private Sub AggiungiBottone(nome As String, handler As EventHandler)
         Dim btn As New Button With {.Text = nome, .AutoSize = True}
         AddHandler btn.Click, handler
-        ' aggiunge SOLO ai bottoni standard
+
         panelBottoni.Controls.Add(btn)
     End Sub
 
     Private Sub UniformaDimensioniBottoni()
         Dim larghezzaMassima As Integer = 0
         Dim altezzaMassima As Integer = 0
-
-        ' Calcola dimensioni massime tra bottoni standard e dinamici
         Dim tuttiPannelli As New List(Of Control) From {panelBottoni, panelBottoniDinamici}
 
         For Each pnl In tuttiPannelli
@@ -3432,7 +3423,6 @@ Public Class DynamicDataForm
             For Each ctrl As Control In pnl.Controls
                 If TypeOf ctrl Is Button Then
                     Dim btn As Button = CType(ctrl, Button)
-                    ' usa PreferredSize per tener conto del testo e padding
                     Dim pref = btn.PreferredSize
                     If pref.Width > larghezzaMassima Then larghezzaMassima = pref.Width
                     If pref.Height > altezzaMassima Then altezzaMassima = pref.Height
@@ -3440,10 +3430,8 @@ Public Class DynamicDataForm
             Next
         Next
 
-        ' Se non trovata alcuna dimensione, esci
         If larghezzaMassima = 0 OrElse altezzaMassima = 0 Then Return
 
-        ' Applica dimensioni uniformi a tutti i bottoni (standard + dinamici)
         For Each pnl In tuttiPannelli
             If pnl Is Nothing Then Continue For
             For Each ctrl As Control In pnl.Controls
@@ -3457,98 +3445,205 @@ Public Class DynamicDataForm
         Next
     End Sub
 
+    Private Function HasColumn(reader As SqlDataReader, columnName As String) As Boolean
+        If reader Is Nothing OrElse String.IsNullOrWhiteSpace(columnName) Then Return False
+        For i As Integer = 0 To reader.FieldCount - 1
+            If String.Equals(reader.GetName(i), columnName, StringComparison.OrdinalIgnoreCase) Then
+                Return True
+            End If
+        Next
+        Return False
+    End Function
+
+    Private Function CreateFormInstanceByName(nomeForm As String) As Form
+        If String.IsNullOrWhiteSpace(nomeForm) Then Return Nothing
+
+        For Each asm In AppDomain.CurrentDomain.GetAssemblies()
+            Try
+                Dim t = asm.GetTypes().FirstOrDefault(Function(tt) String.Equals(tt.Name, nomeForm, StringComparison.OrdinalIgnoreCase))
+                If t IsNot Nothing AndAlso GetType(Form).IsAssignableFrom(t) Then
+                    Try
+                        Dim obj = Activator.CreateInstance(t)
+                        Return TryCast(obj, Form)
+                    Catch
+                        ' ignoro e continuo
+                    End Try
+                End If
+            Catch
+                ' ignoro assembly che non posso enumerare tipi
+            End Try
+        Next
+
+        Return Nothing
+    End Function
+
+    ' ... tutte le altre dichiarazioni e membri restano invariati ...
 
     Private Sub CaricaBottoniDinamici()
-        Dim formNameCorrente As String = Me.Name
-        Dim query As String = "SELECT * FROM Sys_BottoniDinamici WHERE FormName = @formName ORDER BY Ordine"
+            Dim formNameCorrente As String = Me.Name
+            Dim query As String = "SELECT * FROM Sys_BottoniDinamici WHERE FormName = @formName ORDER BY Ordine"
 
-        Try
-            Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand(query, conn)
-                    cmd.Parameters.AddWithValue("@formName", formNameCorrente)
+            Try
+                Using conn As New SqlConnection(ConnString)
+                    Using cmd As New SqlCommand(query, conn)
+                        cmd.Parameters.AddWithValue("@formName", formNameCorrente)
+                        conn.Open()
 
-                    conn.Open()
-                    Using reader = cmd.ExecuteReader()
-                        While reader.Read()
-                            Dim bottoneDinamico = reader("BottoneDinamico").ToString()
-                            Dim buttonText = reader("ButtonText").ToString()
-                            Dim campoChiavePadre = reader("CampoChiavePadre").ToString()
-                            Dim campoChiaveFiglia = reader("CampoChiaveFiglia").ToString()
+                        Using reader = cmd.ExecuteReader()
+                            While reader.Read()
+                                Dim bottoneDinamico As String = If(HasColumn(reader, "BottoneDinamico") AndAlso Not reader.IsDBNull(reader.GetOrdinal("BottoneDinamico")), reader("BottoneDinamico").ToString(), String.Empty)
+                                Dim buttonText As String = If(HasColumn(reader, "ButtonText") AndAlso Not reader.IsDBNull(reader.GetOrdinal("ButtonText")), reader("ButtonText").ToString(), String.Empty)
+                                Dim campoChiavePadre As String = If(HasColumn(reader, "CampoChiavePadre") AndAlso Not reader.IsDBNull(reader.GetOrdinal("CampoChiavePadre")), reader("CampoChiavePadre").ToString(), String.Empty)
+                                Dim campoChiaveFiglia As String = If(HasColumn(reader, "CampoChiaveFiglia") AndAlso Not reader.IsDBNull(reader.GetOrdinal("CampoChiaveFiglia")), reader("CampoChiaveFiglia").ToString(), String.Empty)
+                                Dim formDaAprire As String = If(HasColumn(reader, "FormDaAprire") AndAlso Not reader.IsDBNull(reader.GetOrdinal("FormDaAprire")), reader("FormDaAprire").ToString(), String.Empty)
+                                Dim modulo As String = If(HasColumn(reader, "Modulo") AndAlso Not reader.IsDBNull(reader.GetOrdinal("Modulo")), reader("Modulo").ToString(), String.Empty)
 
-                            Dim btnDinamico As New Button With {
-                            .Text = buttonText,
-                            .AutoSize = True,
-                            .Margin = New Padding(5),
-                            .Tag = New With {
-                                Key .FormName = bottoneDinamico,
-                                Key .CampoPadre = campoChiavePadre,
-                                Key .CampoFiglia = campoChiaveFiglia,
-                                Key .Titolo = buttonText
-                            }
-                        }
+                                Dim displayText = If(String.IsNullOrWhiteSpace(buttonText),
+                                                     If(String.IsNullOrWhiteSpace(bottoneDinamico), "Apri", bottoneDinamico),
+                                                     buttonText)
 
-                            AddHandler btnDinamico.Click, Sub(s, e)
-                                                              If dgvDati.SelectedRows.Count = 0 Then
-                                                                  MDIMessageBox.Show("Seleziona prima una riga dalla griglia per aprire il form collegato.", Me.MdiParent, MessageBoxButtons.OK)
-                                                                  Return
-                                                              End If
+                                Dim btnDinamico As New Button With {
+                                    .Text = displayText,
+                                    .AutoSize = True,
+                                    .Margin = New Padding(5),
+                                    .Tag = New With {
+                                        Key .FormName = bottoneDinamico,
+                                        Key .CampoPadre = campoChiavePadre,
+                                        Key .CampoFiglia = campoChiaveFiglia,
+                                        Key .Titolo = displayText,
+                                        Key .FormDaAprire = formDaAprire,
+                                        Key .Modulo = modulo
+                                    }
+                                }
 
-                                                              Dim info = CType(CType(s, Button).Tag, Object)
-                                                              Dim valoreCella = dgvDati.SelectedRows(0).Cells(info.CampoPadre).Value?.ToString()
-                                                              Dim valoreChiavePadre = If(Not String.IsNullOrEmpty(valoreCella) AndAlso valoreCella.Contains("-"), valoreCella.Split("-"c)(0).Trim(), valoreCella)
+                                AddHandler btnDinamico.Click, Sub(s, e)
+                                                                  Try
+                                                                      Dim info = CType(CType(s, Button).Tag, Object)
+                                                                      Dim nomeFormDaAprire = If(info.FormDaAprire, "").ToString().Trim()
+                                                                      Dim moduloInfo = If(info.Modulo, "").ToString().Trim()
 
-                                                              If String.IsNullOrWhiteSpace(valoreChiavePadre) Then
-                                                                  MDIMessageBox.Show("Il valore della chiave primaria selezionata è nullo o non valido.", Me.MdiParent, MessageBoxButtons.OK)
-                                                                  Return
-                                                              End If
+                                                                      ' Se è specificato un form da aprire (classe già pronta)
+                                                                      If Not String.IsNullOrWhiteSpace(nomeFormDaAprire) Then
+                                                                          If dgvDati Is Nothing OrElse dgvDati.SelectedRows.Count = 0 Then
+                                                                              MDIMessageBox.Show("Seleziona prima una riga dalla griglia.", Me.MdiParent, MessageBoxButtons.OK)
+                                                                              Return
+                                                                          End If
 
-                                                              For Each f As Form In GesPu25.MdiChildren
-                                                                  If TypeOf f Is DynamicDataForm AndAlso f.Name = info.FormName Then
-                                                                      f.WindowState = FormWindowState.Normal
-                                                                      f.BringToFront()
-                                                                      f.Activate()
-                                                                      Return
-                                                                  End If
-                                                              Next
+                                                                          ' Preparo i valori del record selezionato
+                                                                          Dim selRow As DataGridViewRow = dgvDati.SelectedRows(0)
+                                                                          Dim recordValues As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
+                                                                          For Each col As DataGridViewColumn In dgvDati.Columns
+                                                                              Try
+                                                                                  Dim val = selRow.Cells(col.Index).Value
+                                                                                  recordValues(col.Name) = If(val Is Nothing OrElse Convert.IsDBNull(val), Nothing, val)
+                                                                              Catch
+                                                                                  recordValues(col.Name) = Nothing
+                                                                              End Try
+                                                                          Next
 
-                                                              Dim campiFigli = RecuperaCampiDa(info.FormName)
-                                                              Dim nuovoForm As New DynamicDataForm(campiFigli, info.FormName)
-                                                              nuovoForm.MdiParent = GesPu25
-                                                              nuovoForm.Text = $"{info.Titolo} - Filtrato per {info.CampoPadre} = {valoreChiavePadre}"
-                                                              nuovoForm.FiltroIniziale = $"{info.CampoFiglia} = '{valoreChiavePadre}'"
-                                                              nuovoForm.Show()
+                                                                          ' Creo istanza del form target
+                                                                          Dim frmInstance As Form = CreateFormInstanceByName(nomeFormDaAprire)
+                                                                          If frmInstance Is Nothing Then
+                                                                              MDIMessageBox.Show($"Impossibile creare istanza del form '{nomeFormDaAprire}'. Verifica che la classe esista e abbia un costruttore senza parametri.", Me.MdiParent, MessageBoxButtons.OK)
+                                                                              Return
+                                                                          End If
 
-                                                              Dim campoCollegamento = info.CampoFiglia
-                                                              If nuovoForm.campoInputs.ContainsKey(campoCollegamento) Then
-                                                                  Dim ctrl = nuovoForm.campoInputs(campoCollegamento)
+                                                                          ' Imposto Tag in modo utile: includo TableName e Record (dictionary)
+                                                                          frmInstance.Tag = New With {
+                                                                              Key .TableName = Me.Name,
+                                                                              Key .Record = recordValues
+                                                                          }
 
-                                                                  Select Case True
-                                                                      Case TypeOf ctrl Is ComboBox
-                                                                          CType(ctrl, ComboBox).SelectedValue = valoreChiavePadre
+                                                                          ' Se il form target è CreaPDFAssegnazione (o simile) imposto anche Tag diretto con IdAssegnazione per semplicità
+                                                                          Try
+                                                                              If String.Equals(nomeFormDaAprire, "CreaPDFAssegnazione", StringComparison.OrdinalIgnoreCase) Then
+                                                                                  Dim idVal As Object = Nothing
+                                                                                  If recordValues.ContainsKey("IdAssegnazione") Then idVal = recordValues("IdAssegnazione")
+                                                                                  If idVal Is Nothing AndAlso recordValues.ContainsKey("Id") Then idVal = recordValues("Id")
+                                                                                  If idVal IsNot Nothing Then
+                                                                                      ' imposto Tag sia come intero che come oggetto Record
+                                                                                      frmInstance.Tag = idVal
+                                                                                  End If
+                                                                              End If
+                                                                          Catch
+                                                                          End Try
 
-                                                                      Case TypeOf ctrl Is TextBox
-                                                                          CType(ctrl, TextBox).Text = valoreChiavePadre
+                                                                          ' Apertura tramite wrapper applicazione (mantengo comportamento esistente)
+                                                                          Try
+                                                                              GesPu25.ApriModulo2ConPermessi(nomeFormDaAprire, frmInstance)
+                                                                          Catch exCall As Exception
+                                                                              MDIMessageBox.Show($"Errore aprendo il modulo '{nomeFormDaAprire}': {exCall.Message}", Me.MdiParent, MessageBoxButtons.OK)
+                                                                          End Try
 
-                                                                      Case TypeOf ctrl Is FlowLayoutPanel
-                                                                          Dim txt = ctrl.Controls.OfType(Of TextBox)().FirstOrDefault()
-                                                                          If txt IsNot Nothing Then txt.Text = valoreChiavePadre
-                                                                  End Select
-                                                              End If
-                                                          End Sub
+                                                                          Return
+                                                                      End If
 
-                            ' QUI: aggiungi il bottone dinamico al pannello DINAMICO (sotto gli standard)
-                            panelBottoniDinamici.Controls.Add(btnDinamico)
-                        End While
+                                                                      ' Se non esiste formDaAprire, comportamento alternativo: apri DynamicDataForm figlio filtrato
+                                                                      If dgvDati Is Nothing OrElse dgvDati.SelectedRows.Count = 0 Then
+                                                                          MDIMessageBox.Show("Seleziona prima una riga dalla griglia per aprire il form collegato.", Me.MdiParent, MessageBoxButtons.OK)
+                                                                          Return
+                                                                      End If
+
+                                                                      Dim valoreCellaObj = dgvDati.SelectedRows(0).Cells(info.CampoPadre).Value
+                                                                      Dim valoreCella As String = If(valoreCellaObj Is Nothing OrElse Convert.IsDBNull(valoreCellaObj), String.Empty, valoreCellaObj.ToString())
+                                                                      Dim valoreChiavePadre = If(Not String.IsNullOrEmpty(valoreCella) AndAlso valoreCella.Contains("-"), valoreCella.Split("-"c)(0).Trim(), valoreCella)
+
+                                                                      If String.IsNullOrWhiteSpace(valoreChiavePadre) Then
+                                                                          MDIMessageBox.Show("Il valore della chiave primaria selezionata è nullo o non valido.", Me.MdiParent, MessageBoxButtons.OK)
+                                                                          Return
+                                                                      End If
+
+                                                                      Dim nomeFormTarget = If(info.FormName, "").ToString().Trim()
+                                                                      If String.IsNullOrWhiteSpace(nomeFormTarget) Then
+                                                                          MDIMessageBox.Show("Nessun form target definito per il bottone dinamico.", Me.MdiParent, MessageBoxButtons.OK)
+                                                                          Return
+                                                                      End If
+
+                                                                      For Each f As Form In GesPu25.MdiChildren
+                                                                          If TypeOf f Is DynamicDataForm AndAlso String.Equals(f.Name, nomeFormTarget, StringComparison.OrdinalIgnoreCase) Then
+                                                                              f.WindowState = FormWindowState.Normal
+                                                                              f.BringToFront()
+                                                                              f.Activate()
+                                                                              Return
+                                                                          End If
+                                                                      Next
+
+                                                                      Dim campiFigli = RecuperaCampiDa(nomeFormTarget)
+                                                                      Dim nuovoForm As New DynamicDataForm(campiFigli, nomeFormTarget)
+                                                                      nuovoForm.MdiParent = GesPu25
+                                                                      nuovoForm.Text = $"{info.Titolo} - Filtrato per {info.CampoPadre} = {valoreChiavePadre}"
+                                                                      nuovoForm.FiltroIniziale = $"{info.CampoFiglia} = '{valoreChiavePadre}'"
+                                                                      GesPu25.ApriModulo2ConPermessi(nomeFormTarget, nuovoForm)
+
+                                                                      Dim campoCollegamento = info.CampoFiglia
+                                                                      If nuovoForm.campoInputs.ContainsKey(campoCollegamento) Then
+                                                                          Dim targetCtrl = nuovoForm.campoInputs(campoCollegamento)
+                                                                          Select Case True
+                                                                              Case TypeOf targetCtrl Is ComboBox
+                                                                                  CType(targetCtrl, ComboBox).SelectedValue = valoreChiavePadre
+                                                                              Case TypeOf targetCtrl Is TextBox
+                                                                                  CType(targetCtrl, TextBox).Text = valoreChiavePadre
+                                                                              Case TypeOf targetCtrl Is FlowLayoutPanel
+                                                                                  Dim txt = targetCtrl.Controls.OfType(Of TextBox)().FirstOrDefault()
+                                                                                  If txt IsNot Nothing Then txt.Text = valoreChiavePadre
+                                                                          End Select
+                                                                      End If
+                                                                  Catch ex As Exception
+                                                                      MDIMessageBox.Show("Errore esecuzione bottone dinamico: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+                                                                  End Try
+                                                              End Sub
+
+                                panelBottoniDinamici.Controls.Add(btnDinamico)
+                            End While
+                        End Using
                     End Using
                 End Using
-            End Using
-        Catch ex As Exception
-            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel caricamento bottoni dinamici: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
-        End Try
-    End Sub
+            Catch ex As Exception
+                Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel caricamento bottoni dinamici: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
+            End Try
+        End Sub
 
-
-End Class
+    End Class
 
 Partial Public Class VisualMediaForm
 

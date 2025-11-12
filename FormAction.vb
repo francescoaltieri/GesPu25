@@ -1,6 +1,4 @@
-﻿Imports Microsoft.Data.SqlClient
-
-Public Class FormAction
+﻿Public Class FormAction
     Public Property ButtonText As String
     Public Property ActionName As String
     Public Property PosizioneX As Integer?

@@ -59,6 +59,7 @@ Partial Class GesPu25
         TestoEtichetteToolStripMenuItem = New ToolStripMenuItem()
         GestioneGriglieToolStripMenuItem = New ToolStripMenuItem()
         ConvalidaCampiToolStripMenuItem = New ToolStripMenuItem()
+        FileTemplateToolStripMenuItem = New ToolStripMenuItem()
         ToolStripMenuItem2 = New ToolStripSeparator()
         LogoutToolStripMenuItem = New ToolStripMenuItem()
         EsciToolStripMenuItem = New ToolStripMenuItem()
@@ -103,7 +104,7 @@ Partial Class GesPu25
         ' 
         TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem, MovSceneToolStripMenuItem})
         TabelleToolStripMenuItem.Name = "TabelleToolStripMenuItem"
-        TabelleToolStripMenuItem.Size = New Size(115, 22)
+        TabelleToolStripMenuItem.Size = New Size(180, 22)
         TabelleToolStripMenuItem.Text = "Tabelle"
         ' 
         ' EpisodiToolStripMenuItem
@@ -240,7 +241,7 @@ Partial Class GesPu25
         ' 
         OpzioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StrumentiToolStripMenuItem, ParametriToolStripMenuItem})
         OpzioniToolStripMenuItem.Name = "OpzioniToolStripMenuItem"
-        OpzioniToolStripMenuItem.Size = New Size(115, 22)
+        OpzioniToolStripMenuItem.Size = New Size(180, 22)
         OpzioniToolStripMenuItem.Text = "Opzioni"
         ' 
         ' StrumentiToolStripMenuItem
@@ -264,7 +265,7 @@ Partial Class GesPu25
         ' 
         ' ParametriToolStripMenuItem
         ' 
-        ParametriToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ParametriToolStripMenuItem1, ToolStripMenuItem3, GestioneFormToolStripMenuItem, GestioneFormCollegatiToolStripMenuItem, TestoEtichetteToolStripMenuItem, GestioneGriglieToolStripMenuItem, ConvalidaCampiToolStripMenuItem})
+        ParametriToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ParametriToolStripMenuItem1, ToolStripMenuItem3, GestioneFormToolStripMenuItem, GestioneFormCollegatiToolStripMenuItem, TestoEtichetteToolStripMenuItem, GestioneGriglieToolStripMenuItem, ConvalidaCampiToolStripMenuItem, FileTemplateToolStripMenuItem})
         ParametriToolStripMenuItem.Name = "ParametriToolStripMenuItem"
         ParametriToolStripMenuItem.Size = New Size(126, 22)
         ParametriToolStripMenuItem.Text = "Sistema"
@@ -310,21 +311,27 @@ Partial Class GesPu25
         ConvalidaCampiToolStripMenuItem.Size = New Size(201, 22)
         ConvalidaCampiToolStripMenuItem.Text = "Convalida Campi"
         ' 
+        ' FileTemplateToolStripMenuItem
+        ' 
+        FileTemplateToolStripMenuItem.Name = "FileTemplateToolStripMenuItem"
+        FileTemplateToolStripMenuItem.Size = New Size(201, 22)
+        FileTemplateToolStripMenuItem.Text = "File Template"
+        ' 
         ' ToolStripMenuItem2
         ' 
         ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-        ToolStripMenuItem2.Size = New Size(112, 6)
+        ToolStripMenuItem2.Size = New Size(177, 6)
         ' 
         ' LogoutToolStripMenuItem
         ' 
         LogoutToolStripMenuItem.Name = "LogoutToolStripMenuItem"
-        LogoutToolStripMenuItem.Size = New Size(115, 22)
+        LogoutToolStripMenuItem.Size = New Size(180, 22)
         LogoutToolStripMenuItem.Text = "Logout"
         ' 
         ' EsciToolStripMenuItem
         ' 
         EsciToolStripMenuItem.Name = "EsciToolStripMenuItem"
-        EsciToolStripMenuItem.Size = New Size(115, 22)
+        EsciToolStripMenuItem.Size = New Size(180, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
         ' AssegnazioniToolStripMenuItem
@@ -338,32 +345,32 @@ Partial Class GesPu25
         ' 
         StoryboardToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StoryboardToolStripMenuItem1, SceneToolStripMenuItem, PanelToolStripMenuItem})
         StoryboardToolStripMenuItem.Name = "StoryboardToolStripMenuItem"
-        StoryboardToolStripMenuItem.Size = New Size(180, 22)
+        StoryboardToolStripMenuItem.Size = New Size(143, 22)
         StoryboardToolStripMenuItem.Text = "Storyboard"
         ' 
         ' StoryboardToolStripMenuItem1
         ' 
         StoryboardToolStripMenuItem1.Name = "StoryboardToolStripMenuItem1"
-        StoryboardToolStripMenuItem1.Size = New Size(180, 22)
+        StoryboardToolStripMenuItem1.Size = New Size(166, 22)
         StoryboardToolStripMenuItem1.Text = "Storyboard"
         ' 
         ' SceneToolStripMenuItem
         ' 
         SceneToolStripMenuItem.Name = "SceneToolStripMenuItem"
-        SceneToolStripMenuItem.Size = New Size(180, 22)
+        SceneToolStripMenuItem.Size = New Size(166, 22)
         SceneToolStripMenuItem.Text = "Scene Storyboard"
         ' 
         ' PanelToolStripMenuItem
         ' 
         PanelToolStripMenuItem.Name = "PanelToolStripMenuItem"
-        PanelToolStripMenuItem.Size = New Size(180, 22)
+        PanelToolStripMenuItem.Size = New Size(166, 22)
         PanelToolStripMenuItem.Text = "Panel Scene"
         ' 
         ' AssegnazioniToolStripMenuItem1
         ' 
         AssegnazioniToolStripMenuItem1.DropDownItems.AddRange(New ToolStripItem() {AssegnazioniToolStripMenuItem2, AssegnazioniAnimazioniToolStripMenuItem, AssegnazioniDiverseToolStripMenuItem})
         AssegnazioniToolStripMenuItem1.Name = "AssegnazioniToolStripMenuItem1"
-        AssegnazioniToolStripMenuItem1.Size = New Size(180, 22)
+        AssegnazioniToolStripMenuItem1.Size = New Size(143, 22)
         AssegnazioniToolStripMenuItem1.Text = "Assegnazioni"
         ' 
         ' AssegnazioniToolStripMenuItem2
@@ -388,7 +395,7 @@ Partial Class GesPu25
         ' 
         ConsegneToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ConsegneAnimazioniToolStripMenuItem, ConsegneDiverseToolStripMenuItem})
         ConsegneToolStripMenuItem.Name = "ConsegneToolStripMenuItem"
-        ConsegneToolStripMenuItem.Size = New Size(180, 22)
+        ConsegneToolStripMenuItem.Size = New Size(143, 22)
         ConsegneToolStripMenuItem.Text = "Consegne"
         ' 
         ' ConsegneAnimazioniToolStripMenuItem
@@ -519,5 +526,6 @@ Partial Class GesPu25
     Friend WithEvents ConsegneAnimazioniToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ConsegneDiverseToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ConvalidaCampiToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents FileTemplateToolStripMenuItem As ToolStripMenuItem
 
 End Class

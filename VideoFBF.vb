@@ -1,7 +1,5 @@
 ﻿Imports System.IO
-Imports System.Text.RegularExpressions
 Imports Microsoft.Data.SqlClient
-Imports Microsoft.VisualBasic.Devices
 
 Public Class VideoFBF
     Dim editor As VideoEditor
@@ -31,7 +29,7 @@ Public Class VideoFBF
     End Sub
 
     Private Sub VideoFBF_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        RipristinaPosizioneForm()
+        RipristinaPosizioneForm(Me)
 
         lblRevAttiva.Text = "Nessuna revisione attiva"
         CaricaUtentiDisponibili()
@@ -152,31 +150,11 @@ Public Class VideoFBF
         End Using
     End Sub
 
-    Private Sub RipristinaPosizioneForm()
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query = "SELECT X, Y, Width, Height, WindowsState FROM Sys_Form WHERE FormName = @FormName"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@FormName", Me.Name)
-                Using reader = cmd.ExecuteReader()
-                    If reader.Read() Then
-                        Me.StartPosition = FormStartPosition.Manual
-                        Me.Location = New Point(reader("X"), reader("Y"))
-                        Me.Size = New Size(reader("Width"), reader("Height"))
-                        Me.WindowState = If(reader("WindowsState").ToString = "Maximized", FormWindowState.Maximized, FormWindowState.Normal)
-                    Else
-                        Me.StartPosition = FormStartPosition.CenterParent
-                    End If
-                End Using
-            End Using
-        End Using
-    End Sub
-
     Private Sub VideoFBF_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
-        SalvaPosizioneForm()
+        SalvaPosizioneForm(Me)
     End Sub
 
-    Private Sub SalvaPosizioneForm()
+    Private Sub SalvaPosizioneForm2()
         Dim stato = If(Me.WindowState = FormWindowState.Maximized, "Maximized", "Normal")
         Dim x = If(Me.WindowState = FormWindowState.Normal, Me.Location.X, RestoreBounds.X)
         Dim y = If(Me.WindowState = FormWindowState.Normal, Me.Location.Y, RestoreBounds.Y)

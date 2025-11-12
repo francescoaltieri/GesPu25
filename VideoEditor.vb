@@ -1,8 +1,6 @@
-﻿Imports System.Drawing
+﻿Imports System.Globalization
 Imports System.IO
-Imports System.Diagnostics
 Imports System.Text.RegularExpressions
-Imports System.Globalization
 
 Public Class VideoEditor
     Public Property VideoPath As String

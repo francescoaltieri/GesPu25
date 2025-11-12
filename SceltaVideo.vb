@@ -1,6 +1,4 @@
-﻿Imports System.ComponentModel
-Imports System.IO
-Imports System.Net.Mail
+﻿Imports System.IO
 Imports Microsoft.Data.SqlClient
 
 Public Class SceltaVideo

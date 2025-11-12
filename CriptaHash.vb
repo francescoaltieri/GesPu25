@@ -1,5 +1,5 @@
-﻿Imports System.Text
-Imports System.Security.Cryptography
+﻿Imports System.Security.Cryptography
+Imports System.Text
 
 Public Class CriptaHash
     Public Function HashPassword(password As String) As String

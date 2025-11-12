@@ -4,6 +4,9 @@
     <_LastSelectedProfileId>C:\Users\Administrator\Documents\GitHub\GesPu25\My Project\PublishProfiles\FolderProfile.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Update="CreaPDFAssegnazione.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="ExportChoiceForm.vb">
       <SubType>Form</SubType>
     </Compile>

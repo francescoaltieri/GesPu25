@@ -3,8 +3,20 @@
   "WorkspaceRootPath": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\creapdfassegnazione.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:creapdfassegnazione.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\creapdfassegnazione.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:creapdfassegnazione.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
       "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\modulocampidinamici.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:modulocampidinamici.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\formdinamico.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
@@ -18,7 +30,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 2,
           "Children": [
             {
               "$type": "Bookmark",
@@ -26,27 +38,65 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "FormDinamico.vb",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
-              "RelativeDocumentMoniker": "FormDinamico.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
-              "RelativeToolTip": "FormDinamico.vb",
-              "ViewState": "AgIAAF8GAAAAAAAAAAAswMAGAAAAAAAAAAAAAA==",
+              "DocumentIndex": 3,
+              "Title": "ModuloCampiDinamici.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\ModuloCampiDinamici.vb",
+              "RelativeDocumentMoniker": "ModuloCampiDinamici.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\ModuloCampiDinamici.vb",
+              "RelativeToolTip": "ModuloCampiDinamici.vb",
+              "ViewState": "AgIAAI4AAAAAAAAAAAAcwM0AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-11-06T13:19:45.621Z",
+              "WhenOpened": "2025-11-12T16:51:03.546Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "CreaPDFAssegnazione.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\CreaPDFAssegnazione.vb",
+              "RelativeDocumentMoniker": "CreaPDFAssegnazione.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\CreaPDFAssegnazione.vb",
+              "RelativeToolTip": "CreaPDFAssegnazione.vb",
+              "ViewState": "AgIAAE0BAAAAAAAAAAAAwKsBAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2025-11-12T15:53:16.499Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "CreaPDFAssegnazione.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\CreaPDFAssegnazione.vb",
+              "RelativeDocumentMoniker": "CreaPDFAssegnazione.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\CreaPDFAssegnazione.vb [Progettazione]",
+              "RelativeToolTip": "CreaPDFAssegnazione.vb [Progettazione]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2025-11-12T15:53:12.971Z",
+              "EditorCaption": " [Progettazione]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "FormDinamico.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
+              "RelativeDocumentMoniker": "FormDinamico.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
+              "RelativeToolTip": "FormDinamico.vb",
+              "ViewState": "AgIAAPgIAAAAAAAAAAAowCcJAAAgAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2025-11-12T15:51:20.907Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "FormDinamico.vb [Progettazione]",
               "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb",
               "RelativeDocumentMoniker": "FormDinamico.vb",
               "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\FormDinamico.vb [Progettazione]",
               "RelativeToolTip": "FormDinamico.vb [Progettazione]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-11-06T13:19:43.404Z",
+              "WhenOpened": "2025-11-12T15:51:17.96Z",
               "EditorCaption": " [Progettazione]"
             }
           ]

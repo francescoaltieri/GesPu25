@@ -158,5 +158,73 @@ Module ModuloCampiDinamici
         Return campi
     End Function
 
+    Public Sub SalvaPosizioneForm(FormAttivo As Object)
+        Dim stato = If(FormAttivo.WindowState = FormWindowState.Maximized, "Maximized", "Normal")
+        Dim x = If(FormAttivo.WindowState = FormWindowState.Normal, FormAttivo.Location.X, FormAttivo.RestoreBounds.X)
+        Dim y = If(FormAttivo.WindowState = FormWindowState.Normal, FormAttivo.Location.Y, FormAttivo.RestoreBounds.Y)
+        Dim w = If(FormAttivo.WindowState = FormWindowState.Normal, FormAttivo.Size.Width, FormAttivo.RestoreBounds.Width)
+        Dim h = If(FormAttivo.WindowState = FormWindowState.Normal, FormAttivo.Size.Height, FormAttivo.RestoreBounds.Height)
+
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query = "
+            IF EXISTS (SELECT 1 FROM Sys_Form WHERE FormName = @FormName)
+                UPDATE Sys_Form SET X = @X, Y = @Y, Width = @Width, Height = @Height, WindowsState = @WindowsState WHERE FormName = @FormName
+            ELSE
+                INSERT INTO Sys_Form (FormName, X, Y, Width, Height, WindowsState) VALUES (@FormName, @X, @Y, @Width, @Height, @WindowsState)"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@FormName", FormAttivo.Name)
+                cmd.Parameters.AddWithValue("@X", x)
+                cmd.Parameters.AddWithValue("@Y", y)
+                cmd.Parameters.AddWithValue("@Width", w)
+                cmd.Parameters.AddWithValue("@Height", h)
+                cmd.Parameters.AddWithValue("@WindowsState", stato)
+                cmd.ExecuteNonQuery()
+            End Using
+        End Using
+    End Sub
+
+    Public Sub RipristinaPosizioneForm(FormAttivo As Object)
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query = "SELECT X, Y, Width, Height, WindowsState FROM Sys_Form WHERE FormName = @FormName"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@FormName", FormAttivo.Name)
+                Using reader = cmd.ExecuteReader()
+                    If reader.Read() Then
+                        FormAttivo.StartPosition = FormStartPosition.Manual
+                        FormAttivo.Location = New Point(reader("X"), reader("Y"))
+                        FormAttivo.Size = New Size(reader("Width"), reader("Height"))
+                        FormAttivo.WindowState = If(reader("WindowsState").ToString = "Maximized", FormWindowState.Maximized, FormWindowState.Normal)
+                    Else
+                        FormAttivo.StartPosition = FormStartPosition.CenterParent
+                    End If
+                End Using
+            End Using
+        End Using
+    End Sub
+
+    Public Function SpaziaMaiuscole(text As String) As String
+        If String.IsNullOrWhiteSpace(text) Then Return String.Empty
+
+        Dim sb As New StringBuilder()
+        sb.Append(text(0))
+
+        For i = 1 To text.Length - 1
+            Dim c As Char = text(i)
+            Dim prev As Char = text(i - 1)
+
+            If Char.IsUpper(c) AndAlso (Char.IsLower(prev) OrElse Char.IsDigit(prev)) Then
+                sb.Append(" "c)
+            ElseIf prev = "_"c OrElse prev = " "c Then
+                If sb(sb.Length - 1) <> " "c Then sb.Append(" "c)
+            End If
+
+            sb.Append(c)
+        Next
+
+        Return sb.ToString().Trim()
+    End Function
+
 End Module
 
