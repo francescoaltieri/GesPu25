@@ -127,7 +127,7 @@ Module ModuloCampiDinamici
 
                 Dim queryCollegamenti = "
                 SELECT NomeCampo, TabellaCollegata, CampoValore, CampoVisuale
-                FROM Sys_CollegamentiCampi
+                FROM Sys_CampiCollegamento
                 WHERE NomeTabella = @nomeTabella
             "
 

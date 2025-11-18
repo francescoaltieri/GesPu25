@@ -1,5 +1,5 @@
 ﻿<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()> _
-Partial Class CreaPDFAssegnazione
+Partial Class CreaLettAssegnazione
     Inherits System.Windows.Forms.Form
 
     'Form esegue l'override del metodo Dispose per pulire l'elenco dei componenti.
@@ -22,23 +22,24 @@ Partial Class CreaPDFAssegnazione
     'Non modificarla mediante l'editor del codice.
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
-        btnCreaPDF = New Button()
+        btnCreaLett = New Button()
         btnAnnulla = New Button()
         lblCreaPDF = New Label()
+        btnCaricaAllegati = New Button()
         SuspendLayout()
         ' 
-        ' btnCreaPDF
+        ' btnCreaLett
         ' 
-        btnCreaPDF.Location = New Point(52, 51)
-        btnCreaPDF.Name = "btnCreaPDF"
-        btnCreaPDF.Size = New Size(75, 23)
-        btnCreaPDF.TabIndex = 0
-        btnCreaPDF.Text = "Crea PDF"
-        btnCreaPDF.UseVisualStyleBackColor = True
+        btnCreaLett.Location = New Point(28, 56)
+        btnCreaLett.Name = "btnCreaLett"
+        btnCreaLett.Size = New Size(102, 23)
+        btnCreaLett.TabIndex = 0
+        btnCreaLett.Text = "Crea Lettera"
+        btnCreaLett.UseVisualStyleBackColor = True
         ' 
         ' btnAnnulla
         ' 
-        btnAnnulla.Location = New Point(143, 51)
+        btnAnnulla.Location = New Point(91, 94)
         btnAnnulla.Name = "btnAnnulla"
         btnAnnulla.Size = New Size(75, 23)
         btnAnnulla.TabIndex = 1
@@ -49,27 +50,38 @@ Partial Class CreaPDFAssegnazione
         ' 
         lblCreaPDF.AutoSize = True
         lblCreaPDF.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblCreaPDF.Location = New Point(40, 19)
+        lblCreaPDF.Location = New Point(28, 20)
         lblCreaPDF.Name = "lblCreaPDF"
-        lblCreaPDF.Size = New Size(193, 17)
+        lblCreaPDF.Size = New Size(211, 17)
         lblCreaPDF.TabIndex = 2
-        lblCreaPDF.Text = "CREAZIONE PDF Assegnazioni"
+        lblCreaPDF.Text = "CREAZIONE Lettera Assegnazioni"
         ' 
-        ' CreaPDFAssegnazione
+        ' btnCaricaAllegati
+        ' 
+        btnCaricaAllegati.Location = New Point(137, 56)
+        btnCaricaAllegati.Name = "btnCaricaAllegati"
+        btnCaricaAllegati.Size = New Size(102, 23)
+        btnCaricaAllegati.TabIndex = 3
+        btnCaricaAllegati.Text = "Carica Allegati"
+        btnCaricaAllegati.UseVisualStyleBackColor = True
+        ' 
+        ' CreaLettAssegnazione
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(272, 95)
+        ClientSize = New Size(272, 129)
+        Controls.Add(btnCaricaAllegati)
         Controls.Add(lblCreaPDF)
         Controls.Add(btnAnnulla)
-        Controls.Add(btnCreaPDF)
-        Name = "CreaPDFAssegnazione"
-        Text = "Crea PDF Assegnazione"
+        Controls.Add(btnCreaLett)
+        Name = "CreaLettAssegnazione"
+        Text = "Crea Lettera  Assegnazione"
         ResumeLayout(False)
         PerformLayout()
     End Sub
 
-    Friend WithEvents btnCreaPDF As Button
+    Friend WithEvents btnCreaLett As Button
     Friend WithEvents btnAnnulla As Button
     Friend WithEvents lblCreaPDF As Label
+    Friend WithEvents btnCaricaAllegati As Button
 End Class

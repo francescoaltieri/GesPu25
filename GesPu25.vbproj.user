@@ -4,7 +4,7 @@
     <_LastSelectedProfileId>C:\Users\Administrator\Documents\GitHub\GesPu25\My Project\PublishProfiles\FolderProfile.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Update="CreaPDFAssegnazione.vb">
+    <Compile Update="CreaLettAssegnazione.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="ExportChoiceForm.vb">
@@ -37,5 +37,10 @@
     <Compile Update="VisualMediaForm.vb">
       <SubType>Form</SubType>
     </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="VisualMediaForm.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>

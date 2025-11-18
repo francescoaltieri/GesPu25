@@ -51,21 +51,25 @@
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
+            "DocumentFormat.OpenXml": {
+              "target": "Package",
+              "version": "[3.3.0, )"
+            },
             "LibVLCSharp.WinForms": {
               "target": "Package",
               "version": "[3.9.4, )"
             },
             "Microsoft.Data.SqlClient": {
               "target": "Package",
-              "version": "[6.1.0, )"
+              "version": "[7.0.0-preview2.25289.6, )"
             },
             "PDFsharp": {
               "target": "Package",
-              "version": "[6.2.1, )"
+              "version": "[6.2.2, )"
             },
             "System.Data.OleDb": {
               "target": "Package",
-              "version": "[10.0.0-preview.6.25358.103, )"
+              "version": "[10.0.0, )"
             },
             "VideoLAN.LibVLC.Windows": {
               "target": "Package",

@@ -216,19 +216,17 @@ Public Class GesPu25
         ApriModuloConPermessi("Tab_Episodi", Me)
     End Sub
 
-    Private Sub BackgroundToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles BackgroundToolStripMenuItem1.Click
-        ApriModuloConPermessi("Tab_Backgrounds", Me)
-    End Sub
 
-    Private Sub CharactersToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CharactersToolStripMenuItem.Click
+
+    Private Sub CharactersToolStripMenuItem_Click(sender As Object, e As EventArgs)
         ApriModuloConPermessi("Tab_Characters", Me)
     End Sub
 
-    Private Sub PropsToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles PropsToolStripMenuItem.Click
+    Private Sub PropsToolStripMenuItem_Click(sender As Object, e As EventArgs)
         ApriModuloConPermessi("Tab_Props", Me)
     End Sub
 
-    Private Sub EffettiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles EffettiToolStripMenuItem.Click
+    Private Sub EffettiToolStripMenuItem_Click(sender As Object, e As EventArgs)
         ApriModuloConPermessi("Tab_Effetti", Me)
     End Sub
 
@@ -249,6 +247,9 @@ Public Class GesPu25
     End Sub
     Private Sub OggettiLavorazioneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiLavorazioneToolStripMenuItem.Click
         ApriModuloConPermessi("Tab_OggettiLavorazione", Me)
+    End Sub
+    Private Sub ComunicazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ComunicazioniToolStripMenuItem.Click
+        ApriModuloConPermessi("Tab_Comunicazioni", Me)
     End Sub
 
     Private Sub SceneAssegnateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SceneAssegnateToolStripMenuItem.Click
@@ -304,5 +305,16 @@ Public Class GesPu25
         ApriModuloConPermessi("Mov_ConsegneLavD", Me)
     End Sub
 
+    Private Sub OggettiStoryboardToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiStoryboardToolStripMenuItem.Click
+        ApriModuloConPermessi("Tab_OggettiStoryboard", Me)
+    End Sub
+
+    Private Sub ModelPackToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles ModelPackToolStripMenuItem1.Click
+        ApriModuloConPermessi("Mov_ModelPack", Me)
+    End Sub
+
+    Private Sub VociModelPackToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles VociModelPackToolStripMenuItem.Click
+        ApriModuloConPermessi("Mov_ModelPackOggetti", Me)
+    End Sub
 End Class
 
