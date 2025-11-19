@@ -55,6 +55,22 @@
               "target": "Package",
               "version": "[3.3.0, )"
             },
+            "Emgu.CV": {
+              "target": "Package",
+              "version": "[4.12.0.5764, )"
+            },
+            "Emgu.CV.Bitmap": {
+              "target": "Package",
+              "version": "[4.12.0.5764, )"
+            },
+            "Emgu.CV.UI": {
+              "target": "Package",
+              "version": "[4.12.0.5764, )"
+            },
+            "Emgu.CV.runtime.windows": {
+              "target": "Package",
+              "version": "[4.12.0.5764, )"
+            },
             "LibVLCSharp.WinForms": {
               "target": "Package",
               "version": "[3.9.4, )"
@@ -67,9 +83,21 @@
               "target": "Package",
               "version": "[6.2.2, )"
             },
+            "PdfiumViewer": {
+              "target": "Package",
+              "version": "[2.13.0, )"
+            },
+            "PdfiumViewer.Native.x86_64.v8-xfa": {
+              "target": "Package",
+              "version": "[2018.4.8.256, )"
+            },
             "System.Data.OleDb": {
               "target": "Package",
               "version": "[10.0.0, )"
+            },
+            "UglyToad.PdfPig": {
+              "target": "Package",
+              "version": "[1.7.0-custom-5, )"
             },
             "VideoLAN.LibVLC.Windows": {
               "target": "Package",

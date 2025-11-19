@@ -10,6 +10,9 @@
     <Compile Update="ExportChoiceForm.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="PDF2Storyboard.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="SceltaVideo.vb">
       <SubType>Form</SubType>
     </Compile>

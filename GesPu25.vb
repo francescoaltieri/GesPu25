@@ -216,8 +216,6 @@ Public Class GesPu25
         ApriModuloConPermessi("Tab_Episodi", Me)
     End Sub
 
-
-
     Private Sub CharactersToolStripMenuItem_Click(sender As Object, e As EventArgs)
         ApriModuloConPermessi("Tab_Characters", Me)
     End Sub
@@ -315,6 +313,11 @@ Public Class GesPu25
 
     Private Sub VociModelPackToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles VociModelPackToolStripMenuItem.Click
         ApriModuloConPermessi("Mov_ModelPackOggetti", Me)
+    End Sub
+
+    Private Sub AcquisisciDaPDFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AcquisisciDaPDFToolStripMenuItem.Click
+        Dim modulo As New PDF2Storyboard()
+        ApriModulo2ConPermessi("Acquisici da PDF", modulo)
     End Sub
 End Class
 
