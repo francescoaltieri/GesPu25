@@ -20,81 +20,51 @@ Partial Class PDF2Storyboard
     'NOTA: la procedura che segue è richiesta da Progettazione Windows Form
     'Può essere modificata in Progettazione Windows Form.  
     'Non modificarla mediante l'editor del codice.
-    <System.Diagnostics.DebuggerStepThrough()> _
+    <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
-        btnAcquisisciPDF = New Button()
-        btnAnnulla = New Button()
-        picPanel = New PictureBox()
-        Label1 = New Label()
-        Label2 = New Label()
-        txtScena = New TextBox()
-        txtPanel = New TextBox()
+        BtnAcquisisciPDF = New Button()
+        BtnChiudi = New Button()
+        PicPanel = New PictureBox()
         Label3 = New Label()
-        txtStoryboard = New TextBox()
-        btnCaricaStoryboard = New Button()
-        btnPrev = New Button()
-        btnNext = New Button()
-        CType(picPanel, ComponentModel.ISupportInitialize).BeginInit()
+        BtnCaricaStoryboard = New Button()
+        BtnPrev = New Button()
+        BtnNext = New Button()
+        BtnAnnunllaModifica = New Button()
+        BtnSalvaPanel = New Button()
+        ComboStoryboard = New ComboBox()
+        BtnCancellaPanel = New Button()
+        CheckConfermaSalvataggio = New CheckBox()
+        BtnAnimatic = New Button()
+        BtnAssegnaScene = New Button()
+        CType(PicPanel, ComponentModel.ISupportInitialize).BeginInit()
         SuspendLayout()
         ' 
-        ' btnAcquisisciPDF
+        ' BtnAcquisisciPDF
         ' 
-        btnAcquisisciPDF.Location = New Point(12, 577)
-        btnAcquisisciPDF.Name = "btnAcquisisciPDF"
-        btnAcquisisciPDF.Size = New Size(75, 23)
-        btnAcquisisciPDF.TabIndex = 0
-        btnAcquisisciPDF.Text = "Acquisisci PDF"
-        btnAcquisisciPDF.UseVisualStyleBackColor = True
+        BtnAcquisisciPDF.Location = New Point(12, 531)
+        BtnAcquisisciPDF.Name = "BtnAcquisisciPDF"
+        BtnAcquisisciPDF.Size = New Size(98, 43)
+        BtnAcquisisciPDF.TabIndex = 0
+        BtnAcquisisciPDF.Text = "Acquisizione Panels da PDF"
+        BtnAcquisisciPDF.UseVisualStyleBackColor = True
         ' 
-        ' btnAnnulla
+        ' BtnChiudi
         ' 
-        btnAnnulla.Location = New Point(93, 577)
-        btnAnnulla.Name = "btnAnnulla"
-        btnAnnulla.Size = New Size(75, 23)
-        btnAnnulla.TabIndex = 1
-        btnAnnulla.Text = "Annulla"
-        btnAnnulla.UseVisualStyleBackColor = True
+        BtnChiudi.Location = New Point(781, 531)
+        BtnChiudi.Name = "BtnChiudi"
+        BtnChiudi.Size = New Size(75, 43)
+        BtnChiudi.TabIndex = 1
+        BtnChiudi.Text = "Chiudi"
+        BtnChiudi.UseVisualStyleBackColor = True
         ' 
-        ' picPanel
+        ' PicPanel
         ' 
-        picPanel.BorderStyle = BorderStyle.Fixed3D
-        picPanel.Location = New Point(12, 39)
-        picPanel.Name = "picPanel"
-        picPanel.Size = New Size(844, 532)
-        picPanel.TabIndex = 4
-        picPanel.TabStop = False
-        ' 
-        ' Label1
-        ' 
-        Label1.AutoSize = True
-        Label1.Location = New Point(878, 49)
-        Label1.Name = "Label1"
-        Label1.Size = New Size(41, 15)
-        Label1.TabIndex = 5
-        Label1.Text = "Scena:"
-        ' 
-        ' Label2
-        ' 
-        Label2.AutoSize = True
-        Label2.Location = New Point(880, 86)
-        Label2.Name = "Label2"
-        Label2.Size = New Size(39, 15)
-        Label2.TabIndex = 6
-        Label2.Text = "Panel:"
-        ' 
-        ' txtScena
-        ' 
-        txtScena.Location = New Point(925, 46)
-        txtScena.Name = "txtScena"
-        txtScena.Size = New Size(100, 23)
-        txtScena.TabIndex = 7
-        ' 
-        ' txtPanel
-        ' 
-        txtPanel.Location = New Point(925, 78)
-        txtPanel.Name = "txtPanel"
-        txtPanel.Size = New Size(100, 23)
-        txtPanel.TabIndex = 8
+        PicPanel.BorderStyle = BorderStyle.Fixed3D
+        PicPanel.Location = New Point(12, 39)
+        PicPanel.Name = "PicPanel"
+        PicPanel.Size = New Size(844, 486)
+        PicPanel.TabIndex = 4
+        PicPanel.TabStop = False
         ' 
         ' Label3
         ' 
@@ -105,74 +75,135 @@ Partial Class PDF2Storyboard
         Label3.TabIndex = 9
         Label3.Text = "Storyboard:"
         ' 
-        ' txtStoryboard
+        ' BtnCaricaStoryboard
         ' 
-        txtStoryboard.Location = New Point(86, 6)
-        txtStoryboard.Name = "txtStoryboard"
-        txtStoryboard.Size = New Size(221, 23)
-        txtStoryboard.TabIndex = 10
+        BtnCaricaStoryboard.Location = New Point(468, 4)
+        BtnCaricaStoryboard.Name = "BtnCaricaStoryboard"
+        BtnCaricaStoryboard.Size = New Size(154, 29)
+        BtnCaricaStoryboard.TabIndex = 11
+        BtnCaricaStoryboard.Text = "Carica Panels dal Drive"
+        BtnCaricaStoryboard.UseVisualStyleBackColor = True
         ' 
-        ' btnCaricaStoryboard
+        ' BtnPrev
         ' 
-        btnCaricaStoryboard.Location = New Point(313, 6)
-        btnCaricaStoryboard.Name = "btnCaricaStoryboard"
-        btnCaricaStoryboard.Size = New Size(129, 24)
-        btnCaricaStoryboard.TabIndex = 11
-        btnCaricaStoryboard.Text = "Carica Storybord"
-        btnCaricaStoryboard.UseVisualStyleBackColor = True
+        BtnPrev.Location = New Point(630, 531)
+        BtnPrev.Name = "BtnPrev"
+        BtnPrev.Size = New Size(75, 23)
+        BtnPrev.TabIndex = 12
+        BtnPrev.Text = "<"
+        BtnPrev.UseVisualStyleBackColor = True
         ' 
-        ' btnPrev
+        ' BtnNext
         ' 
-        btnPrev.Location = New Point(700, 577)
-        btnPrev.Name = "btnPrev"
-        btnPrev.Size = New Size(75, 23)
-        btnPrev.TabIndex = 12
-        btnPrev.Text = "<"
-        btnPrev.UseVisualStyleBackColor = True
+        BtnNext.Location = New Point(698, 531)
+        BtnNext.Name = "BtnNext"
+        BtnNext.Size = New Size(75, 23)
+        BtnNext.TabIndex = 13
+        BtnNext.Text = ">"
+        BtnNext.UseVisualStyleBackColor = True
         ' 
-        ' btnNext
+        ' BtnAnnunllaModifica
         ' 
-        btnNext.Location = New Point(781, 577)
-        btnNext.Name = "btnNext"
-        btnNext.Size = New Size(75, 23)
-        btnNext.TabIndex = 13
-        btnNext.Text = ">"
-        btnNext.UseVisualStyleBackColor = True
+        BtnAnnunllaModifica.Location = New Point(394, 531)
+        BtnAnnunllaModifica.Name = "BtnAnnunllaModifica"
+        BtnAnnunllaModifica.Size = New Size(69, 43)
+        BtnAnnunllaModifica.TabIndex = 14
+        BtnAnnunllaModifica.Text = "Annulla Modifiche"
+        BtnAnnunllaModifica.UseVisualStyleBackColor = True
+        ' 
+        ' BtnSalvaPanel
+        ' 
+        BtnSalvaPanel.Location = New Point(469, 531)
+        BtnSalvaPanel.Name = "BtnSalvaPanel"
+        BtnSalvaPanel.Size = New Size(69, 43)
+        BtnSalvaPanel.TabIndex = 15
+        BtnSalvaPanel.Text = "Salva Modifiche"
+        BtnSalvaPanel.UseVisualStyleBackColor = True
+        ' 
+        ' ComboStoryboard
+        ' 
+        ComboStoryboard.FormattingEnabled = True
+        ComboStoryboard.Location = New Point(86, 7)
+        ComboStoryboard.Name = "ComboStoryboard"
+        ComboStoryboard.Size = New Size(376, 23)
+        ComboStoryboard.TabIndex = 16
+        ' 
+        ' BtnCancellaPanel
+        ' 
+        BtnCancellaPanel.Location = New Point(544, 531)
+        BtnCancellaPanel.Name = "BtnCancellaPanel"
+        BtnCancellaPanel.Size = New Size(69, 43)
+        BtnCancellaPanel.TabIndex = 18
+        BtnCancellaPanel.Text = "Cancella Panel"
+        BtnCancellaPanel.UseVisualStyleBackColor = True
+        ' 
+        ' CheckConfermaSalvataggio
+        ' 
+        CheckConfermaSalvataggio.AutoSize = True
+        CheckConfermaSalvataggio.Location = New Point(630, 555)
+        CheckConfermaSalvataggio.Name = "CheckConfermaSalvataggio"
+        CheckConfermaSalvataggio.Size = New Size(143, 19)
+        CheckConfermaSalvataggio.TabIndex = 19
+        CheckConfermaSalvataggio.Text = "Conferma Salvataggio"
+        CheckConfermaSalvataggio.UseVisualStyleBackColor = True
+        ' 
+        ' BtnAnimatic
+        ' 
+        BtnAnimatic.Location = New Point(116, 531)
+        BtnAnimatic.Name = "BtnAnimatic"
+        BtnAnimatic.Size = New Size(98, 43)
+        BtnAnimatic.TabIndex = 20
+        BtnAnimatic.Text = "Crea Animatic"
+        BtnAnimatic.UseVisualStyleBackColor = True
+        ' 
+        ' BtnAssegnaScene
+        ' 
+        BtnAssegnaScene.Location = New Point(258, 531)
+        BtnAssegnaScene.Name = "BtnAssegnaScene"
+        BtnAssegnaScene.Size = New Size(98, 43)
+        BtnAssegnaScene.TabIndex = 21
+        BtnAssegnaScene.Text = "Assegna Scene"
+        BtnAssegnaScene.UseVisualStyleBackColor = True
         ' 
         ' PDF2Storyboard
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(1037, 612)
-        Controls.Add(btnNext)
-        Controls.Add(btnPrev)
-        Controls.Add(btnCaricaStoryboard)
-        Controls.Add(txtStoryboard)
+        ClientSize = New Size(865, 586)
+        Controls.Add(BtnAssegnaScene)
+        Controls.Add(BtnAnimatic)
+        Controls.Add(CheckConfermaSalvataggio)
+        Controls.Add(BtnCancellaPanel)
+        Controls.Add(ComboStoryboard)
+        Controls.Add(BtnSalvaPanel)
+        Controls.Add(BtnAnnunllaModifica)
+        Controls.Add(BtnNext)
+        Controls.Add(BtnPrev)
+        Controls.Add(BtnCaricaStoryboard)
         Controls.Add(Label3)
-        Controls.Add(txtPanel)
-        Controls.Add(txtScena)
-        Controls.Add(Label2)
-        Controls.Add(Label1)
-        Controls.Add(picPanel)
-        Controls.Add(btnAnnulla)
-        Controls.Add(btnAcquisisciPDF)
+        Controls.Add(PicPanel)
+        Controls.Add(BtnChiudi)
+        Controls.Add(BtnAcquisisciPDF)
         Name = "PDF2Storyboard"
         Text = "Acquisisci da Storyboard"
-        CType(picPanel, ComponentModel.ISupportInitialize).EndInit()
+        CType(PicPanel, ComponentModel.ISupportInitialize).EndInit()
         ResumeLayout(False)
         PerformLayout()
     End Sub
 
-    Friend WithEvents btnAcquisisciPDF As Button
-    Friend WithEvents btnAnnulla As Button
-    Friend WithEvents picPanel As PictureBox
-    Friend WithEvents Label1 As Label
-    Friend WithEvents Label2 As Label
-    Friend WithEvents txtScena As TextBox
-    Friend WithEvents txtPanel As TextBox
+    Friend WithEvents BtnAcquisisciPDF As Button
+    Friend WithEvents BtnChiudi As Button
+    Friend WithEvents PicPanel As PictureBox
     Private WithEvents Label3 As Label
-    Friend WithEvents txtStoryboard As TextBox
-    Friend WithEvents btnCaricaStoryboard As Button
-    Friend WithEvents btnPrev As Button
-    Friend WithEvents btnNext As Button
+    Friend WithEvents BtnCaricaStoryboard As Button
+    Friend WithEvents BtnPrev As Button
+    Friend WithEvents BtnNext As Button
+    Friend WithEvents BtnAnnunllaModifica As Button
+    Friend WithEvents BtnSalvaPanel As Button
+    Friend WithEvents ComboStoryboard As ComboBox
+    Friend WithEvents BtnCancellaPanel As Button
+    Friend WithEvents CheckConfermaSalvataggio As CheckBox
+    Friend WithEvents BtnAnimatic As Button
+    Friend WithEvents BtnAssegnaScene As Button
+
 End Class

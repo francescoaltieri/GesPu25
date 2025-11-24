@@ -60,6 +60,8 @@ Public Class DynamicDataForm
     Private lblPagingInfo As Label = Nothing
     Private cbPageSize As ComboBox = Nothing
 
+    Private campiCalcolatiDettaglio As Dictionary(Of String, (Formula As String, TipoValore As String, SuSeStesso As Boolean)) = Nothing
+
     Public Sub New(campi As List(Of CampoDatabase), nomeTabella As String)
         Me.Name = nomeTabella
         Me.Text = "Form Dinamico"
@@ -146,7 +148,24 @@ Public Class DynamicDataForm
             ctrl.Anchor = AnchorStyles.Left
             ctrl.Margin = New Padding(5)
             campoInputs.Add(campi(i).Nome, ctrl)
-
+            If campiCalcolatiDettaglio Is Nothing Then CaricaCacheCampiCalcolati()
+            If campiCalcolatiDettaglio.ContainsKey(campi(i).Nome) Then
+                Dim dettaglio = campiCalcolatiDettaglio(campi(i).Nome)
+                If Not dettaglio.SuSeStesso Then
+                    ' disabilita subito il controllo calcolato non autoref
+                    If TypeOf ctrl Is FlowLayoutPanel Then
+                        For Each ic As Control In CType(ctrl, FlowLayoutPanel).Controls
+                            If TypeOf ic Is Button AndAlso String.Equals(CType(ic, Button).Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase) Then
+                                ic.Enabled = True
+                            Else
+                                ic.Enabled = False
+                            End If
+                        Next
+                    Else
+                        ctrl.Enabled = False
+                    End If
+                End If
+            End If
             pannelloSinistro.Controls.Add(lbl, 0, i + 1)
             pannelloSinistro.Controls.Add(ctrl, 1, i + 1)
         Next
@@ -595,6 +614,8 @@ Public Class DynamicDataForm
 
     Private Sub DynamicDataForm_Load(sender As Object, e As EventArgs)
 
+        campiCalcolatiSet = RecuperaCampiCalcolatiSet(Me.Name)
+
         If splitContainer IsNot Nothing Then
             splitContainer.Panel1MinSize = 300
             splitContainer.Panel2MinSize = 300
@@ -705,6 +726,9 @@ Public Class DynamicDataForm
     End Sub
 
     Private Sub AbilitaCampi(abilita As Boolean)
+        ' Assicura cache caricata
+        If campiCalcolatiDettaglio Is Nothing Then CaricaCacheCampiCalcolati()
+
         For Each kvp In campoInputs
             Dim nomeCampo As String = kvp.Key
             Dim ctrl As Control = kvp.Value
@@ -712,14 +736,32 @@ Public Class DynamicDataForm
             Dim campo As CampoDatabase = campiDefiniti.FirstOrDefault(Function(c) c.Nome = nomeCampo)
             If campo Is Nothing Then Continue For
 
-            If nomeCampo.StartsWith("Calc_") Then
-                ctrl.Enabled = False
+            ' Campo calcolato = solo se presente in Sys_CampiCalcolati
+            Dim isCalcolato As Boolean = campiCalcolatiDettaglio IsNot Nothing AndAlso campiCalcolatiDettaglio.ContainsKey(nomeCampo)
+            Dim suSeStesso As Boolean = False
+            If isCalcolato Then suSeStesso = campiCalcolatiDettaglio(nomeCampo).SuSeStesso
+
+            ' Regola: se è calcolato e NON SuSeStesso => disabilita il controllo
+            If isCalcolato AndAlso Not suSeStesso Then
+                ' se è un pannello con bottoni Visualizza, mantieni il bottone abilitato
+                If TypeOf ctrl Is FlowLayoutPanel Then
+                    Dim flow = CType(ctrl, FlowLayoutPanel)
+                    For Each innerCtrl As Control In flow.Controls
+                        If TypeOf innerCtrl Is Button AndAlso String.Equals(CType(innerCtrl, Button).Text?.Trim(), "Visualizza", StringComparison.OrdinalIgnoreCase) Then
+                            innerCtrl.Enabled = True
+                        Else
+                            innerCtrl.Enabled = False
+                        End If
+                    Next
+                Else
+                    ctrl.Enabled = False
+                End If
                 Continue For
             End If
 
+            ' Altrimenti applica le regole standard (identity, chiave, join)
             Dim joinRow = RecuperaJoinPerCampo(nomeTabellaCorrente, nomeCampo)
-            Dim isJoin = joinRow IsNot Nothing
-
+            Dim isJoin = (joinRow IsNot Nothing)
             Dim joinModificabile As Boolean = True
             If isJoin AndAlso joinRow.Table.Columns.Contains("AbilitaModifica") Then
                 joinModificabile = Convert.ToBoolean(joinRow("AbilitaModifica"))
@@ -742,7 +784,6 @@ Public Class DynamicDataForm
             Else
                 ctrl.Enabled = Not isBloccato AndAlso abilita
             End If
-
         Next
     End Sub
 
@@ -907,7 +948,8 @@ Public Class DynamicDataForm
             Return Nothing
         End If
 
-        If Not Regex.IsMatch(tabellaPadre, "^[\w\.]+$") OrElse Not Regex.IsMatch(campoDaPrelevare, "^[\w]+$") Then
+        Dim identPattern As String = "^[\w\.]+$"
+        If Not Regex.IsMatch(tabellaPadre, identPattern) OrElse Not Regex.IsMatch(campoDaPrelevare, "^[\w]+$") Then
             MDIMessageBox.Show($"PrelevaValoreJoin: nome tabella o campo non valido: {tabellaPadre}.{campoDaPrelevare}", Me.MdiParent, MessageBoxButtons.OK)
             Return Nothing
         End If
@@ -1132,7 +1174,6 @@ Public Class DynamicDataForm
             ToggleUIForSaving(False)
 
             sw.Stop()
-            'MDIMessageBox.Show($"SalvaDati durata totale: {sw.ElapsedMilliseconds} ms. ModalitaModifica={isModifica}", Me.MdiParent, MessageBoxButtons.OK)
         End Try
     End Sub
 
@@ -1344,8 +1385,6 @@ Public Class DynamicDataForm
                     Await cachedInsertCommand.ExecuteNonQueryAsync()
                     swExec.Stop()
 
-                    'MDIMessageBox.Show($"ExecuteNonQuery INSERT durata: {swExec.ElapsedMilliseconds} ms.", Me.MdiParent, MessageBoxButtons.OK)
-
                     tx.Commit()
                 Catch ex As Exception
                     Try
@@ -1474,6 +1513,44 @@ Public Class DynamicDataForm
 
     End Function
 
+    Private Function RecuperaCampiCalcolatiDettaglio() As Dictionary(Of String, (Formula As String, TipoValore As String, SuSeStesso As Boolean))
+        Dim diz As New Dictionary(Of String, (String, String, Boolean))(StringComparer.OrdinalIgnoreCase)
+        Using conn As New SqlConnection(ConnString)
+            Dim query = "SELECT NomeCampo, Formula, Tipovalore, SuSeStesso FROM Sys_CampiCalcolati WHERE NomeTabella = @NomeTabella"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@NomeTabella", Me.Name)
+                conn.Open()
+                Using reader = cmd.ExecuteReader()
+                    Dim hasSuSeStesso As Boolean = Enumerable.Range(0, reader.FieldCount).Any(Function(i) String.Equals(reader.GetName(i), "SuSeStesso", StringComparison.OrdinalIgnoreCase))
+                    While reader.Read()
+                        Dim nome = If(reader.IsDBNull(reader.GetOrdinal("NomeCampo")), String.Empty, reader("NomeCampo").ToString()).Trim()
+                        If String.IsNullOrEmpty(nome) Then Continue While
+                        Dim formula = If(HasColumn(reader, "Formula") AndAlso Not reader.IsDBNull(reader.GetOrdinal("Formula")), reader("Formula").ToString(), String.Empty)
+                        Dim tipo = If(HasColumn(reader, "Tipovalore") AndAlso Not reader.IsDBNull(reader.GetOrdinal("Tipovalore")), reader("Tipovalore").ToString().ToLowerInvariant(), "numero")
+                        Dim selfRef As Boolean = False
+                        If hasSuSeStesso AndAlso Not reader.IsDBNull(reader.GetOrdinal("SuSeStesso")) Then
+                            Try
+                                selfRef = Convert.ToBoolean(reader("SuSeStesso"))
+                            Catch
+                                selfRef = False
+                            End Try
+                        End If
+                        diz(nome) = (formula, tipo, selfRef)
+                    End While
+                End Using
+            End Using
+        End Using
+        Return diz
+    End Function
+
+    Private Sub CaricaCacheCampiCalcolati()
+        Try
+            campiCalcolatiDettaglio = RecuperaCampiCalcolatiDettaglio()
+        Catch
+            campiCalcolatiDettaglio = New Dictionary(Of String, (String, String, Boolean))(StringComparer.OrdinalIgnoreCase)
+        End Try
+    End Sub
+
     Private Function EstraiValoreDaControllo(nomeCampo As String, input As Control) As Object
         Dim campiBit As String() = {
             "CanView", "CanInsert", "CanUpdate", "CanDelete"}
@@ -1553,7 +1630,7 @@ Public Class DynamicDataForm
 
         Dim ctrl As Control
 
-        ' Gestione campi path (file / folder) definiti in Sys_CampiPath
+        ' Gestione campi path 
         If IsCampoPath(campo.Nome) Then
             Dim info = RecuperaInfoCampoPath(campo.Nome)
             Dim isFile = info.IsFile
@@ -1587,13 +1664,10 @@ Public Class DynamicDataForm
                                       End Try
                                   End Sub
 
-            ' imposta tooltip iniziale
             AggiornaToolTip()
 
-            ' doppio click sulla textbox: file oppure cartella
             AddHandler txt.DoubleClick, Sub(s, e)
                                             Try
-                                                ' calcola directory iniziale: se txt ha valore usa quello, altrimenti leggi Sys_Parametri PercorsoDefaultPath
                                                 Dim startDir As String = Nothing
                                                 Dim curText = txt.Text.Trim()
 
@@ -1604,7 +1678,6 @@ Public Class DynamicDataForm
                                                         ElseIf Directory.Exists(curText) Then
                                                             startDir = curText
                                                         Else
-                                                            ' se è un percorso non esistente, tentiamo di usarne la directory
                                                             Try
                                                                 startDir = Path.GetDirectoryName(curText)
                                                             Catch
@@ -1617,7 +1690,6 @@ Public Class DynamicDataForm
                                                 End If
 
                                                 If String.IsNullOrWhiteSpace(startDir) Then
-                                                    ' recupera PercorsoDefaultPath da Sys_Parametri
                                                     Try
                                                         Using conn As New SqlConnection(ConnString)
                                                             Using cmd As New SqlCommand("SELECT TOP 1 Valore FROM Sys_Parametri WHERE Descrizione = @DescPar", conn)
@@ -1649,7 +1721,6 @@ Public Class DynamicDataForm
                                                             ofd.InitialDirectory = startDir
                                                         End If
 
-                                                        ' se txt conteneva un file completo, preimpostalo
                                                         If Not String.IsNullOrWhiteSpace(curText) AndAlso File.Exists(curText) Then
                                                             ofd.FileName = Path.GetFileName(curText)
                                                         End If
@@ -1698,7 +1769,6 @@ Public Class DynamicDataForm
             .Margin = New Padding(3)
         }
 
-                ' abilitazione/disabilitazione button in base al testo
                 AddHandler txt.TextChanged, Sub()
                                                 btnView.Enabled = Not String.IsNullOrWhiteSpace(txt.Text)
                                             End Sub
@@ -1734,18 +1804,14 @@ Public Class DynamicDataForm
                                                  End If
                                              End Sub
                 AddHandler panel.MouseLeave, Sub() tt.Hide(panel)
-
-                ' aggiorna tooltip ad ogni cambiamento
                 AddHandler txt.TextChanged, Sub()
                                                 AggiornaToolTip()
                                             End Sub
 
                 panel.Controls.Add(btnView)
 
-                ' Se viene creato il bottone riduco la larghezza della textbox per non farla sovrapporre
                 Try
                     Dim btnW = btnView.PreferredSize.Width + btnView.Margin.Horizontal
-                    'txt.Width = Math.Max(txt.Width - btnW, 100)
                     AggiornaToolTip()
                 Catch
                 End Try
@@ -2418,7 +2484,6 @@ Public Class DynamicDataForm
             Next
         End If
     End Sub
-
     Private Function OttieniPercorsoImgVid(NomeFile As String) As String
 
         If String.IsNullOrWhiteSpace(NomeFile) OrElse NomeFile.Length < 2 Then
@@ -2867,92 +2932,267 @@ Public Class DynamicDataForm
         Return lista.ToArray()
     End Function
 
-    Private Function RecuperaCampiCalcolati() As Dictionary(Of String, (Formula As String, TipoValore As String))
-        Dim dizionario As New Dictionary(Of String, (String, String))
-
+    Private Function RecuperaCampiCalcolati() As Dictionary(Of String, (Formula As String, TipoValore As String, SuSeStesso As Boolean))
+        Dim diz As New Dictionary(Of String, (String, String, Boolean))(StringComparer.OrdinalIgnoreCase)
         Using conn As New SqlConnection(ConnString)
-            Dim query = "SELECT NomeCampo, Formula, Tipovalore FROM Sys_CampiCalcolati WHERE NomeTabella = @NomeTabella"
+            Dim query = "SELECT NomeCampo, Formula, Tipovalore, SuSeStesso FROM Sys_CampiCalcolati WHERE NomeTabella = @NomeTabella"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@NomeTabella", Me.Name)
-
                 conn.Open()
                 Using reader = cmd.ExecuteReader()
+                    Dim hasSuSeStesso As Boolean = Enumerable.Range(0, reader.FieldCount).Any(Function(i) String.Equals(reader.GetName(i), "SuSeStesso", StringComparison.OrdinalIgnoreCase))
                     While reader.Read()
-                        Dim nomeCampo = reader("NomeCampo").ToString()
-                        Dim formula = reader("Formula").ToString()
-                        Dim tipoValore = reader("Tipovalore").ToString().ToLower()
-                        dizionario(nomeCampo) = (formula, tipoValore)
+                        Dim nome = reader("NomeCampo").ToString()
+                        Dim formula = If(reader.IsDBNull(reader.GetOrdinal("Formula")), String.Empty, reader("Formula").ToString())
+                        Dim tipo = If(reader.IsDBNull(reader.GetOrdinal("Tipovalore")), "numero", reader("Tipovalore").ToString().ToLowerInvariant())
+                        Dim selfRef As Boolean = False
+                        If hasSuSeStesso AndAlso Not reader.IsDBNull(reader.GetOrdinal("SuSeStesso")) Then
+                            Try
+                                selfRef = Convert.ToBoolean(reader("SuSeStesso"))
+                            Catch
+                                selfRef = False
+                            End Try
+                        End If
+                        diz(nome) = (formula, tipo, selfRef)
                     End While
                 End Using
             End Using
         End Using
-
-        Return dizionario
+        Return diz
     End Function
 
-    Private Function CalcolaValoriCampiCalcolati(formule As Dictionary(Of String, String), tipiValore As Dictionary(Of String, String)) As Dictionary(Of String, Object)
+    Private campiCalcolatiSet As HashSet(Of String) = Nothing
 
-        Dim risultati As New Dictionary(Of String, Object)
+    Private Function RecuperaCampiCalcolatiSet(nomeTabella As String) As HashSet(Of String)
+        Dim hs As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand("SELECT NomeCampo FROM Sys_CampiCalcolati WHERE NomeTabella = @NomeTabella", conn)
+                    cmd.Parameters.AddWithValue("@NomeTabella", nomeTabella)
+                    Dim dt As New DataTable()
+                    Using da As New SqlDataAdapter(cmd)
+                        da.Fill(dt)
+                    End Using
+                    For Each r As DataRow In dt.Rows
+                        Dim nome = r("NomeCampo").ToString()
+                        If Not String.IsNullOrWhiteSpace(nome) Then hs.Add(nome.Trim())
+                    Next
+                End Using
+            End Using
+        Catch
+            ' fallback: lista vuota -> nessun campo considerato calcolato
+        End Try
+        Return hs
+    End Function
+
+    Private Function PadWithZeros(val As Object, totalWidth As Integer) As String
+        Dim s As String = If(val Is Nothing OrElse val Is DBNull.Value, String.Empty, val.ToString())
+        If totalWidth <= 0 Then Return s
+        If s.Length >= totalWidth Then Return s
+        Return New String("0"c, totalWidth - s.Length) & s
+    End Function
+
+    Private Function ReplaceAddZeroForCampo(expr As String,
+                                       nomeCampo As String,
+                                       campoInputs As Dictionary(Of String, Control),
+                                       valoriCalcolati As Dictionary(Of String, Object)) As String
+        If String.IsNullOrWhiteSpace(expr) Then Return expr
+
+        ' ottieni il valore corrente da usare per il padding (prima i valori calcolati, poi il controllo)
+        Dim valoreRaw As Object = Nothing
+        If valoriCalcolati IsNot Nothing AndAlso valoriCalcolati.ContainsKey(nomeCampo) Then
+            valoreRaw = valoriCalcolati(nomeCampo)
+        ElseIf campoInputs IsNot Nothing AndAlso campoInputs.ContainsKey(nomeCampo) Then
+            Try
+                valoreRaw = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
+            Catch
+                valoreRaw = Nothing
+            End Try
+        End If
+
+        ' regex per AddZero( N )
+        Dim rx As New Regex("AddZero\s*\(\s*(\d+)\s*\)", RegexOptions.IgnoreCase Or RegexOptions.Compiled)
+
+        Dim result As String = rx.Replace(expr, Function(m As Match)
+                                                    Dim digits As Integer = 0
+                                                    Integer.TryParse(m.Groups(1).Value, digits)
+
+                                                    Dim padded As String = PadWithZeros(valoreRaw, digits)
+                                                    Dim escaped = padded.Replace("""", "\""")
+                                                    Return """" & escaped & """"
+                                                End Function)
+
+        Return result
+    End Function
+
+    Private Function CalcolaValoriCampiCalcolati(formule As Dictionary(Of String, String),
+                                              tipiValore As Dictionary(Of String, String)) As Dictionary(Of String, Object)
+
+        Dim risultati As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
+
+        ' Provo a recuperare i dettagli (Formula, TipoValore, SuSeStesso) se disponibile
+        Dim campiDettaglio As Dictionary(Of String, (Formula As String, TipoValore As String, SuSeStesso As Boolean)) = Nothing
+        Try
+            campiDettaglio = RecuperaCampiCalcolati()
+        Catch
+            campiDettaglio = New Dictionary(Of String, (String, String, Boolean))(StringComparer.OrdinalIgnoreCase)
+        End Try
 
         For Each kvp In formule
-            Dim nomeCampo = kvp.Key
-            Dim formula = kvp.Value
-            Dim tipoValore = If(tipiValore.ContainsKey(nomeCampo), tipiValore(nomeCampo).ToLower(), "numero")
-
-            Dim tipiAmmessi As String() = {"numero", "stringa", "data", "booleano", "raw", "testo"}
-            If Not tipiAmmessi.Contains(tipoValore) Then
-                tipoValore = "numero"
+            Dim nomeCampo As String = kvp.Key
+            Dim exprRaw As String = If(kvp.Value, String.Empty)
+            Dim tipo As String = If(tipiValore IsNot Nothing AndAlso tipiValore.ContainsKey(nomeCampo),
+                                tipiValore(nomeCampo).ToLowerInvariant(), "numero")
+            If Not {"numero", "stringa", "data", "booleano", "raw", "testo"}.Contains(tipo) Then
+                tipo = "numero"
             End If
 
             Try
-                Dim espressione = formula
+                Dim expr As String = exprRaw
 
+                ' 1) sostituisco i placeholder dei campi con i loro valori
                 For Each vInput In campoInputs
-                    Dim nome = vInput.Key
-                    Dim valore = EstraiValoreDaControllo(nome, vInput.Value)
+                    Dim phName As String = vInput.Key
+                    Dim controllo As Control = vInput.Value
 
-                    Dim valoreStringa As String
-                    If valore Is Nothing OrElse valore Is DBNull.Value Then
-                        If tipoValore = "stringa" Then
-                            valoreStringa = """" & """" & ""
-                        Else
-                            valoreStringa = "0"
+                    ' Determina se per questo placeholder dobbiamo forzare l'uso del valore dal controllo
+                    Dim forceControlValue As Boolean = False
+                    If String.Equals(phName, nomeCampo, StringComparison.OrdinalIgnoreCase) Then
+                        If campiDettaglio IsNot Nothing AndAlso campiDettaglio.ContainsKey(nomeCampo) Then
+                            forceControlValue = campiDettaglio(nomeCampo).SuSeStesso
                         End If
-                    ElseIf TypeOf valore Is DateTime Then
-                        valoreStringa = """" & CDate(valore).ToString("yyyy-MM-dd") & """"
-                    ElseIf tipoValore = "stringa" Then
-                        valoreStringa = """" & valore.ToString().Replace("""", """""") & """"
-                    Else
-                        valoreStringa = Convert.ToString(valore, Globalization.CultureInfo.InvariantCulture)
                     End If
 
-                    Dim regex As Regex = Nothing
-                    If regexCache.ContainsKey(nome) Then
-                        regex = regexCache(nome)
+                    Dim valoreObj As Object = Nothing
+                    If forceControlValue Then
+                        valoreObj = EstraiValoreDaControllo(phName, controllo)
                     Else
-                        regex = New Regex($"\b{Regex.Escape(nome)}\b", RegexOptions.IgnoreCase Or RegexOptions.Compiled)
-                        regexCache(nome) = regex
+                        If risultati.ContainsKey(phName) Then
+                            valoreObj = risultati(phName)
+                        Else
+                            valoreObj = EstraiValoreDaControllo(phName, controllo)
+                        End If
                     End If
-                    espressione = regex.Replace(espressione, valoreStringa)
+
+                    ' Costruisco la stringa di sostituzione in modo sicuro
+                    Dim sost As String
+                    If valoreObj Is Nothing OrElse valoreObj Is DBNull.Value Then
+                        If tipo = "stringa" OrElse tipo = "testo" OrElse tipo = "raw" Then
+                            sost = """" & "" & """"
+                        Else
+                            sost = "0"
+                        End If
+                    ElseIf TypeOf valoreObj Is DateTime Then
+                        sost = """" & CType(valoreObj, DateTime).ToString("yyyy-MM-dd", Globalization.CultureInfo.InvariantCulture) & """"
+                    ElseIf tipo = "stringa" OrElse tipo = "testo" OrElse tipo = "raw" Then
+                        ' Escape delle doppie virgolette interne: raddoppio o escape con backslash a seconda delle funzioni di valutazione
+                        Dim s As String = valoreObj.ToString()
+                        s = s.Replace("""", """""""") ' raddoppia le doppie virgolette per DataTable/Expression
+                        sost = """" & s & """"
+                    ElseIf TypeOf valoreObj Is Boolean Then
+                        sost = If(Convert.ToBoolean(valoreObj), "1", "0")
+                    Else
+                        ' numero o generico: conversione con invariant culture
+                        sost = Convert.ToString(valoreObj, Globalization.CultureInfo.InvariantCulture)
+                        If String.IsNullOrWhiteSpace(sost) Then sost = "0"
+                    End If
+
+                    ' Usa regex cache per performance e per sostituire solo parole intere
+                    Dim rx As Regex = Nothing
+                    If regexCache.ContainsKey(phName) Then
+                        rx = regexCache(phName)
+                    Else
+                        rx = New Regex("\b" & Regex.Escape(phName) & "\b", RegexOptions.IgnoreCase Or RegexOptions.Compiled)
+                        regexCache(phName) = rx
+                    End If
+
+                    expr = rx.Replace(expr, sost)
                 Next
 
-                Dim risultato As Object
-                If tipoValore = "numero" Then
-                    risultato = New DataTable().Compute(espressione, Nothing)
-                    If IsNumeric(risultato) Then
-                        risultato = Convert.ToDouble(risultato, Globalization.CultureInfo.InvariantCulture)
-                    Else
-                        risultato = Nothing
-                    End If
-                ElseIf tipoValore = "stringa" Then
-                    risultato = ValutaEspressioneStringa(espressione)
-                Else
-                    risultato = espressione
+                ' 2) Replace AddZero(...) per il campo corrente
+                expr = ReplaceAddZeroForCampo(expr, nomeCampo, campoInputs, risultati)
+
+                ' 3) Pulizia espressione: evito espressioni vuote o solo virgolette
+                Dim exprPulita = expr.Trim()
+                If String.IsNullOrEmpty(exprPulita) OrElse Regex.IsMatch(exprPulita, "^\s*""*\s*""*\s*$") Then
+                    ' espressione vuota o solo quote -> risultato nullo o stringa vuota a seconda del tipo
+                    Select Case tipo
+                        Case "stringa", "testo", "raw"
+                            risultati(nomeCampo) = String.Empty
+                        Case "data", "booleano"
+                            risultati(nomeCampo) = Nothing
+                        Case Else
+                            risultati(nomeCampo) = Nothing
+                    End Select
+                    Continue For
                 End If
 
+                ' 4) valutazione finale in base al tipo, con try/catch di protezione
+                Dim risultato As Object = Nothing
+                Select Case tipo
+                    Case "numero"
+                        Try
+                            ' rimuovo eventuali virgolette residue e valuto con DataTable().Compute
+                            Dim eNumerica = exprPulita.Replace("""", "")
+                            If String.IsNullOrWhiteSpace(eNumerica) Then
+                                risultato = Nothing
+                            Else
+                                risultato = New DataTable().Compute(eNumerica, Nothing)
+                                If Not IsNumeric(risultato) Then risultato = Nothing
+                            End If
+                        Catch exCompute As Exception
+                            risultato = Nothing
+                        End Try
+
+                    Case "stringa", "testo", "raw"
+                        Try
+                            risultato = ValutaEspressioneStringa(exprPulita)
+                        Catch
+                            risultato = ""
+                        End Try
+
+                    Case "data"
+                        Try
+                            Dim rawRes As String = ValutaEspressioneStringa(exprPulita)
+                            Dim dt As DateTime
+                            If DateTime.TryParseExact(rawRes, "yyyy-MM-dd", Globalization.CultureInfo.InvariantCulture, Globalization.DateTimeStyles.None, dt) Then
+                                risultato = dt
+                            ElseIf DateTime.TryParse(rawRes, Globalization.CultureInfo.InvariantCulture, Globalization.DateTimeStyles.None, dt) Then
+                                risultato = dt
+                            Else
+                                risultato = Nothing
+                            End If
+                        Catch
+                            risultato = Nothing
+                        End Try
+
+                    Case "booleano"
+                        Try
+                            Dim rawBool As String = ValutaEspressioneStringa(exprPulita)
+                            Dim b As Boolean
+                            If Boolean.TryParse(rawBool, b) Then
+                                risultato = b
+                            ElseIf IsNumeric(rawBool) Then
+                                risultato = (Convert.ToInt32(rawBool) <> 0)
+                            Else
+                                risultato = False
+                            End If
+                        Catch
+                            risultato = False
+                        End Try
+
+                    Case Else
+                        risultato = exprPulita
+                End Select
+
                 risultati(nomeCampo) = risultato
+
             Catch ex As Exception
-                MDIMessageBox.Show($"[Campo calcolato] Errore nel calcolo di '{nomeCampo}': {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
+                ' non bloccare l'intero processo per un errore su un singolo campo
+                Try
+                    MDIMessageBox.Show($"[ Campo calcolato] Errore nel calcolo di '{nomeCampo}' : {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
+                Catch
+                End Try
                 risultati(nomeCampo) = Nothing
             End Try
         Next
@@ -2960,18 +3200,65 @@ Public Class DynamicDataForm
         Return risultati
     End Function
 
+
+
     Private Function ValutaEspressioneStringa(expr As String) As String
+        If expr Is Nothing Then Return String.Empty
+        Dim raw = expr.Trim()
+
+        ' Se l'espressione è vuota o solo virgolette/whitespace -> ritorna stringa vuota
+        If String.IsNullOrWhiteSpace(raw) Then Return String.Empty
+        If Regex.IsMatch(raw, "^\s*""*\s*""*\s*$") Then Return String.Empty
+
+        ' Se è già una stringa racchiusa tra virgolette, restituisci il contenuto interno
+        If raw.StartsWith("""") AndAlso raw.EndsWith("""") AndAlso raw.Length >= 2 Then
+            Return raw.Substring(1, raw.Length - 2).Replace("""""", """")
+        End If
+
+        ' Tentativo principale: DataColumn expression (lo fai già)
         Try
             Dim dt As New DataTable()
-            dt.Columns.Add("Expr", GetType(String), expr)
+            dt.Columns.Add("Expr", GetType(String), raw)
             Dim row = dt.NewRow()
             dt.Rows.Add(row)
-            Return row("Expr").ToString()
+            Dim res = row("Expr")
+            Return If(res Is Nothing OrElse Convert.IsDBNull(res), String.Empty, res.ToString())
         Catch ex As Exception
-            MDIMessageBox.Show($"[StringEval] Errore: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
-            Return ""
+            ' Log locale (non interrompere il flusso)
+            Try
+                MDIMessageBox.Show($"[StringEval] Errore: {ex.Message}{Environment.NewLine}Expr: {raw}", Me.MdiParent, MessageBoxButtons.OK)
+            Catch
+            End Try
+        End Try
+
+        ' Fallback 1: se sembra un'espressione numerica (solo numeri, spazi, operatori), prova DataTable().Compute
+        Try
+            Dim numericCandidate = raw.Replace("""", "").Trim()
+            If Regex.IsMatch(numericCandidate, "^[0-9\+\-\*\/\.\s\(\)]+$") Then
+                Dim computed = New DataTable().Compute(numericCandidate, Nothing)
+                Return If(computed Is Nothing OrElse Convert.IsDBNull(computed), String.Empty, computed.ToString())
+            End If
+        Catch
+        End Try
+
+        ' Fallback 2: rimozione di token vuoti generici: sostituisco """" (doppie virgolette vuote) con stringa vuota
+        Try
+            Dim cleaned = Regex.Replace(raw, """{2,}", """""") ' sostituisce sequenze di doppie virgolette con una sola coppia
+            cleaned = cleaned.Trim()
+            If String.IsNullOrWhiteSpace(cleaned) Then Return String.Empty
+
+            ' Se dopo pulizia è racchiusa tra virgolette restituisco il contenuto
+            If cleaned.StartsWith("""") AndAlso cleaned.EndsWith("""") AndAlso cleaned.Length >= 2 Then
+                Return cleaned.Substring(1, cleaned.Length - 2).Replace("""""", """")
+            End If
+
+            ' Ultima risorsa: restituisco l'espressione originale (non valutata) per evitare crash a monte
+            Return cleaned
+        Catch
+            Return String.Empty
         End Try
     End Function
+
     Private Sub ToggleUIForSaving(saving As Boolean)
         Me.BeginInvoke(New MethodInvoker(Sub()
                                              For Each c As Control In panelBottoni.Controls
