@@ -1,10 +1,10 @@
 ﻿Imports System
 Imports System.Collections.Generic
 Imports System.Data
-Imports System.Data.SqlClient
 Imports System.Drawing
 Imports System.IO
 Imports System.Linq
+Imports System.Reflection
 Imports System.Threading
 Imports System.Threading.Tasks
 Imports System.Windows.Forms
@@ -20,26 +20,33 @@ Public Class AssegnaSceneForm
     ' UI controls
     Private tblContainer As TableLayoutPanel
     Private scrollPanel As Panel
+
     Private cmbScene As ComboBox
     Private btnSave As Button
     Private btnClose As Button
     Private btnSelectAll As Button
     Private btnClearAll As Button
+    Private btnRefresh As Button
     Private lblInfo As Label
 
-    ' Layout constants (preview ridotte, pannello leggermente più largo)
+    ' Overlay (maschera caricamento, senza ProgressBar)
+    Private overlay As Panel
+    Private overlayLabel As Label
+
+    ' Layout
     Private ReadOnly previewW As Integer = 200
     Private ReadOnly previewH As Integer = 130
-    Private ReadOnly extraPanelWidth As Integer = 40 ' <-- larghezza aggiuntiva per il pannello
+    Private ReadOnly extraPanelWidth As Integer = 40
     Private ReadOnly cols As Integer = 4
     Private ReadOnly marginPx As Integer = 8
     Private ReadOnly leftPad As Integer = 12
     Private ReadOnly topPad As Integer = 12
 
+    ' Dati
     Private panelFiles As New List(Of String)()
+    Private items As New List(Of PanelItem)()
     Private cts As CancellationTokenSource = Nothing
 
-    ' Classe per item
     Private Class PanelItem
         Public Property FilePath As String
         Public Property Pic As PictureBox
@@ -48,22 +55,27 @@ Public Class AssegnaSceneForm
         Public Property AssignedInfo As String
     End Class
 
-    Private items As New List(Of PanelItem)()
+    ' Compositing per ridurre flicker/strisce grigie
+    Protected Overrides ReadOnly Property CreateParams As CreateParams
+        Get
+            Dim cp = MyBase.CreateParams
+            cp.ExStyle = cp.ExStyle Or &H2000000 ' WS_EX_COMPOSITED
+            Return cp
+        End Get
+    End Property
 
-    ' --- Costruttore ---
     Public Sub New(storyboardId As String, storyboardDesc As String, outDir As String)
         _storyboardId = storyboardId
         _storyboardDesc = storyboardDesc
         _outDir = outDir
 
         InitializeComponent()
+        EnableDoubleBuffering()
 
-        ' Ripristina posizione/size del form all'apertura
         AddHandler Me.Load, Sub(s, e)
                                 Try
                                     RipristinaPosizioneForm(Me)
                                 Catch
-                                    ' Ignora errori se la funzione non è disponibile o fallisce
                                 End Try
                             End Sub
 
@@ -71,11 +83,12 @@ Public Class AssegnaSceneForm
         AddHandler Me.FormClosing, AddressOf AssegnaSceneForm_FormClosing
     End Sub
 
-    ' --- InitializeComponent (crea UI dinamicamente) ---
     Private Sub InitializeComponent()
         Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.White
+        Me.SetStyle(ControlStyles.AllPaintingInWmPaint Or ControlStyles.UserPaint Or ControlStyles.OptimizedDoubleBuffer, True)
+        Me.UpdateStyles()
 
-        ' Calcola larghezza pannello singolo e dimensione form
         Dim singlePanelWidth = previewW + extraPanelWidth + marginPx * 2
         Dim formWidth As Integer = Math.Max(820, (singlePanelWidth) * cols + 220)
         Dim formHeight As Integer = Math.Max(560, (previewH + marginPx) * 3 + 260)
@@ -85,79 +98,39 @@ Public Class AssegnaSceneForm
 
         Dim top As Integer = topPad
 
-        Dim lblId As New Label() With {
-            .Left = leftPad,
-            .Top = top,
-            .Width = 120,
-            .Text = "Id storyboard:"
-        }
+        Dim lblId As New Label() With {.Left = leftPad, .Top = top, .Width = 120, .Text = "Id storyboard:"}
         Me.Controls.Add(lblId)
 
-        Dim lblIdVal As New Label() With {
-            .Left = lblId.Right + 8,
-            .Top = top,
-            .Width = 360,
-            .Text = _storyboardId
-        }
+        Dim lblIdVal As New Label() With {.Left = lblId.Right + 8, .Top = top, .Width = 360, .Text = _storyboardId}
         Me.Controls.Add(lblIdVal)
 
         top += 26
-
-        Dim lblDesc As New Label() With {
-            .Left = leftPad,
-            .Top = top,
-            .Width = 120,
-            .Text = "Descrizione:"
-        }
+        Dim lblDesc As New Label() With {.Left = leftPad, .Top = top, .Width = 120, .Text = "Descrizione:"}
         Me.Controls.Add(lblDesc)
 
-        Dim lblDescVal As New Label() With {
-            .Left = lblDesc.Right + 8,
-            .Top = top,
-            .Width = 360,
-            .Text = _storyboardDesc
-        }
+        Dim lblDescVal As New Label() With {.Left = lblDesc.Right + 8, .Top = top, .Width = 360, .Text = _storyboardDesc}
         Me.Controls.Add(lblDescVal)
 
         top += 30
-
-        Dim lblScene As New Label() With {
-            .Left = leftPad,
-            .Top = top,
-            .Width = 120,
-            .Text = "Seleziona scena:"
-        }
+        Dim lblScene As New Label() With {.Left = leftPad, .Top = top, .Width = 120, .Text = "Seleziona scena:"}
         Me.Controls.Add(lblScene)
 
-        cmbScene = New ComboBox() With {
-            .Left = lblScene.Right + 8,
-            .Top = top - 2,
-            .Width = 260,
-            .DropDownStyle = ComboBoxStyle.DropDownList
-        }
+        cmbScene = New ComboBox() With {.Left = lblScene.Right + 8, .Top = top - 2, .Width = 260, .DropDownStyle = ComboBoxStyle.DropDownList}
         Me.Controls.Add(cmbScene)
 
-        btnSelectAll = New Button() With {
-            .Left = cmbScene.Right + 12,
-            .Top = top - 2,
-            .Width = 120,
-            .Text = "Seleziona tutti"
-        }
+        btnSelectAll = New Button() With {.Left = cmbScene.Right + 12, .Top = top - 2, .Width = 120, .Text = "Seleziona tutti"}
         AddHandler btnSelectAll.Click, AddressOf BtnSelectAll_Click
         Me.Controls.Add(btnSelectAll)
 
-        btnClearAll = New Button() With {
-            .Left = btnSelectAll.Right + 8,
-            .Top = top - 2,
-            .Width = 120,
-            .Text = "Deseleziona tutti"
-        }
+        btnClearAll = New Button() With {.Left = btnSelectAll.Right + 8, .Top = top - 2, .Width = 120, .Text = "Deseleziona tutti"}
         AddHandler btnClearAll.Click, AddressOf BtnClearAll_Click
         Me.Controls.Add(btnClearAll)
 
-        top += 36
+        btnRefresh = New Button() With {.Left = btnClearAll.Right + 8, .Top = top - 2, .Width = 120, .Text = "Aggiorna"}
+        AddHandler btnRefresh.Click, AddressOf BtnRefresh_Click
+        Me.Controls.Add(btnRefresh)
 
-        ' Scroll panel e TableLayoutPanel per la griglia
+        top += 36
         Dim gridWidth = Math.Max((cols * singlePanelWidth), Me.ClientSize.Width - 40)
         Dim rowsVisible As Integer = 3
         Dim gridHeight = rowsVisible * (previewH + 80)
@@ -168,7 +141,8 @@ Public Class AssegnaSceneForm
             .Width = gridWidth,
             .Height = gridHeight,
             .AutoScroll = True,
-            .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right,
+            .BackColor = Color.White
         }
         Me.Controls.Add(scrollPanel)
 
@@ -177,12 +151,36 @@ Public Class AssegnaSceneForm
             .AutoSize = True,
             .AutoSizeMode = AutoSizeMode.GrowAndShrink,
             .Dock = DockStyle.Top,
-            .Padding = New Padding(marginPx)
+            .Padding = New Padding(marginPx),
+            .BackColor = Color.White
         }
         For i As Integer = 0 To cols - 1
             tblContainer.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, singlePanelWidth))
         Next
         scrollPanel.Controls.Add(tblContainer)
+
+        ' Overlay senza ProgressBar
+        overlay = New Panel() With {
+            .Left = scrollPanel.Left,
+            .Top = scrollPanel.Top,
+            .Width = scrollPanel.Width,
+            .Height = scrollPanel.Height,
+            .BackColor = Color.FromArgb(180, Color.White),
+            .Visible = False
+        }
+        overlayLabel = New Label() With {
+            .AutoSize = False,
+            .Dock = DockStyle.Top,
+            .Height = 40,
+            .TextAlign = ContentAlignment.MiddleCenter,
+            .Font = New Font(SystemFonts.DefaultFont.FontFamily, 11.0F, FontStyle.Bold),
+            .ForeColor = Color.DimGray,
+            .Text = "Caricamento in corso ..."
+        }
+        Dim overlaySpacer As New Panel() With {.Dock = DockStyle.Fill, .BackColor = Color.Transparent}
+        overlay.Controls.Add(overlaySpacer)
+        overlay.Controls.Add(overlayLabel)
+        Me.Controls.Add(overlay)
 
         lblInfo = New Label() With {
             .Left = leftPad,
@@ -194,105 +192,131 @@ Public Class AssegnaSceneForm
         }
         Me.Controls.Add(lblInfo)
 
-        ' Pulsanti sotto il pannello, centrati
-        btnSave = New Button() With {
-            .Text = "Salva",
-            .Width = 120,
-            .Height = 36,
-            .Anchor = AnchorStyles.Bottom
-        }
+        btnSave = New Button() With {.Text = "Salva", .Width = 120, .Height = 36, .Anchor = AnchorStyles.Bottom}
         AddHandler btnSave.Click, AddressOf BtnSave_Click
         Me.Controls.Add(btnSave)
 
-        btnClose = New Button() With {
-            .Text = "Chiudi",
-            .Width = 120,
-            .Height = 36,
-            .Anchor = AnchorStyles.Bottom
-        }
+        btnClose = New Button() With {.Text = "Chiudi", .Width = 120, .Height = 36, .Anchor = AnchorStyles.Bottom}
         AddHandler btnClose.Click, Sub(s, e) Me.Close()
         Me.Controls.Add(btnClose)
 
-        ' Resize handler per posizionare i pulsanti sotto il pannello
-        AddHandler Me.Resize, Sub(s, e)
-                                  Dim newGridWidth = Math.Max((cols * singlePanelWidth), Me.ClientSize.Width - 40)
-                                  scrollPanel.Left = leftPad
-                                  scrollPanel.Top = top
-                                  scrollPanel.Width = newGridWidth
-                                  scrollPanel.Height = gridHeight
-                                  lblInfo.Top = scrollPanel.Bottom + 8
+        AddHandler Me.Resize,
+            Sub(s, e)
+                Dim newGridWidth = Math.Max((cols * (previewW + extraPanelWidth + marginPx * 2)), Me.ClientSize.Width - 40)
+                scrollPanel.Left = leftPad
+                scrollPanel.Top = top
+                scrollPanel.Width = newGridWidth
+                scrollPanel.Height = gridHeight
 
-                                  Dim buttonsTotalWidth = btnSave.Width + 12 + btnClose.Width
-                                  Dim buttonsLeft = scrollPanel.Left + Math.Max(0, (scrollPanel.Width - buttonsTotalWidth) \ 2)
-                                  btnSave.Left = buttonsLeft
-                                  btnSave.Top = lblInfo.Bottom + 12
-                                  btnClose.Left = btnSave.Right + 12
-                                  btnClose.Top = btnSave.Top
-                              End Sub
+                overlay.Left = scrollPanel.Left
+                overlay.Top = scrollPanel.Top
+                overlay.Width = scrollPanel.Width
+                overlay.Height = scrollPanel.Height
+
+                lblInfo.Top = scrollPanel.Bottom + 8
+
+                Dim buttonsTotalWidth = btnSave.Width + 12 + btnClose.Width
+                Dim buttonsLeft = scrollPanel.Left + Math.Max(0, (scrollPanel.Width - buttonsTotalWidth) \ 2)
+                btnSave.Left = buttonsLeft
+                btnSave.Top = lblInfo.Bottom + 12
+                btnClose.Left = btnSave.Right + 12
+                btnClose.Top = btnSave.Top
+            End Sub
     End Sub
 
-    ' --- Evento Shown: avvia caricamento asincrono ---
+    Private Sub EnableDoubleBuffering()
+        SetDoubleBuffered(scrollPanel, True)
+        SetDoubleBuffered(tblContainer, True)
+    End Sub
+
+    Private Sub SetDoubleBuffered(ctrl As Control, enable As Boolean)
+        Dim pi = ctrl.GetType().GetProperty("DoubleBuffered", BindingFlags.Instance Or BindingFlags.NonPublic)
+        If pi IsNot Nothing Then
+            pi.SetValue(ctrl, enable, Nothing)
+        End If
+    End Sub
+
     Private Async Sub AssegnaSceneForm_Shown(sender As Object, e As EventArgs)
         cts = New CancellationTokenSource()
         Dim token = cts.Token
 
         Try
             Me.UseWaitCursor = True
-            btnSave.Enabled = False
-            btnSelectAll.Enabled = False
-            btnClearAll.Enabled = False
-            cmbScene.Enabled = False
+            ToggleTopButtons(False)
+
+            ' Overlay visibile, griglia nascosta finché non è pronta
+            overlay.Visible = True
+            overlayLabel.Text = "Caricamento Panels ..."
+            scrollPanel.Visible = False
 
             LoadScenes()
+
+            overlayLabel.Text = "Caricamento lista panel ..."
             Await LoadPanelFilesAsync(token)
-            BuildGrid()
-            Await LoadThumbnailsAsync(token)
+
+            overlayLabel.Text = "Costruzione griglia ..."
+            BuildGrid() ' griglia completa con placeholder e sfondi bianchi
+
+            ' Ora la griglia è completamente composta, visibile senza strisce
+            scrollPanel.Visible = True
+
+            ' Aggiorna testo overlay con conteggio (senza ProgressBar)
+            overlayLabel.Text = "Caricamento anteprime ..."
+            Await LoadThumbnailsAsync(token,
+                Sub(done, total)
+                    Dim msg As String = $"Caricamento anteprime {done}/{total}"
+                    If overlayLabel.InvokeRequired Then
+                        overlayLabel.BeginInvoke(Sub() overlayLabel.Text = msg)
+                    Else
+                        overlayLabel.Text = msg
+                    End If
+                End Sub)
+
+            overlay.Visible = False
 
         Catch ex As OperationCanceledException
-            ' caricamento annullato
         Catch ex As Exception
             MDIMessageBox.Show("Errore caricamento preview: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
         Finally
             Me.UseWaitCursor = False
-            btnSave.Enabled = True
-            btnSelectAll.Enabled = True
-            btnClearAll.Enabled = True
-            cmbScene.Enabled = True
-            If cts IsNot Nothing Then
-                cts.Dispose()
-                cts = Nothing
-            End If
+            ToggleTopButtons(True)
+            If cts IsNot Nothing Then cts.Dispose() : cts = Nothing
         End Try
     End Sub
 
     Private Sub AssegnaSceneForm_FormClosing(sender As Object, e As FormClosingEventArgs)
-        ' Annulla eventuali operazioni asincrone
-        If cts IsNot Nothing Then
-            cts.Cancel()
-        End If
-
-        ' Salva posizione/size del form alla chiusura
+        If cts IsNot Nothing Then cts.Cancel()
         Try
             SalvaPosizioneForm(Me)
         Catch
-            ' Ignora errori se la funzione non è disponibile o fallisce
         End Try
     End Sub
 
-    ' --- Carica le scene dallo storyboard ---
+    Private Sub ToggleTopButtons(enabled As Boolean)
+        btnSave.Enabled = enabled
+        btnSelectAll.Enabled = enabled
+        btnClearAll.Enabled = enabled
+        cmbScene.Enabled = enabled
+        btnRefresh.Enabled = enabled
+    End Sub
+
     Private Sub LoadScenes()
         Try
             Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand("SELECT IdProgScena, NumScena, Descrizione FROM Mov_StoryboardScene WHERE StoryboardId = @id ORDER BY NumScena", conn)
+                Using cmd As New SqlCommand("SELECT IdProgScena, NumScena, Descrizione 
+                                             FROM Mov_StoryboardScene 
+                                             WHERE StoryboardId = @id 
+                                             ORDER BY NumScena", conn)
                     cmd.Parameters.AddWithValue("@id", _storyboardId)
+
                     Dim dt As New DataTable()
                     Using da As New SqlDataAdapter(cmd)
                         da.Fill(dt)
                     End Using
 
                     If dt.Rows.Count = 0 Then
-                        cmbScene.DataSource = Nothing
                         MDIMessageBox.Show("Nessuna scena trovata per questo storyboard.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Information)
+                        cmbScene.DataSource = Nothing
                         Return
                     End If
 
@@ -314,32 +338,36 @@ Public Class AssegnaSceneForm
         End Try
     End Sub
 
-    ' --- Carica lista file PNG (asincrono) ---
     Private Async Function LoadPanelFilesAsync(token As CancellationToken) As Task
         panelFiles.Clear()
         items.Clear()
 
         Await Task.Run(Sub()
-                           If Not IO.Directory.Exists(_outDir) Then
-                               Throw New IO.DirectoryNotFoundException("Cartella panel non trovata: " & _outDir)
+                           If Not Directory.Exists(_outDir) Then
+                               Throw New DirectoryNotFoundException("Cartella panel non trovata: " & _outDir)
                            End If
-
-                           Dim files = IO.Directory.EnumerateFiles(_outDir, "*.png", SearchOption.TopDirectoryOnly).OrderBy(Function(f) f).ToList()
+                           Dim files = Directory.EnumerateFiles(_outDir, "*.png", SearchOption.TopDirectoryOnly) _
+                                               .OrderBy(Function(f) f) _
+                                               .ToList()
                            SyncLock panelFiles
                                panelFiles.AddRange(files)
                            End SyncLock
                        End Sub, token)
     End Function
 
-    ' --- Costruisce la griglia (senza immagini) ---
     Private Sub BuildGrid()
+        ' Costruzione off-screen con layout sospeso
+        scrollPanel.SuspendLayout()
+        tblContainer.SuspendLayout()
+
         tblContainer.Controls.Clear()
         tblContainer.RowCount = 0
+        tblContainer.RowStyles.Clear()
         items.Clear()
 
         Dim colIndex As Integer = 0
         Dim rowIndex As Integer = -1
-        Dim singlePanelWidth = previewW + extraPanelWidth + marginPx * 2
+        Dim singlePanelWidthLocal = previewW + extraPanelWidth + marginPx * 2
 
         For i As Integer = 0 To panelFiles.Count - 1
             If colIndex = 0 Then
@@ -352,10 +380,10 @@ Public Class AssegnaSceneForm
             Dim assigned As Boolean = False
             Dim assignedInfo As String = String.Empty
 
-            ' Verifica se già assegnato (legge Descrizione)
+            ' Verifica assegnazione
             Try
                 Using conn As New SqlConnection(ConnString)
-                    Using cmd As New SqlCommand("SELECT Descrizione FROM Mov_StoryboardScenePanel WHERE ImgVidPanel = @img", conn)
+                    Using cmd As New SqlCommand("SELECT NumScena FROM Mov_StoryboardScenePanel WHERE ImgVidPanel = @img", conn)
                         cmd.Parameters.AddWithValue("@img", filePath)
                         conn.Open()
                         Dim res = cmd.ExecuteScalar()
@@ -370,9 +398,10 @@ Public Class AssegnaSceneForm
             End Try
 
             Dim panel As New Panel() With {
-                .Width = singlePanelWidth,
+                .Width = singlePanelWidthLocal,
                 .Height = previewH + 80,
-                .Margin = New Padding(marginPx)
+                .Margin = New Padding(marginPx),
+                .BackColor = Color.White
             }
 
             Dim pb As New PictureBox() With {
@@ -383,17 +412,19 @@ Public Class AssegnaSceneForm
                 .Top = 8,
                 .BorderStyle = BorderStyle.FixedSingle,
                 .Cursor = Cursors.Hand,
-                .Image = Nothing
+                .BackColor = Color.White,
+                .Image = GetPlaceholderImage() ' placeholder subito per evitare grigio
             }
             panel.Controls.Add(pb)
 
             Dim cb As New CheckBox() With {
                 .Left = 8,
                 .Top = pb.Bottom + 8,
-                .Width = previewW + extraPanelWidth - 16, ' checkbox più largo per adattarsi al pannello
-                .Text = IO.Path.GetFileName(filePath),
+                .Width = previewW + extraPanelWidth - 16,
+                .Text = Path.GetFileName(filePath),
                 .Checked = False,
-                .Enabled = Not assigned
+                .Enabled = Not assigned,
+                .BackColor = Color.White
             }
             panel.Controls.Add(cb)
 
@@ -405,7 +436,8 @@ Public Class AssegnaSceneForm
                     .Height = 18,
                     .Text = assignedInfo,
                     .ForeColor = Color.DarkRed,
-                    .Font = New Font(SystemFonts.DefaultFont.FontFamily, 9.0F, FontStyle.Bold)
+                    .Font = New Font(SystemFonts.DefaultFont.FontFamily, 9.0F, FontStyle.Bold),
+                    .BackColor = Color.White
                 }
                 panel.Controls.Add(lblAssigned)
             End If
@@ -416,32 +448,47 @@ Public Class AssegnaSceneForm
 
             tblContainer.Controls.Add(panel, colIndex, rowIndex)
 
-            Dim pi As New PanelItem With {
-                .FilePath = filePath,
-                .Pic = pb,
-                .Cb = cb,
-                .Assigned = assigned,
-                .AssignedInfo = assignedInfo
-            }
+            Dim pi As New PanelItem With {.FilePath = filePath, .Pic = pb, .Cb = cb, .Assigned = assigned, .AssignedInfo = assignedInfo}
             items.Add(pi)
 
             colIndex += 1
             If colIndex >= cols Then colIndex = 0
         Next
+
+        tblContainer.ResumeLayout(True)
+        scrollPanel.ResumeLayout(True)
+        tblContainer.PerformLayout()
+        scrollPanel.PerformLayout()
     End Sub
 
-    ' --- Carica thumbnails in parallelo ---
-    Private Async Function LoadThumbnailsAsync(token As CancellationToken) As Task
+    Private Function GetPlaceholderImage() As Image
+        Dim bmp As New Bitmap(previewW, previewH)
+        Using g = Graphics.FromImage(bmp)
+            g.Clear(Color.WhiteSmoke)
+            Using pen As New Pen(Color.Gainsboro)
+                g.DrawRectangle(pen, 0, 0, previewW - 1, previewH - 1)
+            End Using
+            Using s As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
+                Using font As New Font(SystemFonts.DefaultFont.FontFamily, 9.0F, FontStyle.Regular)
+                    g.DrawString("Anteprima", font, Brushes.Gray, New RectangleF(0, 0, previewW, previewH), s)
+                End Using
+            End Using
+        End Using
+        Return bmp
+    End Function
+
+    Private Async Function LoadThumbnailsAsync(token As CancellationToken, progress As Action(Of Integer, Integer)) As Task
         If items.Count = 0 Then Return
 
+        Dim total As Integer = items.Count
+        Dim done As Integer = 0
         Dim maxParallel As Integer = Math.Max(2, Environment.ProcessorCount)
         Dim sem As New SemaphoreSlim(maxParallel)
         Dim tasks As New List(Of Task)()
 
         For i As Integer = 0 To items.Count - 1
             token.ThrowIfCancellationRequested()
-            Dim idx = i
-            Dim it = items(idx)
+            Dim it = items(i)
 
             tasks.Add(Task.Run(Async Function()
                                    Await sem.WaitAsync(token)
@@ -464,15 +511,10 @@ Public Class AssegnaSceneForm
                                            bmp = Nothing
                                        End Try
 
-                                       If token.IsCancellationRequested Then
-                                           If bmp IsNot Nothing Then bmp.Dispose()
-                                           Return
-                                       End If
-
                                        If bmp IsNot Nothing Then
                                            If it.Pic IsNot Nothing AndAlso Not it.Pic.IsDisposed Then
                                                If it.Pic.InvokeRequired Then
-                                                   it.Pic.Invoke(Sub() it.Pic.Image = bmp)
+                                                   it.Pic.BeginInvoke(Sub() it.Pic.Image = bmp)
                                                Else
                                                    it.Pic.Image = bmp
                                                End If
@@ -481,6 +523,8 @@ Public Class AssegnaSceneForm
                                            End If
                                        End If
                                    Finally
+                                       Interlocked.Increment(done)
+                                       If progress IsNot Nothing Then progress(done, total)
                                        sem.Release()
                                    End Try
                                End Function, token))
@@ -489,21 +533,62 @@ Public Class AssegnaSceneForm
         Await Task.WhenAll(tasks)
     End Function
 
-    ' --- Seleziona tutti i checkbox abilitati ---
+    Private Async Sub BtnRefresh_Click(sender As Object, e As EventArgs)
+        If cts IsNot Nothing Then cts.Cancel()
+        cts = New CancellationTokenSource()
+        Dim token = cts.Token
+
+        Try
+            Me.UseWaitCursor = True
+            ToggleTopButtons(False)
+
+            overlay.Visible = True
+            overlayLabel.Text = "Aggiornamento Panels ..."
+            scrollPanel.Visible = False
+
+            LoadScenes()
+
+            overlayLabel.Text = "Aggiornamento lista panel ..."
+            Await LoadPanelFilesAsync(token)
+
+            overlayLabel.Text = "Ricostruzione griglia ..."
+            BuildGrid()
+
+            scrollPanel.Visible = True
+
+            overlayLabel.Text = "Caricamento anteprime ..."
+            Await LoadThumbnailsAsync(token,
+                Sub(done, total)
+                    Dim msg As String = $"Caricamento anteprime {done}/{total}"
+                    If overlayLabel.InvokeRequired Then
+                        overlayLabel.BeginInvoke(Sub() overlayLabel.Text = msg)
+                    Else
+                        overlayLabel.Text = msg
+                    End If
+                End Sub)
+
+            overlay.Visible = False
+        Catch ex As OperationCanceledException
+        Catch ex As Exception
+            MDIMessageBox.Show("Errore aggiornamento panel: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            Me.UseWaitCursor = False
+            ToggleTopButtons(True)
+        End Try
+    End Sub
+
     Private Sub BtnSelectAll_Click(sender As Object, e As EventArgs)
         For Each it In items
             If Not it.Assigned Then it.Cb.Checked = True
         Next
     End Sub
 
-    ' --- Deseleziona tutti i checkbox abilitati ---
     Private Sub BtnClearAll_Click(sender As Object, e As EventArgs)
         For Each it In items
             If Not it.Assigned Then it.Cb.Checked = False
         Next
     End Sub
 
-    ' --- Salvataggio selezioni in DB ---
     Private Sub BtnSave_Click(sender As Object, e As EventArgs)
         If cmbScene.SelectedItem Is Nothing Then
             MDIMessageBox.Show("Seleziona una scena.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -511,6 +596,7 @@ Public Class AssegnaSceneForm
         End If
 
         Dim selectedNumScena As String = Convert.ToString(cmbScene.SelectedValue)
+
         Dim selectedPaths As New List(Of String)
         For Each it In items
             If Not it.Assigned AndAlso it.Cb.Checked Then
@@ -523,26 +609,51 @@ Public Class AssegnaSceneForm
             Return
         End If
 
+        Dim episodioId As String = String.Empty
+        Try
+            Using connE As New SqlConnection(ConnString)
+                Using cmdE As New SqlCommand("SELECT TOP 1 EpisodioId
+                                              FROM Mov_StoryboardScene
+                                              WHERE StoryboardId = @sb AND NumScena = @num", connE)
+                    cmdE.Parameters.AddWithValue("@sb", _storyboardId)
+                    cmdE.Parameters.AddWithValue("@num", selectedNumScena)
+                    connE.Open()
+                    Dim resE = cmdE.ExecuteScalar()
+                    If resE IsNot Nothing AndAlso Not Convert.IsDBNull(resE) Then
+                        episodioId = Convert.ToString(resE)
+                    End If
+                End Using
+            End Using
+        Catch ex As Exception
+            MDIMessageBox.Show("Impossibile recuperare EpisodioId: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End Try
+
+        If String.IsNullOrWhiteSpace(episodioId) Then
+            MDIMessageBox.Show("EpisodioId non disponibile per la scena selezionata.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End If
+
         Try
             Using conn As New SqlConnection(ConnString)
                 conn.Open()
                 Using tran = conn.BeginTransaction()
-                    ' Conteggio corrente per la scena (numero di panel già presenti per quella scena)
                     Dim currentCount As Integer = 0
-                    Using cntCmd As New SqlCommand("SELECT COUNT(1) FROM Mov_StoryboardScenePanel WHERE NumScena = @num", conn, tran)
+                    Using cntCmd As New SqlCommand("SELECT COUNT(1)
+                                                    FROM Mov_StoryboardScenePanel
+                                                    WHERE NumScena = @num", conn, tran)
                         cntCmd.Parameters.AddWithValue("@num", selectedNumScena)
                         currentCount = Convert.ToInt32(cntCmd.ExecuteScalar())
                     End Using
 
-                    Dim seq As Integer = currentCount + 1
                     Dim inserted As Integer = 0
                     Dim skipped As Integer = 0
-                    Dim insertedPaths As New List(Of String)
 
-                    For Each p In selectedPaths
-                        ' Controllo unicità su ImgVidPanel
-                        Using chkCmd As New SqlCommand("SELECT COUNT(1) FROM Mov_StoryboardScenePanel WHERE ImgVidPanel = @img", conn, tran)
-                            chkCmd.Parameters.AddWithValue("@img", p)
+                    For Each originalPath In selectedPaths
+                        Using chkCmd As New SqlCommand("SELECT COUNT(1)
+                                                        FROM Mov_StoryboardScenePanel
+                                                        WHERE ImgVidPanel = @img", conn, tran)
+                            chkCmd.Parameters.AddWithValue("@img", originalPath)
                             Dim existsCount = Convert.ToInt32(chkCmd.ExecuteScalar())
                             If existsCount > 0 Then
                                 skipped += 1
@@ -550,61 +661,59 @@ Public Class AssegnaSceneForm
                             End If
                         End Using
 
-                        ' costruzione descrizione: solo progressivo padded a 4 cifre
+                        Dim seq As Integer = currentCount + inserted + 1
                         Dim panelSeqPadded As String = seq.ToString().PadLeft(4, "0"c)
                         Dim descr As String = panelSeqPadded
 
-                        Using insCmd As New SqlCommand("INSERT INTO Mov_StoryboardScenePanel (Descrizione, NumScena, ImgVidPanel) VALUES (@descr, @num, @img)", conn, tran)
+                        Using insCmd As New SqlCommand("INSERT INTO Mov_StoryboardScenePanel (Descrizione, NumScena, ImgVidPanel)
+                                                        VALUES (@descr, @num, @img)", conn, tran)
                             insCmd.Parameters.AddWithValue("@descr", descr)
                             insCmd.Parameters.AddWithValue("@num", selectedNumScena)
-                            insCmd.Parameters.AddWithValue("@img", p)
+                            insCmd.Parameters.AddWithValue("@img", originalPath)
                             insCmd.ExecuteNonQuery()
                         End Using
 
                         inserted += 1
-                        insertedPaths.Add(p)
-                        seq += 1
                     Next
 
                     tran.Commit()
 
-                    ' Aggiorna stato in memoria e UI: mostra "Assegnato: 0001" (solo progressivo)
                     For Each it In items
-                        If insertedPaths.Contains(it.FilePath) Then
+                        If Not it.Assigned AndAlso it.Cb.Checked AndAlso selectedPaths.Contains(it.FilePath) Then
                             it.Assigned = True
                             it.Cb.Checked = False
                             it.Cb.Enabled = False
 
-                            Dim idxInInserted = insertedPaths.IndexOf(it.FilePath)
-                            If idxInInserted >= 0 Then
-                                Dim seqForLabel As Integer = currentCount + 1 + idxInInserted
-                                Dim labelDescr As String = seqForLabel.ToString().PadLeft(4, "0"c)
+                            Dim lblAssigned =
+                                it.Pic.Parent.Controls.OfType(Of Label)().
+                                    FirstOrDefault(Function(l) l.Text.StartsWith("Assegnato:", StringComparison.OrdinalIgnoreCase))
 
-                                Dim lblAssigned = it.Pic.Parent.Controls.OfType(Of Label)().FirstOrDefault(Function(l) l.Text.StartsWith("Assegnato:"))
-                                If lblAssigned Is Nothing Then
-                                    Dim newLbl As New Label() With {
-                                        .Left = 8,
-                                        .Top = it.Cb.Bottom + 6,
-                                        .Width = previewW + extraPanelWidth - 16,
-                                        .Height = 18,
-                                        .Text = $"Assegnato: {labelDescr}",
-                                        .ForeColor = Color.DarkRed,
-                                        .Font = New Font(SystemFonts.DefaultFont.FontFamily, 9.0F, FontStyle.Bold)
-                                    }
-                                    it.Pic.Parent.Controls.Add(newLbl)
-                                Else
-                                    lblAssigned.Text = $"Assegnato: {labelDescr}"
-                                End If
+                            Dim labelText As String = $"Assegnato: {selectedNumScena}"
+                            If lblAssigned Is Nothing Then
+                                Dim newLbl As New Label() With {
+                                    .Left = 8,
+                                    .Top = it.Cb.Bottom + 6,
+                                    .Width = previewW + extraPanelWidth - 16,
+                                    .Height = 18,
+                                    .Text = labelText,
+                                    .ForeColor = Color.DarkRed,
+                                    .Font = New Font(SystemFonts.DefaultFont.FontFamily, 9.0F, FontStyle.Bold)
+                                }
+                                it.Pic.Parent.Controls.Add(newLbl)
+                            Else
+                                lblAssigned.Text = labelText
                             End If
+
+                            it.AssignedInfo = labelText
                         End If
                     Next
 
-                    MDIMessageBox.Show($"Assegnazione completata. Inseriti: {inserted}. Saltati (già assegnati): {skipped}.", Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    MDIMessageBox.Show($"Assegnazione completata. Inseriti: {inserted}. Saltati: {skipped}.",
+                                       Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Information)
                 End Using
             End Using
         Catch ex As Exception
             MDIMessageBox.Show("Errore salvataggio: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
-
 End Class

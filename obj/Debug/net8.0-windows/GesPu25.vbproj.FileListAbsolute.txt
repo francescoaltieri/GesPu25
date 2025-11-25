@@ -1946,3 +1946,4 @@ C:\Users\Administrator\Documents\GitHub\GesPu25\bin\Debug\net8.0-windows\runtime
 C:\Users\Administrator\Documents\GitHub\GesPu25\bin\Debug\net8.0-windows\runtimes\win-x86\native\vcruntime140.dll
 C:\Users\Administrator\Documents\GitHub\GesPu25\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\Microsoft.Win32.SystemEvents.dll
 C:\Users\Administrator\Documents\GitHub\GesPu25\bin\Debug\net8.0-windows\runtimes\browser\lib\net8.0\System.Text.Encodings.Web.dll
+C:\Users\Administrator\Documents\GitHub\GesPu25\obj\Debug\net8.0-windows\GesPu25.CaricaOggettiModelPack.resources

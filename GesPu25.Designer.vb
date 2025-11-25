@@ -66,9 +66,11 @@ Partial Class GesPu25
         StoryboardToolStripMenuItem1 = New ToolStripMenuItem()
         SceneToolStripMenuItem = New ToolStripMenuItem()
         PanelToolStripMenuItem = New ToolStripMenuItem()
+        AcquisisciDaPDFToolStripMenuItem = New ToolStripMenuItem()
         ModelPackToolStripMenuItem = New ToolStripMenuItem()
         ModelPackToolStripMenuItem1 = New ToolStripMenuItem()
         VociModelPackToolStripMenuItem = New ToolStripMenuItem()
+        OggettiModelPackToolStripMenuItem = New ToolStripMenuItem()
         AssegnazioniToolStripMenuItem1 = New ToolStripMenuItem()
         AssegnazioniToolStripMenuItem2 = New ToolStripMenuItem()
         AssegnazioniAnimazioniToolStripMenuItem = New ToolStripMenuItem()
@@ -81,7 +83,6 @@ Partial Class GesPu25
         StatusStrip1 = New StatusStrip()
         toolStripUser = New ToolStripStatusLabel()
         toolStripDataOra = New ToolStripStatusLabel()
-        AcquisisciDaPDFToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         StatusStrip1.SuspendLayout()
         SuspendLayout()
@@ -106,7 +107,7 @@ Partial Class GesPu25
         ' 
         TabelleToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {EpisodiToolStripMenuItem, AnagraficheToolStripMenuItem, LibraryToolStripMenuItem, LavorazioniToolStripMenuItem, MovSceneToolStripMenuItem, ComunicazioniToolStripMenuItem})
         TabelleToolStripMenuItem.Name = "TabelleToolStripMenuItem"
-        TabelleToolStripMenuItem.Size = New Size(180, 22)
+        TabelleToolStripMenuItem.Size = New Size(115, 22)
         TabelleToolStripMenuItem.Text = "Tabelle"
         ' 
         ' EpisodiToolStripMenuItem
@@ -231,7 +232,7 @@ Partial Class GesPu25
         ' 
         OpzioniToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {StrumentiToolStripMenuItem, ParametriToolStripMenuItem})
         OpzioniToolStripMenuItem.Name = "OpzioniToolStripMenuItem"
-        OpzioniToolStripMenuItem.Size = New Size(180, 22)
+        OpzioniToolStripMenuItem.Size = New Size(115, 22)
         OpzioniToolStripMenuItem.Text = "Opzioni"
         ' 
         ' StrumentiToolStripMenuItem
@@ -310,18 +311,18 @@ Partial Class GesPu25
         ' ToolStripMenuItem2
         ' 
         ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-        ToolStripMenuItem2.Size = New Size(177, 6)
+        ToolStripMenuItem2.Size = New Size(112, 6)
         ' 
         ' LogoutToolStripMenuItem
         ' 
         LogoutToolStripMenuItem.Name = "LogoutToolStripMenuItem"
-        LogoutToolStripMenuItem.Size = New Size(180, 22)
+        LogoutToolStripMenuItem.Size = New Size(115, 22)
         LogoutToolStripMenuItem.Text = "Logout"
         ' 
         ' EsciToolStripMenuItem
         ' 
         EsciToolStripMenuItem.Name = "EsciToolStripMenuItem"
-        EsciToolStripMenuItem.Size = New Size(180, 22)
+        EsciToolStripMenuItem.Size = New Size(115, 22)
         EsciToolStripMenuItem.Text = "Esci"
         ' 
         ' AssegnazioniToolStripMenuItem
@@ -341,24 +342,30 @@ Partial Class GesPu25
         ' StoryboardToolStripMenuItem1
         ' 
         StoryboardToolStripMenuItem1.Name = "StoryboardToolStripMenuItem1"
-        StoryboardToolStripMenuItem1.Size = New Size(180, 22)
+        StoryboardToolStripMenuItem1.Size = New Size(167, 22)
         StoryboardToolStripMenuItem1.Text = "Storyboard"
         ' 
         ' SceneToolStripMenuItem
         ' 
         SceneToolStripMenuItem.Name = "SceneToolStripMenuItem"
-        SceneToolStripMenuItem.Size = New Size(180, 22)
+        SceneToolStripMenuItem.Size = New Size(167, 22)
         SceneToolStripMenuItem.Text = "Scene Storyboard"
         ' 
         ' PanelToolStripMenuItem
         ' 
         PanelToolStripMenuItem.Name = "PanelToolStripMenuItem"
-        PanelToolStripMenuItem.Size = New Size(180, 22)
+        PanelToolStripMenuItem.Size = New Size(167, 22)
         PanelToolStripMenuItem.Text = "Panel Scene"
+        ' 
+        ' AcquisisciDaPDFToolStripMenuItem
+        ' 
+        AcquisisciDaPDFToolStripMenuItem.Name = "AcquisisciDaPDFToolStripMenuItem"
+        AcquisisciDaPDFToolStripMenuItem.Size = New Size(167, 22)
+        AcquisisciDaPDFToolStripMenuItem.Text = "Acquisisci da PDF"
         ' 
         ' ModelPackToolStripMenuItem
         ' 
-        ModelPackToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ModelPackToolStripMenuItem1, VociModelPackToolStripMenuItem})
+        ModelPackToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ModelPackToolStripMenuItem1, VociModelPackToolStripMenuItem, OggettiModelPackToolStripMenuItem})
         ModelPackToolStripMenuItem.Name = "ModelPackToolStripMenuItem"
         ModelPackToolStripMenuItem.Size = New Size(180, 22)
         ModelPackToolStripMenuItem.Text = "Model Pack"
@@ -366,14 +373,20 @@ Partial Class GesPu25
         ' ModelPackToolStripMenuItem1
         ' 
         ModelPackToolStripMenuItem1.Name = "ModelPackToolStripMenuItem1"
-        ModelPackToolStripMenuItem1.Size = New Size(179, 22)
+        ModelPackToolStripMenuItem1.Size = New Size(215, 22)
         ModelPackToolStripMenuItem1.Text = "Model Pack"
         ' 
         ' VociModelPackToolStripMenuItem
         ' 
         VociModelPackToolStripMenuItem.Name = "VociModelPackToolStripMenuItem"
-        VociModelPackToolStripMenuItem.Size = New Size(179, 22)
+        VociModelPackToolStripMenuItem.Size = New Size(215, 22)
         VociModelPackToolStripMenuItem.Text = "Oggetti Model Pack"
+        ' 
+        ' OggettiModelPackToolStripMenuItem
+        ' 
+        OggettiModelPackToolStripMenuItem.Name = "OggettiModelPackToolStripMenuItem"
+        OggettiModelPackToolStripMenuItem.Size = New Size(215, 22)
+        OggettiModelPackToolStripMenuItem.Text = "Carica Oggetti Model Pack"
         ' 
         ' AssegnazioniToolStripMenuItem1
         ' 
@@ -458,12 +471,6 @@ Partial Class GesPu25
         toolStripDataOra.Name = "toolStripDataOra"
         toolStripDataOra.Size = New Size(4, 17)
         ' 
-        ' AcquisisciDaPDFToolStripMenuItem
-        ' 
-        AcquisisciDaPDFToolStripMenuItem.Name = "AcquisisciDaPDFToolStripMenuItem"
-        AcquisisciDaPDFToolStripMenuItem.Size = New Size(180, 22)
-        AcquisisciDaPDFToolStripMenuItem.Text = "Acquisisci da PDF"
-        ' 
         ' GesPu25
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
@@ -544,5 +551,6 @@ Partial Class GesPu25
     Friend WithEvents ModelPackToolStripMenuItem1 As ToolStripMenuItem
     Friend WithEvents VociModelPackToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents AcquisisciDaPDFToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents OggettiModelPackToolStripMenuItem As ToolStripMenuItem
 
 End Class

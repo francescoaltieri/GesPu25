@@ -166,6 +166,11 @@ Public Class GesPu25
         ApriModulo2ConPermessi("VideoFBF", modulo)
     End Sub
 
+    Private Sub OggettiModelPackToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiModelPackToolStripMenuItem.Click
+        Dim modulo As New CaricaOggettiModelPack()
+        ApriModulo2ConPermessi("CaricaOggettiModelPack", modulo)
+    End Sub
+
     Private Sub ParametriToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles ParametriToolStripMenuItem1.Click
         ApriModuloConPermessi("Sys_Parametri", Me)
     End Sub
@@ -304,7 +309,7 @@ Public Class GesPu25
     End Sub
 
     Private Sub OggettiStoryboardToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiStoryboardToolStripMenuItem.Click
-        ApriModuloConPermessi("Tab_OggettiStoryboard", Me)
+        ApriModuloConPermessi("Tab_OggettiLavorazione", Me)
     End Sub
 
     Private Sub ModelPackToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles ModelPackToolStripMenuItem1.Click
@@ -319,5 +324,6 @@ Public Class GesPu25
         Dim modulo As New PDF2Storyboard()
         ApriModulo2ConPermessi("Acquisici da PDF", modulo)
     End Sub
+
 End Class
 

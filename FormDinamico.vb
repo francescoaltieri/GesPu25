@@ -361,7 +361,7 @@ Public Class DynamicDataForm
                                        End Using
                                    End Using
                                Catch ex As Exception
-                                   MDIMessageBox.Show($"CaricaPaginaAsync errore: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
+                                   Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"CaricaPaginaAsync errore: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
                                End Try
                            End Sub)
 
@@ -1326,7 +1326,6 @@ Public Class DynamicDataForm
     End Function
 
     Private Async Function SalvaInserimentoAsync() As Task
-
         Dim swTotal As New Stopwatch()
         swTotal.Start()
 
@@ -1370,20 +1369,60 @@ Public Class DynamicDataForm
                         cachedInsertCommand.Transaction = tx
                     End If
 
+                    ' --- NUOVA LOGICA: gestisci @intervallo ---
+                    Dim intervalHandled As Boolean = False
                     For Each nomeCampo In colonne
-                        Dim param = cachedInsertCommand.Parameters("@" & nomeCampo)
                         Dim v = valoriInput(nomeCampo)
-                        If v Is Nothing Then
-                            param.Value = DBNull.Value
-                        Else
-                            param.Value = v
+                        Dim strVal As String = If(v Is DBNull.Value, Nothing, Convert.ToString(v))
+                        If Not String.IsNullOrEmpty(strVal) AndAlso strVal.StartsWith("@intervallo", StringComparison.OrdinalIgnoreCase) Then
+                            Dim parsed = ParseInterval(strVal)
+                            If parsed.HasValue Then
+                                intervalHandled = True
+                                Dim startVal = parsed.Value.startVal
+                                Dim endVal = parsed.Value.endVal
+                                Dim stepVal = parsed.Value.stepVal
+                                Dim padLen = parsed.Value.padLen
+
+                                Dim iterations As Long
+                                If stepVal > 0 AndAlso startVal <= endVal Then
+                                    iterations = ((endVal - startVal) \ stepVal) + 1
+                                ElseIf stepVal < 0 AndAlso startVal >= endVal Then
+                                    iterations = ((startVal - endVal) \ Math.Abs(stepVal)) + 1
+                                Else
+                                    Throw New InvalidOperationException("Intervallo e step incompatibili.")
+                                End If
+
+                                For i As Long = 0 To iterations - 1
+                                    Dim currentVal = startVal + (i * stepVal)
+                                    Dim formatted = currentVal.ToString("D" & padLen)
+
+                                    ' imposta parametri per ogni colonna
+                                    For Each col In colonne
+                                        Dim param = cachedInsertCommand.Parameters("@" & col)
+                                        If col.Equals(nomeCampo, StringComparison.OrdinalIgnoreCase) Then
+                                            param.Value = formatted
+                                        Else
+                                            Dim valNorm = valoriInput(col)
+                                            param.Value = If(valNorm Is Nothing, DBNull.Value, valNorm)
+                                        End If
+                                    Next
+
+                                    Await cachedInsertCommand.ExecuteNonQueryAsync()
+                                Next
+                            End If
+                            Exit For ' gestiamo solo il primo intervallo trovato
                         End If
                     Next
 
-                    Dim swExec As New Stopwatch()
-                    swExec.Start()
-                    Await cachedInsertCommand.ExecuteNonQueryAsync()
-                    swExec.Stop()
+                    ' Se nessun intervallo, esegui un singolo insert normale
+                    If Not intervalHandled Then
+                        For Each nomeCampo In colonne
+                            Dim param = cachedInsertCommand.Parameters("@" & nomeCampo)
+                            Dim v = valoriInput(nomeCampo)
+                            param.Value = If(v Is Nothing, DBNull.Value, v)
+                        Next
+                        Await cachedInsertCommand.ExecuteNonQueryAsync()
+                    End If
 
                     tx.Commit()
                 Catch ex As Exception
@@ -1397,12 +1436,19 @@ Public Class DynamicDataForm
         End Using
 
         If errorList.Count > 0 Then
-            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show(String.Join(Environment.NewLine, errorList), Me.MdiParent, MessageBoxButtons.OK)))
+            Dim msg = String.Join(Environment.NewLine, errorList)
+            If Me.InvokeRequired Then
+                Me.BeginInvoke(Sub()
+                                   MDIMessageBox.Show(msg, Me.MdiParent, MessageBoxButtons.OK)
+                               End Sub)
+            Else
+                MDIMessageBox.Show(msg, Me.MdiParent, MessageBoxButtons.OK)
+            End If
         End If
 
         swTotal.Stop()
-
     End Function
+
 
     Private Async Function SalvaModificaAsync() As Task
         Dim swTotal As New Stopwatch()
@@ -2398,10 +2444,10 @@ Public Class DynamicDataForm
 
                                       Dim nomeFile = txtFileName.Text.Trim()
                                       Dim percorso = OttieniPercorsoImgVid(nomeFile)
-                                      If String.IsNullOrWhiteSpace(percorso) Then
-                                          MDIMessageBox.Show("Percorso multimediale non configurato.", Me.MdiParent, MessageBoxButtons.OK)
-                                          Return
-                                      End If
+                                      'If String.IsNullOrWhiteSpace(percorso) Then
+                                      'MDIMessageBox.Show("Percorso multimediale non configurato.", Me.MdiParent, MessageBoxButtons.OK)
+                                      'Return
+                                      'End If
 
                                       Dim fullPath = Path.Combine(percorso, nomeFile)
                                       If Not File.Exists(fullPath) Then
@@ -2511,7 +2557,7 @@ Public Class DynamicDataForm
             Return ""
         End Try
 
-        Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Nella Tabella Sys_Parametri non è stato trovato nessun risultato", Me.MdiParent, MessageBoxButtons.OK)))
+        'Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Nella Tabella Sys_Parametri non è stato trovato nessun risultato", Me.MdiParent, MessageBoxButtons.OK)))
         Return ""
     End Function
 
@@ -4121,6 +4167,208 @@ Public Class DynamicDataForm
             Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show("Errore nel caricamento bottoni dinamici: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)))
         End Try
     End Sub
+
+    Private Function ParseInterval(expr As String) As (startVal As Long, endVal As Long, stepVal As Long, padLen As Integer)?
+        If String.IsNullOrWhiteSpace(expr) Then Return Nothing
+
+        Dim rx As New Regex("^@intervallo\(\s*([+-]?\d+)\s*-\s*([+-]?\d+)(?:\s+step\s+([+-]?\d+))?\s*\)$", RegexOptions.IgnoreCase)
+        Dim m = rx.Match(expr.Trim())
+        If Not m.Success Then Return Nothing
+
+        Dim sStr = m.Groups(1).Value
+        Dim eStr = m.Groups(2).Value
+        Dim stepStr = If(m.Groups(3).Success, m.Groups(3).Value, "1")
+
+        Dim padLen As Integer = Math.Max(sStr.TrimStart("+"c, "-"c).Length, eStr.TrimStart("+"c, "-"c).Length)
+
+        Dim startVal As Long
+        Dim endVal As Long
+        Dim stepVal As Long
+
+        If Not Int64.TryParse(sStr, startVal) Then Return Nothing
+        If Not Int64.TryParse(eStr, endVal) Then Return Nothing
+        If Not Int64.TryParse(stepStr, stepVal) Then Return Nothing
+        If stepVal = 0 Then Return Nothing
+
+        Return (startVal, endVal, stepVal, padLen)
+    End Function
+
+    Private Function GetColumnSqlDbType(conn As SqlConnection, tableName As String, columnName As String) As SqlDbType
+        Dim schemaName As String = "dbo"
+        Dim tn = tableName
+        Dim col = columnName
+
+        Dim sql = "SELECT t.name AS TypeName FROM sys.columns c " &
+              "JOIN sys.types t ON c.user_type_id = t.user_type_id " &
+              "JOIN sys.tables tb ON c.object_id = tb.object_id " &
+              "WHERE tb.name = @table AND c.name = @col"
+
+        Using cmd As New SqlCommand(sql, conn)
+            cmd.Parameters.AddWithValue("@table", tn)
+            cmd.Parameters.AddWithValue("@col", col)
+            Dim res = cmd.ExecuteScalar()
+            If res Is Nothing Then Return SqlDbType.NVarChar
+            Dim typeName = Convert.ToString(res).ToLowerInvariant()
+            Select Case typeName
+                Case "int" : Return SqlDbType.Int
+                Case "bigint" : Return SqlDbType.BigInt
+                Case "smallint" : Return SqlDbType.SmallInt
+                Case "tinyint" : Return SqlDbType.TinyInt
+                Case "decimal", "numeric" : Return SqlDbType.Decimal
+                Case "float" : Return SqlDbType.Float
+                Case "real" : Return SqlDbType.Real
+                Case "bit" : Return SqlDbType.Bit
+                Case "datetime", "smalldatetime", "datetime2" : Return SqlDbType.DateTime
+                Case "date" : Return SqlDbType.Date
+                Case "time" : Return SqlDbType.Time
+                Case Else : Return SqlDbType.NVarChar
+            End Select
+        End Using
+    End Function
+
+    ' originalFields: Dictionary(Of String,Object) con tutti i campi e i valori del record originale
+    ' fieldName: il campo che può contenere @intervallo(...)
+    ' connString: stringa di connessione
+    ' tableName: nome tabella DB (es. "FormDinamicoTable" o la tua tabella)
+    Private Sub SaveRecordsFromInterval(originalFields As Dictionary(Of String, Object),
+                                    fieldName As String,
+                                    connString As String,
+                                    tableName As String)
+        Dim rawValueObj As Object = Nothing
+        If Not originalFields.TryGetValue(fieldName, rawValueObj) Then
+            Throw New ArgumentException("Campo non trovato in originalFields")
+        End If
+
+        Dim rawValue = Convert.ToString(rawValueObj)
+        Dim parsed = ParseInterval(rawValue)
+        If parsed Is Nothing Then
+            ' Non è un intervallo: salva un singolo record
+            SaveSingleRecord(originalFields, connString, tableName)
+            Return
+        End If
+
+        Dim startVal = parsed.Value.startVal
+        Dim endVal = parsed.Value.endVal
+        Dim stepVal = parsed.Value.stepVal
+        Dim padLen = parsed.Value.padLen
+
+        ' Calcola iterazioni e protezione
+        Dim maxIterations As Integer = 10000
+        Dim iterations As Long = 0
+        If (stepVal > 0 AndAlso startVal <= endVal) Then
+            iterations = ((endVal - startVal) \ stepVal) + 1
+        ElseIf (stepVal < 0 AndAlso startVal >= endVal) Then
+            iterations = ((startVal - endVal) \ Math.Abs(stepVal)) + 1
+        Else
+            Throw New InvalidOperationException("Intervallo e step incompatibili (nessuna iterazione).")
+        End If
+
+        If iterations <= 0 OrElse iterations > maxIterations Then
+            Throw New InvalidOperationException($"Numero di iterazioni non valido o troppo grande: {iterations}. Limite: {maxIterations}.")
+        End If
+
+        ' Prepara INSERT dinamico
+        Dim columns = originalFields.Keys.ToList()
+        Dim insertCols As New List(Of String)
+        Dim paramNames As New List(Of String)
+        For Each col In columns
+            insertCols.Add("[" & col & "]")
+            paramNames.Add("@" & col)
+        Next
+        Dim insertSql = $"INSERT INTO {tableName} ({String.Join(", ", insertCols)}) VALUES ({String.Join(", ", paramNames)})"
+
+        Using conn As New SqlConnection(connString)
+            conn.Open()
+            Using tran = conn.BeginTransaction()
+                Try
+                    ' Determina il tipo SQL del campo variabile
+                    Dim fieldSqlType = GetColumnSqlDbType(conn, tableName, fieldName)
+
+                    Using cmd As New SqlCommand(insertSql, conn, tran)
+                        cmd.Parameters.Clear()
+                        ' crea parametri con valori iniziali
+                        For Each col In columns
+                            Dim param = cmd.Parameters.Add("@" & col, SqlDbType.NVarChar)
+                            Dim val = originalFields(col)
+                            If val Is Nothing Then
+                                param.Value = DBNull.Value
+                            Else
+                                param.Value = val
+                            End If
+                        Next
+
+                        Dim current = startVal
+                        For i As Long = 1 To iterations
+                            ' formatta il valore con padding
+                            Dim formattedStr As String = If(padLen > 0, current.ToString("D" & padLen), current.ToString())
+                            ' imposta parametro con tipo corretto
+                            Dim p = cmd.Parameters("@" & fieldName)
+                            If fieldSqlType = SqlDbType.Int OrElse fieldSqlType = SqlDbType.BigInt OrElse fieldSqlType = SqlDbType.SmallInt OrElse fieldSqlType = SqlDbType.TinyInt Then
+                                Dim numericVal As Long
+                                If Long.TryParse(formattedStr, numericVal) Then
+                                    p.SqlDbType = fieldSqlType
+                                    p.Value = numericVal
+                                Else
+                                    ' fallback: salva come stringa
+                                    p.SqlDbType = SqlDbType.NVarChar
+                                    p.Value = formattedStr
+                                End If
+                            ElseIf fieldSqlType = SqlDbType.Decimal OrElse fieldSqlType = SqlDbType.Float OrElse fieldSqlType = SqlDbType.Real Then
+                                Dim dbl As Double
+                                If Double.TryParse(formattedStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, dbl) Then
+                                    p.SqlDbType = fieldSqlType
+                                    p.Value = dbl
+                                Else
+                                    p.SqlDbType = SqlDbType.NVarChar
+                                    p.Value = formattedStr
+                                End If
+                            Else
+                                p.SqlDbType = SqlDbType.NVarChar
+                                p.Value = formattedStr
+                            End If
+
+                            ' esegui insert
+                            cmd.ExecuteNonQuery()
+                            current = current + stepVal
+                        Next
+                    End Using
+
+                    tran.Commit()
+                Catch ex As Exception
+                    Try
+                        tran.Rollback()
+                    Catch
+                    End Try
+                    Throw
+                End Try
+            End Using
+        End Using
+    End Sub
+
+    Private Sub SaveSingleRecord(fields As Dictionary(Of String, Object), connString As String, tableName As String)
+        Dim columns = fields.Keys.ToList()
+        Dim insertCols = columns.Select(Function(c) "[" & c & "]").ToArray()
+        Dim paramNames = columns.Select(Function(c) "@" & c).ToArray()
+        Dim insertSql = $"INSERT INTO {tableName} ({String.Join(", ", insertCols)}) VALUES ({String.Join(", ", paramNames)})"
+
+        Using conn As New SqlConnection(connString)
+            conn.Open()
+            Using cmd As New SqlCommand(insertSql, conn)
+                For Each col In columns
+                    Dim val = fields(col)
+                    If val Is Nothing Then
+                        cmd.Parameters.AddWithValue("@" & col, DBNull.Value)
+                    Else
+                        cmd.Parameters.AddWithValue("@" & col, val)
+                    End If
+                Next
+                cmd.ExecuteNonQuery()
+            End Using
+        End Using
+    End Sub
+
+
+
 
 End Class
 

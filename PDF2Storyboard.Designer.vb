@@ -185,7 +185,7 @@ Partial Class PDF2Storyboard
         Controls.Add(BtnChiudi)
         Controls.Add(BtnAcquisisciPDF)
         Name = "PDF2Storyboard"
-        Text = "Acquisisci da Storyboard"
+        Text = "Acquisisci Panel Storyboard da PDF"
         CType(PicPanel, ComponentModel.ISupportInitialize).EndInit()
         ResumeLayout(False)
         PerformLayout()
