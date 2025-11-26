@@ -13,6 +13,7 @@ Imports pic = DocumentFormat.OpenXml.Drawing.Pictures
 Imports wp = DocumentFormat.OpenXml.Drawing.Wordprocessing
 Imports SysMath = System.Math
 Imports System.ComponentModel
+Imports System.Drawing
 
 Public Class CreaLettAssegnazione
     Inherits Form
@@ -840,7 +841,7 @@ Public Class CreaLettAssegnazione
         Next
     End Function
 
-    Private Sub btnAnnulla_Click(sender As Object, e As EventArgs) Handles btnAnnulla.Click
+    Private Sub btnAnnulla_Click(sender As Object, e As EventArgs) Handles btnChiudi.Click
         Me.Close()
     End Sub
 
@@ -848,8 +849,609 @@ Public Class CreaLettAssegnazione
         SalvaPosizioneForm(Me)
     End Sub
 
+    ' Imports necessari:
+    ' Imports System
+    ' Imports System.Data
+    ' Imports System.Data.SqlClient
+    ' Imports System.IO
+    ' Imports DocumentFormat.OpenXml
+    ' Imports DocumentFormat.OpenXml.Packaging
+    ' Imports DocumentFormat.OpenXml.Wordprocessing
+
+    ' Classe per tenere traccia degli oggetti copiati
+    Private Class CopiedItem
+        Public Property ModelPackId As String
+        Public Property TipoOggettoLavorazioneId As String
+        Public Property OggettoLavorazioneId As String
+        Public Property FileName As String
+        Public Property FolderKey As String
+        Public Property EpisodioId As String
+    End Class
+
+    Private _lastAssegnazioneId As Integer
+    Private _lastDataAssegnazioneStr As String
+
     Private Sub btnCaricaAllegati_Click(sender As Object, e As EventArgs) Handles btnCaricaAllegati.Click
+        ' Disabilita UI
+        btnCaricaAllegati.Enabled = False
+        btnCreaLett.Enabled = False
+        btnChiudi.Enabled = False
 
+        Dim errors As New List(Of String)
+        Dim copiedItems As New List(Of CopiedItem)
+
+        ' Crea e configura il form di progresso
+        Dim progressForm As New CopyProgressForm()
+        progressForm.AssegnazioneId = _idAssegnazione
+
+        Dim mdiHost As Form = Nothing
+        If Me.MdiParent IsNot Nothing Then
+            mdiHost = Me.MdiParent
+        ElseIf Application.OpenForms("GesPu25") IsNot Nothing Then
+            mdiHost = Application.OpenForms("GesPu25")
+        End If
+
+        If mdiHost IsNot Nothing Then
+            progressForm.MdiParent = mdiHost
+            progressForm.StartPosition = FormStartPosition.Manual
+            Dim parentClient = mdiHost.ClientSize
+            Dim x = System.Math.Max(0, (parentClient.Width - progressForm.Width) \ 2)
+            Dim y = System.Math.Max(0, (parentClient.Height - progressForm.Height) \ 2)
+            progressForm.Location = New Point(x, y)
+            progressForm.Show()
+        Else
+            progressForm.StartPosition = FormStartPosition.CenterParent
+            progressForm.Show(Me)
+        End If
+        progressForm.BringToFront()
+
+        _lastAssegnazioneId = _idAssegnazione
+        _lastDataAssegnazioneStr = String.Empty
+
+        Try
+            Using cn As New SqlConnection(ConnString)
+                cn.Open()
+
+                ' 1) Recupera OperatoreAssegnatario e DataAssegnazione dalla testata Mov_Assegnazioni
+                Dim operatoreRaw As Object = Nothing
+                Dim dataAssegnazioneObj As Object = Nothing
+                Using cmd As New SqlCommand("SELECT OperatoreAssegnatario, DataAssegnazione FROM Mov_Assegnazioni WHERE IdAssegnazione = @Id", cn)
+                    cmd.Parameters.Add("@Id", SqlDbType.Int).Value = _idAssegnazione
+                    Using rdr = cmd.ExecuteReader()
+                        If rdr.Read() Then
+                            operatoreRaw = If(rdr.IsDBNull(0), Nothing, rdr.GetValue(0))
+                            dataAssegnazioneObj = If(rdr.IsDBNull(1), Nothing, rdr.GetValue(1))
+                        End If
+                    End Using
+                End Using
+
+                If operatoreRaw Is Nothing Then
+                    errors.Add($"IdAssegnazione {_idAssegnazione}: OperatoreAssegnatario non trovato.")
+                    progressForm.AddMessage($"Errore: Operatore assegnatario non trovato per Id {_idAssegnazione}")
+                    GoTo EndProcess
+                End If
+
+                Dim operatoreKeyStr As String = operatoreRaw.ToString().Trim()
+                If String.IsNullOrWhiteSpace(operatoreKeyStr) Then
+                    errors.Add($"IdAssegnazione {_idAssegnazione}: OperatoreAssegnatario vuoto.")
+                    progressForm.AddMessage($"Errore: Operatore assegnatario vuoto per Id {_idAssegnazione}")
+                    GoTo EndProcess
+                End If
+
+                If dataAssegnazioneObj IsNot Nothing AndAlso Not IsDBNull(dataAssegnazioneObj) Then
+                    Dim dt As DateTime
+                    If DateTime.TryParse(dataAssegnazioneObj.ToString(), dt) Then
+                        _lastDataAssegnazioneStr = dt.ToString("yyyy-MM-dd")
+                    Else
+                        _lastDataAssegnazioneStr = dataAssegnazioneObj.ToString()
+                    End If
+                End If
+
+                ' 2) Recupera CartellaAssegnata per il fornitore (Tab_Fornitori)
+                Dim cartellaAssegnata As String = Nothing
+                Using cmd As New SqlCommand("SELECT CartellaAssegnata FROM Tab_Fornitori WHERE IdFornitore = @key OR Descrizione = @key", cn)
+                    cmd.Parameters.Add("@key", SqlDbType.NVarChar, 100).Value = operatoreKeyStr
+                    Dim obj = cmd.ExecuteScalar()
+                    If obj IsNot Nothing AndAlso obj IsNot DBNull.Value Then cartellaAssegnata = obj.ToString()
+                End Using
+
+                If String.IsNullOrWhiteSpace(cartellaAssegnata) Then
+                    errors.Add($"Operatore '{operatoreKeyStr}': CartellaAssegnata non trovata.")
+                    progressForm.AddMessage($"Errore: Cartella assegnata non trovata per operatore {operatoreKeyStr}")
+                    GoTo EndProcess
+                End If
+                If Not Directory.Exists(cartellaAssegnata) Then Directory.CreateDirectory(cartellaAssegnata)
+
+                ' 3) Recupera righe Mov_AssegnazioniLavA (NumScena) e Mov_AssegnazioniLavD (LavorazioneId) filtrate per questa assegnazione
+                Dim lavA_Scenes As New List(Of (EpisodioId As String, NumScena As String))
+                Dim lavD_List As New List(Of (EpisodioId As String, LavorazioneId As String))
+
+                Using cmd As New SqlCommand("SELECT EpisodioId, NumScena FROM Mov_AssegnazioniLavA WHERE AssegnazioneId = @Id", cn)
+                    cmd.Parameters.Add("@Id", SqlDbType.Int).Value = _idAssegnazione
+                    Using rdr = cmd.ExecuteReader()
+                        While rdr.Read()
+                            Dim episodio = If(rdr.IsDBNull(0), String.Empty, rdr.GetString(0))
+                            Dim numScena = If(rdr.IsDBNull(1), String.Empty, rdr.GetString(1))
+                            If Not String.IsNullOrWhiteSpace(numScena) Then
+                                lavA_Scenes.Add((episodio, numScena))
+                            End If
+                        End While
+                    End Using
+                End Using
+
+                Using cmd As New SqlCommand("SELECT EpisodioId, LavorazioneId FROM Mov_AssegnazioniLavD WHERE AssegnazioneId = @Id", cn)
+                    cmd.Parameters.Add("@Id", SqlDbType.Int).Value = _idAssegnazione
+                    Using rdr = cmd.ExecuteReader()
+                        While rdr.Read()
+                            Dim episodio = If(rdr.IsDBNull(0), String.Empty, rdr.GetString(0))
+                            Dim lavorazioneId = If(rdr.IsDBNull(1), String.Empty, rdr.GetString(1))
+                            If Not String.IsNullOrWhiteSpace(lavorazioneId) Then
+                                lavD_List.Add((episodio, lavorazioneId))
+                            End If
+                        End While
+                    End Using
+                End Using
+
+                If lavA_Scenes.Count = 0 Then
+                    errors.Add($"Nessuna scena trovata in Mov_AssegnazioniLavA per IdAssegnazione {_idAssegnazione}.")
+                    progressForm.AddMessage($"Nessuna scena LavA per assegnazione {_idAssegnazione}. Operazione interrotta.")
+                    GoTo EndProcess
+                End If
+
+                ' 4) Con i NumScena recuperati, prendi gli IdModelPack da Mov_ModelPack (solo per queste scene)
+                Dim modelPackInfo As New Dictionary(Of String, (EpisodioId As String, NumScena As String))
+                Dim paramNames As New List(Of String)
+                Dim parameters As New List(Of SqlParameter)
+                For i As Integer = 0 To lavA_Scenes.Count - 1
+                    Dim pn = $"@ns{i}"
+                    paramNames.Add(pn)
+                    parameters.Add(New SqlParameter(pn, SqlDbType.NVarChar, 15) With {.Value = lavA_Scenes(i).NumScena})
+                Next
+
+                Dim sqlMp As String = "SELECT IdModelPack, EpisodioId, NumScena FROM Mov_ModelPack WHERE NumScena IN (" & String.Join(",", paramNames) & ")"
+                Using cmd As New SqlCommand(sqlMp, cn)
+                    For Each p In parameters
+                        cmd.Parameters.Add(p)
+                    Next
+                    Using rdr = cmd.ExecuteReader()
+                        While rdr.Read()
+                            Dim idmpStr = If(rdr.IsDBNull(0), String.Empty, rdr.GetString(0))
+                            Dim episodioIdStr = If(rdr.IsDBNull(1), String.Empty, rdr.GetString(1))
+                            Dim scenaStr = If(rdr.IsDBNull(2), String.Empty, rdr.GetString(2))
+                            If Not String.IsNullOrWhiteSpace(idmpStr) AndAlso Not modelPackInfo.ContainsKey(idmpStr) Then
+                                modelPackInfo.Add(idmpStr, (episodioIdStr, scenaStr))
+                            End If
+                        End While
+                    End Using
+                End Using
+
+                If modelPackInfo.Count = 0 Then
+                    errors.Add($"Nessun ModelPack trovato per le scene collegate all'assegnazione {_idAssegnazione}.")
+                    progressForm.AddMessage($"Nessun ModelPack trovato per le scene dell'assegnazione {_idAssegnazione}.")
+                    GoTo EndProcess
+                End If
+
+                ' 5) Per ogni ModelPackId prendi gli oggetti e copia SOLO quegli oggetti (unico ModelPack per iterazione)
+                Using cmd As New SqlCommand("
+                SELECT ModelPackId, TipoOggettoLavorazioneId, OggettoLavorazioneId, FileOggettoLavorazione 
+                FROM Mov_ModelPackOggetti 
+                WHERE ModelPackId = @ModelPackId", cn)
+                    cmd.Parameters.Add("@ModelPackId", SqlDbType.NVarChar, 10)
+
+                    For Each kvp In modelPackInfo
+                        Dim idmp = kvp.Key
+                        Dim episodioIdFromMp = kvp.Value.EpisodioId
+                        Dim scenaFromMp = kvp.Value.NumScena
+
+                        cmd.Parameters("@ModelPackId").Value = idmp
+
+                        Using rdr = cmd.ExecuteReader()
+                            While rdr.Read()
+                                Dim mpId = If(rdr.IsDBNull(0), String.Empty, rdr.GetString(0))
+                                Dim tipoOggetto = If(rdr.IsDBNull(1), String.Empty, rdr.GetString(1))
+                                Dim oggettoLavId = If(rdr.IsDBNull(2), String.Empty, rdr.GetString(2))
+                                Dim filePath = If(rdr.IsDBNull(3), String.Empty, rdr.GetString(3))
+
+                                Dim fileNameOnly As String = If(String.IsNullOrWhiteSpace(filePath), String.Empty, Path.GetFileName(filePath))
+
+                                ' Trova le entries LavA che hanno lo stesso NumScena (scenaFromMp)
+                                Dim matchingLavA = lavA_Scenes.Where(Function(s) s.NumScena = scenaFromMp).ToList()
+
+                                ' Se non ci sono entry LavA per questa scena, ignora l'oggetto
+                                If matchingLavA.Count = 0 Then
+                                    errors.Add($"ModelPack {mpId}: scena '{scenaFromMp}' non presente nelle righe LavA dell'assegnazione. Oggetto ignorato.")
+                                    progressForm.AddMessage($"Oggetto ignorato per ModelPack {mpId}: scena {scenaFromMp} non collegata all'assegnazione.")
+                                    Continue While
+                                End If
+
+                                ' Per ogni entry LavA corrispondente copia il file e logga con episodio+scena
+                                For Each en In matchingLavA
+                                    Dim episodioFolderName As String = If(String.IsNullOrWhiteSpace(en.EpisodioId), If(String.IsNullOrWhiteSpace(episodioIdFromMp), "UnknownEpisodio", episodioIdFromMp), en.EpisodioId)
+                                    Dim folderKeyName As String = If(String.IsNullOrWhiteSpace(en.NumScena), "UnknownScene", en.NumScena)
+                                    Dim destFolder As String = Path.Combine(cartellaAssegnata, episodioFolderName, "00.Materiali", folderKeyName)
+
+                                    Try
+                                        If String.IsNullOrWhiteSpace(filePath) Then
+                                            errors.Add($"ModelPack {mpId}: FileOggettoLavorazione vuoto. Oggetto ignorato.")
+                                            progressForm.AddMessage($"Ignorato (file vuoto): ModelPack {mpId}")
+                                            Continue For
+                                        End If
+                                        If Not File.Exists(filePath) Then
+                                            errors.Add($"ModelPack {mpId}: File non trovato: {filePath}. Oggetto ignorato.")
+                                            progressForm.AddMessage($"File non trovato: {filePath}")
+                                            Continue For
+                                        End If
+
+                                        If Not Directory.Exists(destFolder) Then Directory.CreateDirectory(destFolder)
+                                        Dim destPath = Path.Combine(destFolder, fileNameOnly)
+                                        File.Copy(filePath, destPath, True)
+
+                                        ' Log nel form con episodio e scena
+                                        progressForm.AddMessageFileScene(fileNameOnly, episodioFolderName, folderKeyName)
+
+                                        ' Aggiungo l'item copiato
+                                        copiedItems.Add(New CopiedItem With {
+                                        .ModelPackId = mpId,
+                                        .TipoOggettoLavorazioneId = tipoOggetto,
+                                        .OggettoLavorazioneId = oggettoLavId,
+                                        .FileName = fileNameOnly,
+                                        .EpisodioId = episodioFolderName
+                                    })
+                                    Catch ex As Exception
+                                        errors.Add($"Errore copia ModelPack {mpId} file '{filePath}': {ex.Message}")
+                                        progressForm.AddMessage($"Errore copia: {ex.Message}")
+                                    End Try
+                                Next
+                            End While
+                        End Using
+                    Next
+                End Using
+
+EndProcess:
+                cn.Close()
+            End Using
+
+            ' 6) Log su Desktop (sintesi)
+            Dim desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+            Dim logFilePath = Path.Combine(desktopPath, $"CaricaAllegati_Log_{_idAssegnazione}_{DateTime.Now:yyyyMMdd_HHmmss}.txt")
+            Try
+                Using sw As New StreamWriter(logFilePath, False)
+                    sw.WriteLine($"Log operazione Carica Allegati - IdAssegnazione: {_idAssegnazione}")
+                    sw.WriteLine($"Data esecuzione: {DateTime.Now}")
+                    sw.WriteLine()
+                    If errors.Count = 0 Then
+                        sw.WriteLine("Nessun errore.")
+                    Else
+                        sw.WriteLine("Errori:")
+                        For Each er In errors
+                            sw.WriteLine(er)
+                        Next
+                    End If
+                    sw.WriteLine()
+                    sw.WriteLine("Oggetti copiati:")
+                    For Each ci In copiedItems
+                        sw.WriteLine($"{ci.ModelPackId};{ci.TipoOggettoLavorazioneId};{ci.OggettoLavorazioneId};{ci.FileName};{ci.EpisodioId};{ci.FolderKey}")
+                    Next
+                End Using
+                progressForm.AddMessage($"Log creato: {Path.GetFileName(logFilePath)}")
+            Catch ex As Exception
+                progressForm.AddMessage($"Impossibile creare log: {ex.Message}")
+            End Try
+
+            ' 7) Genera Word report
+            If copiedItems.Count > 0 Then
+                Dim wordFilePath = Path.Combine(desktopPath, $"CaricaAllegati_List_{_idAssegnazione}_{DateTime.Now:yyyyMMdd_HHmmss}.docx")
+                Try
+                    CreateWordReport_OpenXml(copiedItems, wordFilePath)
+                    progressForm.AddMessage($"Report Word creato: {Path.GetFileName(wordFilePath)}")
+                Catch ex As Exception
+                    errors.Add($"Errore creazione Word: {ex.Message}")
+                    progressForm.AddMessage($"Errore creazione Word: {ex.Message}")
+                End Try
+            Else
+                progressForm.AddMessage("Nessun file copiato, report Word non creato.")
+            End If
+
+            progressForm.AddMessage("Operazione completata.")
+        Catch ex As Exception
+            progressForm.AddMessage($"Errore generale: {ex.Message}")
+        Finally
+            btnCaricaAllegati.Enabled = True
+            btnCreaLett.Enabled = True
+            btnChiudi.Enabled = True
+        End Try
     End Sub
-End Class
 
+
+
+    ' -------------------------
+    ' CreateWordReport_OpenXml
+    ' -------------------------
+    Private Sub CreateWordReport_OpenXml(items As List(Of CopiedItem), outputPath As String)
+        If File.Exists(outputPath) Then
+            Try
+                File.Delete(outputPath)
+            Catch
+                outputPath = Path.Combine(Path.GetDirectoryName(outputPath),
+                                      Path.GetFileNameWithoutExtension(outputPath) & "_new" & Path.GetExtension(outputPath))
+            End Try
+        End If
+
+        Using wordDoc = WordprocessingDocument.Create(outputPath, WordprocessingDocumentType.Document)
+            Dim mainPart = wordDoc.AddMainDocumentPart()
+            mainPart.Document = New Document(New Body())
+            Dim body = mainPart.Document.Body
+
+            ' Titolo centrato
+            Dim titleText = $"Lista file copiati – Assegnazione: {_lastAssegnazioneId}  Data: {_lastDataAssegnazioneStr}"
+            Dim titlePara As New Paragraph(
+            New ParagraphProperties(New Justification() With {.Val = JustificationValues.Center},
+                                    New SpacingBetweenLines() With {.After = "200"}),
+            New Run(New RunProperties(New Bold(), New FontSize() With {.Val = "28"}), New Text(titleText))
+        )
+            body.Append(titlePara)
+            body.Append(New Paragraph(New Run(New Text(String.Empty))))
+
+            ' Tabella
+            Dim table As New Table()
+            Dim tblPr As New TableProperties(
+            New TableStyle() With {.Val = "TableGrid"},
+            New TableWidth() With {.Type = TableWidthUnitValues.Pct, .Width = "5000"},
+            New TableBorders(
+                New TopBorder() With {.Val = BorderValues.Single, .Size = 8},
+                New BottomBorder() With {.Val = BorderValues.Single, .Size = 8},
+                New LeftBorder() With {.Val = BorderValues.Single, .Size = 8},
+                New RightBorder() With {.Val = BorderValues.Single, .Size = 8},
+                New InsideHorizontalBorder() With {.Val = BorderValues.Single, .Size = 8},
+                New InsideVerticalBorder() With {.Val = BorderValues.Single, .Size = 8}
+            )
+        )
+            table.Append(tblPr)
+
+            table.Append(New TableGrid(
+            New GridColumn() With {.Width = "2400"},
+            New GridColumn() With {.Width = "2200"},
+            New GridColumn() With {.Width = "2400"},
+            New GridColumn() With {.Width = "1800"},
+            New GridColumn() With {.Width = "2200"},
+            New GridColumn() With {.Width = "3600"}
+        ))
+
+            ' Header row (ripetuta su ogni pagina) - centrata orizz. e vert.
+            Dim headerRow As New TableRow()
+            headerRow.Append(New TableRowProperties(New TableHeader()))
+            headerRow.Append(
+            MakeHeaderCell("Model Pack"),
+            MakeHeaderCell("Tipo Oggetto"),
+            MakeHeaderCell("Oggetto Lavorazione"),
+            MakeHeaderCell("Episodio"),
+            MakeHeaderCell("Nome file trasmesso")
+        )
+            table.Append(headerRow)
+
+            ' Righe dati: ultima colonna = FileName (solo nome + estensione)
+            For Each it In items
+                Dim tr As New TableRow()
+                tr.Append(
+                MakeCell(NullToEmpty(it.ModelPackId)),
+                MakeCell(NullToEmpty(it.TipoOggettoLavorazioneId)),
+                MakeCell(NullToEmpty(it.OggettoLavorazioneId)),
+                MakeCell(NullToEmpty(it.EpisodioId)),
+                MakeCell(NullToEmpty(it.FileName))
+            )
+                table.Append(tr)
+            Next
+
+            body.Append(table)
+            mainPart.Document.Save()
+        End Using
+    End Sub
+
+    ' Helper per header (centrato orizz. e vert., bold)
+    Private Function MakeHeaderCell(text As String) As TableCell
+        Dim r As New Run(New Text(If(text, String.Empty)))
+        r.RunProperties = New RunProperties(New Bold())
+
+        Dim pPr As New ParagraphProperties(New Justification() With {.Val = JustificationValues.Center})
+        Dim p As New Paragraph(pPr, r)
+
+        Dim tcPr As New TableCellProperties()
+        tcPr.Append(New TableCellVerticalAlignment() With {.Val = TableVerticalAlignmentValues.Center})
+        tcPr.Append(New TableCellWidth() With {.Type = TableWidthUnitValues.Auto})
+
+        Return New TableCell(tcPr, p)
+    End Function
+
+    ' Helper per celle dati
+    Private Function MakeCell(text As String, Optional centerHoriz As Boolean = False, Optional centerVert As Boolean = False) As TableCell
+        Dim r As New Run(New Text(If(text, String.Empty)))
+        Dim pPr As ParagraphProperties = Nothing
+        If centerHoriz Then
+            pPr = New ParagraphProperties(New Justification() With {.Val = JustificationValues.Center})
+        Else
+            pPr = New ParagraphProperties()
+        End If
+        Dim p As New Paragraph(pPr, r)
+
+        Dim tcPr As New TableCellProperties(New TableCellWidth() With {.Type = TableWidthUnitValues.Auto})
+        If centerVert Then tcPr.Append(New TableCellVerticalAlignment() With {.Val = TableVerticalAlignmentValues.Center})
+
+        Return New TableCell(tcPr, p)
+    End Function
+
+    Private Function NullToEmpty(s As String) As String
+        Return If(String.IsNullOrEmpty(s), String.Empty, s)
+    End Function
+
+
+    ' Helper per creare celle di tabella
+    Private Function CreateTableCell(text As String, Optional isHeader As Boolean = False) As TableCell
+        Dim tc = New TableCell()
+        Dim p = New Paragraph()
+        Dim r = New Run()
+        r.Append(New Text(text))
+        If isHeader Then
+            r.RunProperties = New RunProperties(New Bold())
+        End If
+        p.Append(r)
+        tc.Append(p)
+
+        ' Imposta larghezza cella (opzionale)
+        Dim tcPr = New TableCellProperties()
+        tcPr.Append(New TableCellWidth() With {.Type = TableWidthUnitValues.Dxa, .Width = "2400"})
+        tc.Append(tcPr)
+
+        Return tc
+    End Function
+
+    Public Class CopyProgressForm
+        Inherits Form
+
+        Private txtLog As TextBox
+        Private btnClose As Button
+        Private btnSaveLog As Button
+
+        ' Espone l'IdAssegnazione per includerlo nel nome del file di log
+        Public Property AssegnazioneId As Integer
+
+        Public Sub New()
+            InitializeComponent()
+        End Sub
+
+        Private Sub InitializeComponent()
+            Me.Text = "Progresso copia"
+            Me.MinimumSize = New Size(640, 360)
+            Me.Size = New Size(760, 460)
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.Sizable
+
+            ' TextBox log
+            txtLog = New TextBox() With {
+                .Multiline = True,
+                .ScrollBars = ScrollBars.Vertical,
+                .ReadOnly = True,
+                .Font = New System.Drawing.Font("Consolas", 9),
+                .Dock = DockStyle.Fill,
+                .BackColor = System.Drawing.Color.White
+            }
+
+            ' Panel inferiore con TableLayout per evitare tagli dei bottoni
+            Dim pnlBottom As New Panel() With {
+                .Dock = DockStyle.Bottom,
+                .Height = 56,
+                .Padding = New Padding(8)
+            }
+
+            Dim tbl As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .ColumnCount = 3,
+                .RowCount = 1
+            }
+            tbl.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F)) ' spazio flessibile a sinistra
+            tbl.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize)) ' Salva log
+            tbl.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize)) ' Chiudi
+            tbl.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            btnSaveLog = New Button() With {
+                .Text = "Salva log",
+                .Width = 110,
+                .Height = 30,
+                .Anchor = AnchorStyles.Right Or AnchorStyles.Bottom,
+                .Margin = New Padding(6)
+            }
+            AddHandler btnSaveLog.Click, AddressOf BtnSaveLog_Click
+
+            btnClose = New Button() With {
+                .Text = "Chiudi",
+                .Width = 110,
+                .Height = 30,
+                .Anchor = AnchorStyles.Right Or AnchorStyles.Bottom,
+                .Margin = New Padding(6)
+            }
+            AddHandler btnClose.Click, AddressOf BtnClose_Click
+
+            ' Aggiungo i controlli alla tabella (i bottoni a destra)
+            tbl.Controls.Add(New Label() With {.AutoSize = True}, 0, 0) ' placeholder per colonna espandibile
+            tbl.Controls.Add(btnSaveLog, 1, 0)
+            tbl.Controls.Add(btnClose, 2, 0)
+
+            pnlBottom.Controls.Add(tbl)
+
+            Me.Controls.Add(txtLog)
+            Me.Controls.Add(pnlBottom)
+
+            ' Salva automaticamente il log alla chiusura (se vuoi disabilitare, rimuovi l'handler)
+            AddHandler Me.FormClosing, AddressOf CopyProgressForm_FormClosing
+        End Sub
+
+        ' Aggiunge un messaggio generico con timestamp (thread-safe)
+        Public Sub AddMessage(message As String)
+            Dim line As String = $"{DateTime.Now:HH:mm:ss} - {message}"
+            If Me.InvokeRequired Then
+                Me.Invoke(New Action(Of String)(AddressOf AddMessageInternal), line)
+            Else
+                AddMessageInternal(line)
+            End If
+        End Sub
+
+        ' Aggiunge un messaggio specifico per file + episodio + scena (thread-safe)
+        Public Sub AddMessageFileScene(fileName As String, episodio As String, scena As String)
+            Dim epText As String = If(String.IsNullOrWhiteSpace(episodio), "N/A", episodio)
+            Dim scenaText As String = If(String.IsNullOrWhiteSpace(scena), "N/A", scena)
+            Dim line As String = $"{DateTime.Now:HH:mm:ss} - Copia: {fileName} (Episodio: {epText}; Scena: {scenaText})"
+            If Me.InvokeRequired Then
+                Me.Invoke(New Action(Of String)(AddressOf AddMessageInternal), line)
+            Else
+                AddMessageInternal(line)
+            End If
+        End Sub
+
+        ' Metodo interno che aggiorna la TextBox
+        Private Sub AddMessageInternal(line As String)
+            If txtLog.TextLength > 0 Then
+                txtLog.AppendText(Environment.NewLine)
+            End If
+            txtLog.AppendText(line)
+            txtLog.SelectionStart = txtLog.TextLength
+            txtLog.ScrollToCaret()
+        End Sub
+
+        ' Salva il contenuto della TextBox in un file sul Desktop
+        Private Sub BtnSaveLog_Click(sender As Object, e As EventArgs)
+            SaveLogToDesktop()
+        End Sub
+
+        ' Chiude il form
+        Private Sub BtnClose_Click(sender As Object, e As EventArgs)
+            Me.Close()
+        End Sub
+
+        ' Salvataggio automatico alla chiusura (opzionale)
+        Private Sub CopyProgressForm_FormClosing(sender As Object, e As FormClosingEventArgs)
+            SaveLogToDesktop()
+        End Sub
+
+        ' Metodo che effettua il salvataggio del log sul Desktop
+        Private Sub SaveLogToDesktop()
+            Try
+                Dim desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+                Dim idPart As String = If(AssegnazioneId > 0, $"_Assegnazione_{AssegnazioneId}", "")
+                Dim fileName = $"CaricaAllegati_ProgressLog{idPart}_{DateTime.Now:yyyyMMdd_HHmmss}.txt"
+                Dim fullPath = Path.Combine(desktopPath, fileName)
+                File.WriteAllText(fullPath, txtLog.Text)
+                MessageBox.Show($"Log salvato sul Desktop: {fileName}", "Salva log", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Catch ex As Exception
+                MessageBox.Show($"Errore salvataggio log: {ex.Message}", "Salva log", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Sub
+
+        ' Metodo pubblico per ottenere il contenuto (opzionale)
+        Public Function GetLogText() As String
+            Return txtLog.Text
+        End Function
+    End Class
+
+
+
+
+End Class

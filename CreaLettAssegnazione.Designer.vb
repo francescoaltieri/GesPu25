@@ -23,7 +23,7 @@ Partial Class CreaLettAssegnazione
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
         btnCreaLett = New Button()
-        btnAnnulla = New Button()
+        btnChiudi = New Button()
         lblCreaPDF = New Label()
         btnCaricaAllegati = New Button()
         SuspendLayout()
@@ -37,14 +37,14 @@ Partial Class CreaLettAssegnazione
         btnCreaLett.Text = "Crea Lettera"
         btnCreaLett.UseVisualStyleBackColor = True
         ' 
-        ' btnAnnulla
+        ' btnChiudi
         ' 
-        btnAnnulla.Location = New Point(91, 94)
-        btnAnnulla.Name = "btnAnnulla"
-        btnAnnulla.Size = New Size(75, 23)
-        btnAnnulla.TabIndex = 1
-        btnAnnulla.Text = "Annulla"
-        btnAnnulla.UseVisualStyleBackColor = True
+        btnChiudi.Location = New Point(91, 94)
+        btnChiudi.Name = "btnChiudi"
+        btnChiudi.Size = New Size(75, 23)
+        btnChiudi.TabIndex = 1
+        btnChiudi.Text = "Chiudi"
+        btnChiudi.UseVisualStyleBackColor = True
         ' 
         ' lblCreaPDF
         ' 
@@ -72,7 +72,7 @@ Partial Class CreaLettAssegnazione
         ClientSize = New Size(272, 129)
         Controls.Add(btnCaricaAllegati)
         Controls.Add(lblCreaPDF)
-        Controls.Add(btnAnnulla)
+        Controls.Add(btnChiudi)
         Controls.Add(btnCreaLett)
         Name = "CreaLettAssegnazione"
         Text = "Crea Lettera  Assegnazione"
@@ -81,7 +81,7 @@ Partial Class CreaLettAssegnazione
     End Sub
 
     Friend WithEvents btnCreaLett As Button
-    Friend WithEvents btnAnnulla As Button
+    Friend WithEvents btnChiudi As Button
     Friend WithEvents lblCreaPDF As Label
     Friend WithEvents btnCaricaAllegati As Button
 End Class
