@@ -202,7 +202,7 @@ Public Class DynamicDataForm
         AggiungiBottone("Salva", AddressOf SalvaDati)
         DisabilitaPulsante("Salva", True)
         AggiungiBottone("Cancella", AddressOf CancellaDati)
-        AggiungiBottone("Annulla", AddressOf AnnullaOperazione)
+        AggiungiBottone("Reset", AddressOf AnnullaOperazione)
         DisabilitaPulsante("Annulla", True)
         AggiungiBottone("Esporta", AddressOf EsportaTabella)
         AggiungiBottone("Rimuovi filtro", Sub()
@@ -691,7 +691,7 @@ Public Class DynamicDataForm
     End Sub
 
     Private Sub AnnullaOperazione()
-        Dim risposta = MDIMessageBox.Show("Vuoi annullare l’operazione corrente?", Me.MdiParent, MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+        Dim risposta = MDIMessageBox.Show("Vuoi eseguire reset del Form?", Me.MdiParent, MessageBoxButtons.YesNo, MessageBoxIcon.Question)
 
         If risposta = DialogResult.Yes Then
 
@@ -708,19 +708,7 @@ Public Class DynamicDataForm
                 End If
             Next
 
-            DisabilitaCampi()
-
-            pageIndex = 0
-            CaricaPaginaAsync()
-            DisabilitaPulsante("Salva", True)
-            lampeggioAttivo = False
-            lblModalita.ForeColor = Color.DarkGreen
-            DisabilitaPulsante("Annulla", True)
-            ModalitaCorrente = "nessuna"
-            lblModalita.Text = "In Attesa..."
-            PulisciCampi()
-            ResetLabelDescrizioni()
-            UpdateButtonsByModalita()
+            ResetForm()
 
         End If
     End Sub
@@ -790,10 +778,6 @@ Public Class DynamicDataForm
     Private Sub DisabilitaCampi()
         AbilitaCampi(False)
     End Sub
-
-    Private Function CampoIDGestitoManuale() As Boolean
-        Return False
-    End Function
 
     Private Sub FocusSulPrimoCampoEditabile()
         Me.BeginInvoke(New MethodInvoker(Sub()
@@ -898,7 +882,7 @@ Public Class DynamicDataForm
                 End Select
             End If
 
-            ctrl.Enabled = Not campo.IsIdentity
+            'ctrl.Enabled = Not campo.IsIdentity
         Next
 
         FocusSulPrimoCampoEditabile()
@@ -1109,7 +1093,6 @@ Public Class DynamicDataForm
 
     End Sub
 
-
     Private Async Sub SalvaDati(sender As Object, e As EventArgs)
         Dim sw As New Stopwatch()
         sw.Start()
@@ -1183,17 +1166,19 @@ Public Class DynamicDataForm
             Return
         End If
 
-        campiDefiniti = RecuperaCampiDa(Me.Name)
+        'campiDefiniti = RecuperaCampiDa(Me.Name)
 
         Dim campoChiave = campiDefiniti.FirstOrDefault(Function(c) c.IsChiave)
         If campoChiave Is Nothing Then
             MDIMessageBox.Show("Nessuna chiave primaria definita.", Me.MdiParent, MessageBoxButtons.OK)
+            ResetForm()
             Return
         End If
 
         Dim cella = dgvDati.SelectedRows(0).Cells(campoChiave.Nome)
         If cella.Value Is Nothing Then
             MDIMessageBox.Show("Il valore della chiave è nullo.", Me.MdiParent, MessageBoxButtons.OK)
+            ResetForm()
             Return
         End If
 
@@ -1215,8 +1200,6 @@ Public Class DynamicDataForm
                 If pageIndex > 0 AndAlso (totalRows - 1) <= pageIndex * pageSize Then
                     pageIndex = Math.Max(0, pageIndex - 1)
                 End If
-                CaricaPaginaAsync()
-                PulisciCampi()
 
             Catch ex As SqlException
                 If ex.Number = 547 Then
@@ -1228,6 +1211,22 @@ Public Class DynamicDataForm
                 MDIMessageBox.Show("Errore imprevisto: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
             End Try
         End If
+        ResetForm()
+    End Sub
+
+    Private Sub ResetForm()
+        DisabilitaCampi()
+        pageIndex = 0
+        CaricaPaginaAsync()
+        DisabilitaPulsante("Salva", True)
+        lampeggioAttivo = False
+        lblModalita.ForeColor = Color.DarkGreen
+        DisabilitaPulsante("Annulla", True)
+        ModalitaCorrente = "nessuna"
+        lblModalita.Text = "In Attesa..."
+        PulisciCampi()
+        ResetLabelDescrizioni()
+        UpdateButtonsByModalita()
     End Sub
 
     Private Sub ResetLabelDescrizioni()
@@ -1355,6 +1354,30 @@ Public Class DynamicDataForm
 
         Dim errorList As New List(Of String)
 
+        ' --- Prepara cache join e lookup prima della transazione ---
+        Dim joinDefs As New Dictionary(Of String, DataRow)(StringComparer.OrdinalIgnoreCase)
+        Dim joinLookupCache As New Dictionary(Of String, DataTable)(StringComparer.OrdinalIgnoreCase)
+        Dim joinResultCache As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
+
+        For Each nomeCampo In colonne
+            Try
+                Dim jr = RecuperaJoinPerCampo(Me.Name, nomeCampo)
+                If jr IsNot Nothing Then
+                    joinDefs(nomeCampo) = jr
+                    ' Se la definizione join contiene il nome di una tabella di lookup, caricala in cache
+                    If jr.Table.Columns.Contains("TabellaElenco") Then
+                        Dim tabName = jr("TabellaElenco").ToString()
+                        If Not String.IsNullOrWhiteSpace(tabName) AndAlso Not joinLookupCache.ContainsKey(tabName) Then
+                            Dim dtRef = RecuperaTabellaCached(tabName)
+                            If dtRef IsNot Nothing Then joinLookupCache(tabName) = dtRef
+                        End If
+                    End If
+                End If
+            Catch
+                ' swallow: non bloccare l'inserimento per errori di lookup join
+            End Try
+        Next
+
         Using conn As New SqlConnection(ConnString)
             Await conn.OpenAsync()
 
@@ -1369,49 +1392,94 @@ Public Class DynamicDataForm
                         cachedInsertCommand.Transaction = tx
                     End If
 
-                    ' --- NUOVA LOGICA: gestisci @intervallo ---
+                    ' --- gestisci @intervallo ---
                     Dim intervalHandled As Boolean = False
                     For Each nomeCampo In colonne
-                        Dim v = valoriInput(nomeCampo)
-                        Dim strVal As String = If(v Is DBNull.Value, Nothing, Convert.ToString(v))
-                        If Not String.IsNullOrEmpty(strVal) AndAlso strVal.StartsWith("@intervallo", StringComparison.OrdinalIgnoreCase) Then
-                            Dim parsed = ParseInterval(strVal)
-                            If parsed.HasValue Then
-                                intervalHandled = True
-                                Dim startVal = parsed.Value.startVal
-                                Dim endVal = parsed.Value.endVal
-                                Dim stepVal = parsed.Value.stepVal
-                                Dim padLen = parsed.Value.padLen
+                        Dim valore As Object = Nothing
 
-                                Dim iterations As Long
-                                If stepVal > 0 AndAlso startVal <= endVal Then
-                                    iterations = ((endVal - startVal) \ stepVal) + 1
-                                ElseIf stepVal < 0 AndAlso startVal >= endVal Then
-                                    iterations = ((startVal - endVal) \ Math.Abs(stepVal)) + 1
+                        ' 1) Se è un campo calcolato, prendi il valore calcolato
+                        If valoriCalcolati.ContainsKey(nomeCampo) Then
+                            valore = valoriCalcolati(nomeCampo)
+                        Else
+                            ' 2) Prova a estrarre il valore dal controllo (se esiste)
+                            Try
+                                If campoInputs.ContainsKey(nomeCampo) Then
+                                    valore = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
                                 Else
-                                    Throw New InvalidOperationException("Intervallo e step incompatibili.")
+                                    valore = DBNull.Value
                                 End If
-
-                                For i As Long = 0 To iterations - 1
-                                    Dim currentVal = startVal + (i * stepVal)
-                                    Dim formatted = currentVal.ToString("D" & padLen)
-
-                                    ' imposta parametri per ogni colonna
-                                    For Each col In colonne
-                                        Dim param = cachedInsertCommand.Parameters("@" & col)
-                                        If col.Equals(nomeCampo, StringComparison.OrdinalIgnoreCase) Then
-                                            param.Value = formatted
-                                        Else
-                                            Dim valNorm = valoriInput(col)
-                                            param.Value = If(valNorm Is Nothing, DBNull.Value, valNorm)
-                                        End If
-                                    Next
-
-                                    Await cachedInsertCommand.ExecuteNonQueryAsync()
-                                Next
-                            End If
-                            Exit For ' gestiamo solo il primo intervallo trovato
+                            Catch ex As Exception
+                                valore = DBNull.Value
+                            End Try
                         End If
+
+                        ' 3) Se il campo ha una definizione di JOIN, risolvi il valore join leggendo le chiavi figlie dai controlli
+                        Try
+                            Dim joinRow As DataRow = Nothing
+                            If joinDefs.ContainsKey(nomeCampo) Then joinRow = joinDefs(nomeCampo)
+
+                            If joinRow IsNot Nothing Then
+                                Dim chiaviFiglia As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
+                                For i As Integer = 1 To 3
+                                    Dim chiaveNome = $"ChiaveFiglia{i}"
+                                    If joinRow.Table.Columns.Contains(chiaveNome) Then
+                                        Dim nomeCampoFiglio = joinRow(chiaveNome).ToString()
+                                        If Not String.IsNullOrWhiteSpace(nomeCampoFiglio) Then
+                                            Dim valFiglio As Object = DBNull.Value
+                                            If campoInputs.ContainsKey(nomeCampoFiglio) Then
+                                                Dim ctrlFiglio = campoInputs(nomeCampoFiglio)
+                                                If ctrlFiglio IsNot Nothing Then
+                                                    If TypeOf ctrlFiglio Is TextBox Then
+                                                        valFiglio = CType(ctrlFiglio, TextBox).Text
+                                                    ElseIf TypeOf ctrlFiglio Is ComboBox Then
+                                                        valFiglio = CType(ctrlFiglio, ComboBox).SelectedValue
+                                                    ElseIf TypeOf ctrlFiglio Is FlowLayoutPanel Then
+                                                        Dim flow = CType(ctrlFiglio, FlowLayoutPanel)
+                                                        Dim innerTxt = flow.Controls.OfType(Of TextBox)().FirstOrDefault()
+                                                        If innerTxt IsNot Nothing Then
+                                                            valFiglio = innerTxt.Text
+                                                        Else
+                                                            Try
+                                                                valFiglio = ctrlFiglio.Text
+                                                            Catch
+                                                                valFiglio = DBNull.Value
+                                                            End Try
+                                                        End If
+                                                    Else
+                                                        Try
+                                                            valFiglio = ctrlFiglio.Text
+                                                        Catch
+                                                            valFiglio = DBNull.Value
+                                                        End Try
+                                                    End If
+                                                End If
+                                            ElseIf valoriInput.ContainsKey(nomeCampoFiglio) Then
+                                                valFiglio = valoriInput(nomeCampoFiglio)
+                                            Else
+                                                valFiglio = DBNull.Value
+                                            End If
+
+                                            If valFiglio Is Nothing OrElse String.IsNullOrEmpty(Convert.ToString(valFiglio)) Then
+                                                chiaviFiglia.Add(chiaveNome, DBNull.Value)
+                                            Else
+                                                chiaviFiglia.Add(chiaveNome, valFiglio)
+                                            End If
+                                        End If
+                                    End If
+                                Next
+
+                                ' usa la versione cached/memoized
+                                Dim valoreJoin = PrelevaValoreJoinCached(joinRow, chiaviFiglia, joinLookupCache, joinResultCache)
+                                If valoreJoin IsNot Nothing Then
+                                    valore = valoreJoin
+                                End If
+                            End If
+                        Catch ex As Exception
+                            errorList.Add($"Errore join campo {nomeCampo}: {ex.Message}")
+                        End Try
+
+                        If valore Is Nothing Then valore = DBNull.Value
+                        valoriInput(nomeCampo) = valore
                     Next
 
                     ' Se nessun intervallo, esegui un singolo insert normale
@@ -1447,6 +1515,75 @@ Public Class DynamicDataForm
         End If
 
         swTotal.Stop()
+    End Function
+
+    Private Function BuildJoinCacheKey(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As String
+        Dim sb As New System.Text.StringBuilder()
+        ' usa un identificatore stabile per la definizione join (es. TabellaJoin o concatenazione colonne)
+        If joinRow.Table.Columns.Contains("IdJoin") Then
+            sb.Append(joinRow("IdJoin").ToString())
+        ElseIf joinRow.Table.Columns.Contains("TabellaElenco") Then
+            sb.Append(joinRow("TabellaElenco").ToString())
+        Else
+            ' fallback: usa nome campo e hash della definizione
+            sb.Append(joinRow.Table.TableName & "_" & joinRow.ItemArray.GetHashCode().ToString())
+        End If
+        ' aggiungi le chiavi figlia in ordine
+        For i As Integer = 1 To 3
+            Dim k = $"ChiaveFiglia{i}"
+            If chiaviFiglia.ContainsKey(k) Then
+                Dim v = chiaviFiglia(k)
+                sb.Append("|" & If(v Is Nothing OrElse Convert.IsDBNull(v), "<NULL>", v.ToString()))
+            Else
+                sb.Append("|<MISSING>")
+            End If
+        Next
+        Return sb.ToString()
+    End Function
+
+    Private Function PrelevaValoreJoinCached(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object), lookupCache As Dictionary(Of String, DataTable), resultCache As Dictionary(Of String, Object)) As Object
+        Dim cacheKey = BuildJoinCacheKey(joinRow, chiaviFiglia)
+        If resultCache.ContainsKey(cacheKey) Then
+            Return resultCache(cacheKey)
+        End If
+
+        ' Se possibile, prova a risolvere usando lookupCache (evita chiamate DB in PrelevaValoreJoin)
+        Try
+            If joinRow.Table.Columns.Contains("TabellaElenco") Then
+                Dim tabName = joinRow("TabellaElenco").ToString()
+                Dim chiaveCol = If(joinRow.Table.Columns.Contains("ChiaveElenco"), joinRow("ChiaveElenco").ToString(), String.Empty)
+                Dim campoVis = If(joinRow.Table.Columns.Contains("CampoVisuale"), joinRow("CampoVisuale").ToString(), String.Empty)
+                If Not String.IsNullOrWhiteSpace(tabName) AndAlso lookupCache.ContainsKey(tabName) AndAlso Not String.IsNullOrWhiteSpace(chiaveCol) Then
+                    Dim dtRef = lookupCache(tabName)
+                    ' costruisci filtro usando la prima chiave figlia non nulla (adatta se join usa più chiavi)
+                    Dim filtroParts As New List(Of String)
+                    For i As Integer = 1 To 3
+                        Dim k = $"ChiaveFiglia{i}"
+                        If chiaviFiglia.ContainsKey(k) Then
+                            Dim v = chiaviFiglia(k)
+                            If v IsNot Nothing AndAlso Not Convert.IsDBNull(v) Then
+                                filtroParts.Add($"{chiaveCol} = '{v.ToString().Replace("'", "''")}'")
+                            End If
+                        End If
+                    Next
+                    If filtroParts.Count > 0 Then
+                        Dim rows = dtRef.Select(String.Join(" AND ", filtroParts.ToArray()))
+                        If rows.Length > 0 Then
+                            Dim val = rows(0)(chiaveCol)
+                            resultCache(cacheKey) = val
+                            Return val
+                        End If
+                    End If
+                End If
+            End If
+        Catch
+            ' fallback alla PrelevaValoreJoin originale
+        End Try
+
+        ' fallback: chiama la funzione esistente (potrebbe fare query)
+        Dim valore = PrelevaValoreJoin(joinRow, chiaviFiglia)
+        resultCache(cacheKey) = valore
+        Return valore
     End Function
 
 
@@ -2004,6 +2141,7 @@ Public Class DynamicDataForm
 
         Return ctrl
     End Function
+
 
     Private Function RecuperaInfoCampoPath(nomeCampo As String) As (IsFile As Boolean, BottoneVisualizza As Boolean)
         Try

@@ -1,19 +1,23 @@
-﻿Imports System.Data
-Imports System.Data.SqlClient
+﻿'Imports System.Data
+'Imports System.Data.SqlClient
 Imports System.IO
 Imports System.Linq
 Imports System.Text.RegularExpressions
 Imports System.Windows.Forms
+Imports Microsoft.Data.SqlClient
+
+Imports System.ComponentModel
+Imports System.Drawing
+
 Imports DocumentFormat.OpenXml
 Imports DocumentFormat.OpenXml.Packaging
 Imports DocumentFormat.OpenXml.Wordprocessing
-Imports Microsoft.Data.SqlClient
+
 Imports a = DocumentFormat.OpenXml.Drawing
 Imports pic = DocumentFormat.OpenXml.Drawing.Pictures
 Imports wp = DocumentFormat.OpenXml.Drawing.Wordprocessing
+
 Imports SysMath = System.Math
-Imports System.ComponentModel
-Imports System.Drawing
 
 Public Class CreaLettAssegnazione
     Inherits Form
@@ -841,22 +845,13 @@ Public Class CreaLettAssegnazione
         Next
     End Function
 
-    Private Sub btnAnnulla_Click(sender As Object, e As EventArgs) Handles btnChiudi.Click
+    Private Sub btnChiudi_Click(sender As Object, e As EventArgs) Handles btnChiudi.Click
         Me.Close()
     End Sub
 
     Private Sub CreaLettAssegnazione_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
         SalvaPosizioneForm(Me)
     End Sub
-
-    ' Imports necessari:
-    ' Imports System
-    ' Imports System.Data
-    ' Imports System.Data.SqlClient
-    ' Imports System.IO
-    ' Imports DocumentFormat.OpenXml
-    ' Imports DocumentFormat.OpenXml.Packaging
-    ' Imports DocumentFormat.OpenXml.Wordprocessing
 
     ' Classe per tenere traccia degli oggetti copiati
     Private Class CopiedItem
@@ -870,7 +865,6 @@ Public Class CreaLettAssegnazione
 
     Private _lastAssegnazioneId As Integer
     Private _lastDataAssegnazioneStr As String
-
     Private Sub btnCaricaAllegati_Click(sender As Object, e As EventArgs) Handles btnCaricaAllegati.Click
         ' Disabilita UI
         btnCaricaAllegati.Enabled = False
@@ -1162,8 +1156,6 @@ EndProcess:
         End Try
     End Sub
 
-
-
     ' -------------------------
     ' CreateWordReport_OpenXml
     ' -------------------------
@@ -1380,8 +1372,6 @@ EndProcess:
             Me.Controls.Add(txtLog)
             Me.Controls.Add(pnlBottom)
 
-            ' Salva automaticamente il log alla chiusura (se vuoi disabilitare, rimuovi l'handler)
-            AddHandler Me.FormClosing, AddressOf CopyProgressForm_FormClosing
         End Sub
 
         ' Aggiunge un messaggio generico con timestamp (thread-safe)
@@ -1450,8 +1440,5 @@ EndProcess:
             Return txtLog.Text
         End Function
     End Class
-
-
-
 
 End Class

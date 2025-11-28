@@ -33,7 +33,7 @@ Partial Class CreaLettAssegnazione
         btnCreaLett.Location = New Point(28, 56)
         btnCreaLett.Name = "btnCreaLett"
         btnCreaLett.Size = New Size(102, 23)
-        btnCreaLett.TabIndex = 0
+        btnCreaLett.TabIndex = 1
         btnCreaLett.Text = "Crea Lettera"
         btnCreaLett.UseVisualStyleBackColor = True
         ' 
@@ -42,7 +42,7 @@ Partial Class CreaLettAssegnazione
         btnChiudi.Location = New Point(91, 94)
         btnChiudi.Name = "btnChiudi"
         btnChiudi.Size = New Size(75, 23)
-        btnChiudi.TabIndex = 1
+        btnChiudi.TabIndex = 3
         btnChiudi.Text = "Chiudi"
         btnChiudi.UseVisualStyleBackColor = True
         ' 
@@ -53,7 +53,7 @@ Partial Class CreaLettAssegnazione
         lblCreaPDF.Location = New Point(28, 20)
         lblCreaPDF.Name = "lblCreaPDF"
         lblCreaPDF.Size = New Size(211, 17)
-        lblCreaPDF.TabIndex = 2
+        lblCreaPDF.TabIndex = 0
         lblCreaPDF.Text = "CREAZIONE Lettera Assegnazioni"
         ' 
         ' btnCaricaAllegati
@@ -61,7 +61,7 @@ Partial Class CreaLettAssegnazione
         btnCaricaAllegati.Location = New Point(137, 56)
         btnCaricaAllegati.Name = "btnCaricaAllegati"
         btnCaricaAllegati.Size = New Size(102, 23)
-        btnCaricaAllegati.TabIndex = 3
+        btnCaricaAllegati.TabIndex = 2
         btnCaricaAllegati.Text = "Carica Allegati"
         btnCaricaAllegati.UseVisualStyleBackColor = True
         ' 
@@ -75,7 +75,7 @@ Partial Class CreaLettAssegnazione
         Controls.Add(btnChiudi)
         Controls.Add(btnCreaLett)
         Name = "CreaLettAssegnazione"
-        Text = "Crea Lettera  Assegnazione"
+        Text = "Crea Lettera Assegnazione"
         ResumeLayout(False)
         PerformLayout()
     End Sub
