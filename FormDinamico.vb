@@ -62,6 +62,11 @@ Public Class DynamicDataForm
 
     Private campiCalcolatiDettaglio As Dictionary(Of String, (Formula As String, TipoValore As String, SuSeStesso As Boolean)) = Nothing
 
+    ' Cache per i campi join: chiave = NomeTabella + "|" + NomeCampo
+    Private campiJoinCache As Dictionary(Of String, DataRow) = Nothing
+    Private campiJoinCacheLoadedForTable As String = String.Empty
+
+
     Public Sub New(campi As List(Of CampoDatabase), nomeTabella As String)
         Me.Name = nomeTabella
         Me.Text = "Form Dinamico"
@@ -637,6 +642,7 @@ Public Class DynamicDataForm
     Private Sub DynamicDataForm_Resize(sender As Object, e As EventArgs)
         AggiornaMaxWidthModalita()
     End Sub
+
     Private Sub AggiornaMaxWidthModalita()
         Try
             Dim padding As Integer = 40
@@ -748,7 +754,7 @@ Public Class DynamicDataForm
             End If
 
             ' Altrimenti applica le regole standard (identity, chiave, join)
-            Dim joinRow = RecuperaJoinPerCampo(nomeTabellaCorrente, nomeCampo)
+            Dim joinRow = RecuperaJoinPerCampoCached(nomeTabellaCorrente, nomeCampo)
             Dim isJoin = (joinRow IsNot Nothing)
             Dim joinModificabile As Boolean = True
             If isJoin AndAlso joinRow.Table.Columns.Contains("AbilitaModifica") Then
@@ -827,7 +833,6 @@ Public Class DynamicDataForm
                                          End Sub))
     End Sub
 
-
     Private Sub InserisciDati(sender As Object, e As EventArgs)
 
         isModifica = False
@@ -889,20 +894,18 @@ Public Class DynamicDataForm
 
     End Sub
 
-    Private Function RecuperaJoinPerCampo(nomeTabella As String, nomeCampo As String) As DataRow
-        Using conn As New SqlConnection(ConnString)
-            Dim query = "SELECT * FROM sys_CampiJoin WHERE NomeTabella = @Tabella AND NomeCampo = @Campo"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@Tabella", nomeTabella)
-                cmd.Parameters.AddWithValue("@Campo", nomeCampo)
-                Dim da As New SqlDataAdapter(cmd)
-                Dim dt As New DataTable()
-                da.Fill(dt)
-                If dt.Rows.Count > 0 Then Return dt.Rows(0)
-            End Using
-        End Using
+    Private Function RecuperaJoinPerCampoCached(nomeTabella As String, nomeCampo As String) As DataRow
+        If campiJoinCache Is Nothing OrElse campiJoinCacheLoadedForTable <> nomeTabella Then
+            CaricaCampiJoinCachePerTabella(nomeTabella)
+        End If
+
+        Dim key = $"{nomeTabella}|{nomeCampo}"
+        If campiJoinCache IsNot Nothing AndAlso campiJoinCache.ContainsKey(key) Then
+            Return campiJoinCache(key)
+        End If
         Return Nothing
     End Function
+
 
     Private Function PrelevaValoreJoin(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As Object
 
@@ -997,6 +1000,9 @@ Public Class DynamicDataForm
             Return
         End If
 
+        ' Carica la cache dei campi join per questa tabella una sola volta
+        CaricaCampiJoinCachePerTabella(Me.Name)
+
         DisabilitaPulsante("Salva", False)
         ModalitaCorrente = "modifica"
         lblModalita.Text = "Modifica in corso..."
@@ -1014,7 +1020,7 @@ Public Class DynamicDataForm
         For Each campo In campiDefiniti
             If Not campoInputs.ContainsKey(campo.Nome) Then Continue For
 
-            Dim joinRow = RecuperaJoinPerCampo(Me.Name, campo.Nome)
+            Dim joinRow = RecuperaJoinPerCampoCached(Me.Name, campo.Nome)
             If joinRow IsNot Nothing Then
                 ' Costruisco dizionario chiavi figlia (se presenti nella definizione join)
                 Dim chiaviFiglia As New Dictionary(Of String, Object)
@@ -1078,7 +1084,6 @@ Public Class DynamicDataForm
                             lbl.Text = "..."
                         End Try
                     End If
-
                 Else
                     ' fallback generico
                     Try
@@ -1142,7 +1147,7 @@ Public Class DynamicDataForm
                                                      DisabilitaPulsante("Salva", True)
                                                      lblModalita.ForeColor = Color.DarkGreen
                                                      ModalitaCorrente = "nessuna"
-                                                     lblModalita.Text = ""
+                                                     lblModalita.Text = "Scheda Salvata"
                                                      DisabilitaPulsante("Annulla", True)
                                                      UpdateButtonsByModalita()
                                                  Catch ex As Exception
@@ -1155,7 +1160,6 @@ Public Class DynamicDataForm
         Finally
             ShowBusyOverlay(False)
             ToggleUIForSaving(False)
-
             sw.Stop()
         End Try
     End Sub
@@ -1212,6 +1216,117 @@ Public Class DynamicDataForm
             End Try
         End If
         ResetForm()
+    End Sub
+
+    Private Sub CaricaCampiJoinCachePerTabella(nomeTabella As String)
+        If campiJoinCache IsNot Nothing AndAlso campiJoinCacheLoadedForTable = nomeTabella Then
+            Return
+        End If
+
+        Dim dict As New Dictionary(Of String, DataRow)(StringComparer.OrdinalIgnoreCase)
+
+        Using conn As New SqlConnection(ConnString)
+            Dim query = "SELECT * FROM sys_CampiJoin WHERE NomeTabella = @Tabella"
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@Tabella", nomeTabella)
+                Dim da As New SqlDataAdapter(cmd)
+                Dim dt As New DataTable()
+                da.Fill(dt)
+                For Each r As DataRow In dt.Rows
+                    Dim nomeCampo = r("NomeCampo").ToString()
+                    Dim key = $"{nomeTabella}|{nomeCampo}"
+                    If Not dict.ContainsKey(key) Then
+                        dict.Add(key, r)
+                    End If
+                Next
+            End Using
+        End Using
+
+        campiJoinCache = dict
+        campiJoinCacheLoadedForTable = nomeTabella
+    End Sub
+
+    Private Function EstraiValoreDaControllo(ctrl As Control) As Object
+        If ctrl Is Nothing Then Return Nothing
+
+        If TypeOf ctrl Is TextBox Then
+            Return CType(ctrl, TextBox).Text
+        ElseIf TypeOf ctrl Is ComboBox Then
+            Return CType(ctrl, ComboBox).SelectedValue
+        ElseIf TypeOf ctrl Is FlowLayoutPanel Then
+            Dim innerTxt = ctrl.Controls.OfType(Of TextBox)().FirstOrDefault()
+            If innerTxt IsNot Nothing Then Return innerTxt.Text
+        End If
+        Try
+            Return ctrl.Text
+        Catch
+            Return Nothing
+        End Try
+    End Function
+
+    Private Sub AggiornaControlloConValoreJoin(ctrl As Control, valoreJoin As Object)
+        If ctrl Is Nothing Then Return
+
+        If TypeOf ctrl Is TextBox Then
+            CType(ctrl, TextBox).Text = If(valoreJoin Is Nothing, String.Empty, valoreJoin.ToString())
+        ElseIf TypeOf ctrl Is ComboBox Then
+            Try
+                CType(ctrl, ComboBox).SelectedValue = valoreJoin
+            Catch
+                CType(ctrl, ComboBox).SelectedIndex = -1
+            End Try
+        ElseIf TypeOf ctrl Is FlowLayoutPanel Then
+            Dim flow = CType(ctrl, FlowLayoutPanel)
+            Dim innerTxt = flow.Controls.OfType(Of TextBox)().FirstOrDefault()
+            If innerTxt IsNot Nothing Then innerTxt.Text = If(valoreJoin Is Nothing, String.Empty, valoreJoin.ToString())
+            ' Aggiorna label descrizione se necessario (puoi riutilizzare la logica esistente)
+        Else
+            Try
+                ctrl.Text = If(valoreJoin Is Nothing, String.Empty, valoreJoin.ToString())
+            Catch
+            End Try
+        End If
+    End Sub
+
+    Private Sub RicalcolaCampiJoinPrimaSalvataggio()
+        ' Assicurati che la cache sia caricata
+        CaricaCampiJoinCachePerTabella(Me.Name)
+
+        For Each campo In campiDefiniti
+            If Not campoInputs.ContainsKey(campo.Nome) Then Continue For
+
+            Dim joinRow = RecuperaJoinPerCampoCached(Me.Name, campo.Nome)
+            If joinRow Is Nothing Then Continue For
+
+            ' Costruisco dizionario chiavi figlia (se presenti nella definizione join)
+            Dim chiaviFiglia As New Dictionary(Of String, Object)
+            For i = 1 To 3
+                Dim chiaveNome = $"ChiaveFiglia{i}"
+                If joinRow.Table.Columns.Contains(chiaveNome) Then
+                    Dim nomeCampoFiglio = joinRow(chiaveNome).ToString()
+                    If Not String.IsNullOrWhiteSpace(nomeCampoFiglio) Then
+                        Dim valore As Object = Nothing
+                        ' Se esiste un controllo per il campo figlio, prendi il valore dal controllo (valore modificato)
+                        If campoInputs.ContainsKey(nomeCampoFiglio) Then
+                            Dim ctrlFiglio = campoInputs(nomeCampoFiglio)
+                            valore = EstraiValoreDaControllo(ctrlFiglio)
+                        Else
+                            ' Altrimenti prendi dalla riga selezionata nella griglia (fallback)
+                            valore = If(dgvDati.SelectedRows.Count > 0, dgvDati.SelectedRows(0).Cells(nomeCampoFiglio).Value, Nothing)
+                        End If
+                        chiaviFiglia.Add(chiaveNome, valore)
+                    End If
+                End If
+            Next
+
+            Dim valoreJoin = PrelevaValoreJoin(joinRow, chiaviFiglia)
+
+            ' Aggiorna il controllo target
+            Dim ctrl = campoInputs(campo.Nome)
+            If ctrl Is Nothing Then Continue For
+
+            AggiornaControlloConValoreJoin(ctrl, valoreJoin)
+        Next
     End Sub
 
     Private Sub ResetForm()
@@ -1328,6 +1443,13 @@ Public Class DynamicDataForm
         Dim swTotal As New Stopwatch()
         swTotal.Start()
 
+        ' Assicurati di avere i campi definiti
+        campiDefiniti = RecuperaCampiDa(Me.Name)
+
+        ' Carica cache join e ricalcola i campi join prima di costruire i valori da inserire
+        CaricaCampiJoinCachePerTabella(Me.Name)
+        RicalcolaCampiJoinPrimaSalvataggio()
+
         Dim campiCalcolati = RecuperaCampiCalcolati()
         Dim formule = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.Formula)
         Dim tipiValore = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.TipoValore)
@@ -1355,13 +1477,15 @@ Public Class DynamicDataForm
         Dim errorList As New List(Of String)
 
         ' --- Prepara cache join e lookup prima della transazione ---
+        CaricaCampiJoinCachePerTabella(Me.Name)
+
         Dim joinDefs As New Dictionary(Of String, DataRow)(StringComparer.OrdinalIgnoreCase)
         Dim joinLookupCache As New Dictionary(Of String, DataTable)(StringComparer.OrdinalIgnoreCase)
         Dim joinResultCache As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
 
         For Each nomeCampo In colonne
             Try
-                Dim jr = RecuperaJoinPerCampo(Me.Name, nomeCampo)
+                Dim jr = RecuperaJoinPerCampoCached(Me.Name, nomeCampo)
                 If jr IsNot Nothing Then
                     joinDefs(nomeCampo) = jr
                     ' Se la definizione join contiene il nome di una tabella di lookup, caricala in cache
@@ -1369,12 +1493,14 @@ Public Class DynamicDataForm
                         Dim tabName = jr("TabellaElenco").ToString()
                         If Not String.IsNullOrWhiteSpace(tabName) AndAlso Not joinLookupCache.ContainsKey(tabName) Then
                             Dim dtRef = RecuperaTabellaCached(tabName)
-                            If dtRef IsNot Nothing Then joinLookupCache(tabName) = dtRef
+                            If dtRef IsNot Nothing Then
+                                joinLookupCache(tabName) = dtRef
+                            End If
                         End If
                     End If
                 End If
             Catch
-                ' swallow: non bloccare l'inserimento per errori di lookup join
+                ' non bloccare l'inserimento per errori di lookup join
             End Try
         Next
 
@@ -1416,7 +1542,9 @@ Public Class DynamicDataForm
                         ' 3) Se il campo ha una definizione di JOIN, risolvi il valore join leggendo le chiavi figlie dai controlli
                         Try
                             Dim joinRow As DataRow = Nothing
-                            If joinDefs.ContainsKey(nomeCampo) Then joinRow = joinDefs(nomeCampo)
+                            If joinDefs.ContainsKey(nomeCampo) Then
+                                joinRow = joinDefs(nomeCampo)
+                            End If
 
                             If joinRow IsNot Nothing Then
                                 Dim chiaviFiglia As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
@@ -1468,8 +1596,16 @@ Public Class DynamicDataForm
                                     End If
                                 Next
 
-                                ' usa la versione cached/memoized
-                                Dim valoreJoin = PrelevaValoreJoinCached(joinRow, chiaviFiglia, joinLookupCache, joinResultCache)
+                                ' usa la versione cached/memorized (se disponibile)
+                                Dim valoreJoin As Object = Nothing
+                                Try
+                                    ' Se hai PrelevaValoreJoinCached che usa joinLookupCache/joinResultCache, chiamala
+                                    valoreJoin = PrelevaValoreJoinCached(joinRow, chiaviFiglia, joinLookupCache, joinResultCache)
+                                Catch
+                                    ' fallback alla versione non-cached se necessario
+                                    valoreJoin = PrelevaValoreJoin(joinRow, chiaviFiglia)
+                                End Try
+
                                 If valoreJoin IsNot Nothing Then
                                     valore = valoreJoin
                                 End If
@@ -1516,6 +1652,7 @@ Public Class DynamicDataForm
 
         swTotal.Stop()
     End Function
+
 
     Private Function BuildJoinCacheKey(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As String
         Dim sb As New System.Text.StringBuilder()
@@ -1592,6 +1729,10 @@ Public Class DynamicDataForm
         swTotal.Start()
 
         campiDefiniti = RecuperaCampiDa(Me.Name)
+
+        ' Carica cache join e ricalcola i campi join prima di costruire i valori da salvare
+        CaricaCampiJoinCachePerTabella(Me.Name)
+        RicalcolaCampiJoinPrimaSalvataggio()
 
         Try
             Dim convalide = RecuperaConvalideDaSys(Me.Name)
@@ -1693,8 +1834,8 @@ Public Class DynamicDataForm
         End Using
 
         swTotal.Stop()
-
     End Function
+
 
     Private Function RecuperaCampiCalcolatiDettaglio() As Dictionary(Of String, (Formula As String, TipoValore As String, SuSeStesso As Boolean))
         Dim diz As New Dictionary(Of String, (String, String, Boolean))(StringComparer.OrdinalIgnoreCase)

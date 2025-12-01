@@ -12,47 +12,44 @@ Public Class Login
         End If
     End Sub
 
-    Private Sub Login_Closed(sender As Object, e As EventArgs) Handles Me.Closed
+    Private Sub BtnAnnulla_Click(sender As Object, e As EventArgs) Handles BtnAnnulla.Click
         Application.Exit()
     End Sub
 
-    Private Sub BtnAnnulla_Click(sender As Object, e As EventArgs) Handles BtnAnnulla.Click
-        Me.Close()
-    End Sub
-
     Private Sub BtnLogin_Click(sender As Object, e As EventArgs) Handles BtnLogin.Click
+        Try
+            Dim query As String = "SELECT NomeUtente FROM Sys_Utenti WHERE NomeUtente = @nome AND Password = @password"
+            Dim Cripta As New CriptaHash
+            Dim hashedPassword = Cripta.HashPassword(txtPassword.Text)
+            Dim utenteAutenticato As Object = Nothing
 
-        Dim query As String = "SELECT NomeUtente FROM Sys_Utenti WHERE NomeUtente = @nome AND Password = @password"
-        Dim Cripta As New CriptaHash
-        Dim hashedPassword = Cripta.HashPassword(txtPassword.Text)
-        Dim utenteAutenticato As Object = Nothing
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@nome", txtNomeUtente.Text)
+                    cmd.Parameters.AddWithValue("@password", hashedPassword)
 
-        Using conn As New SqlConnection(ConnString)
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@nome", txtNomeUtente.Text)
-                cmd.Parameters.AddWithValue("@password", hashedPassword)
-
-                conn.Open()
-                utenteAutenticato = cmd.ExecuteScalar() ' 🔹 Recupera il NomeUtente se esiste
+                    conn.Open()
+                    utenteAutenticato = cmd.ExecuteScalar() ' 🔹 Recupera il NomeUtente se esiste
+                End Using
             End Using
-        End Using
 
-        If utenteAutenticato IsNot Nothing Then
-            ' ✅ Memorizza nella sessione
-            SessioneUtente.NomeUtenteCorrente = txtNomeUtente.Text
-            SessioneUtente.Autorizzazioni = New AutorizzazioniUtente()
-            SessioneUtente.Autorizzazioni.Carica(txtNomeUtente.Text)
-            SessioneUtente.DataConnessione = Now
+            If utenteAutenticato IsNot Nothing Then
+                SessioneUtente.NomeUtenteCorrente = txtNomeUtente.Text
+                SessioneUtente.Autorizzazioni = New AutorizzazioniUtente()
+                SessioneUtente.Autorizzazioni.Carica(txtNomeUtente.Text)
+                SessioneUtente.DataConnessione = Now
 
-            ' Imposta i testi
-            GesPu25.toolStripUser.Text = "Utente: " & SessioneUtente.NomeUtenteCorrente
-            GesPu25.toolStripDataOra.Text = "Connesso dalle " & SessioneUtente.DataConnessione.ToString("HH:mm - dd/MM/yyyy")
+                GesPu25.toolStripUser.Text = "Utente: " & SessioneUtente.NomeUtenteCorrente
+                GesPu25.toolStripDataOra.Text = "Connesso dalle " & SessioneUtente.DataConnessione.ToString("HH:mm - dd/MM/yyyy")
 
-            Me.Hide()
-            AttivaTuttiIMenu(GesPu25.MenuStrip1)
-        Else
-            Dim risposta = MDIMessageBox.Show("Nome utente o password errati.", Me.MdiParent, MessageBoxButtons.OK)
-        End If
+                AttivaTuttiIMenu(GesPu25.MenuStrip1)
+                Me.Close()
+            Else
+                Dim risposta = MDIMessageBox.Show("Nome utente o password errati.", Me.MdiParent, MessageBoxButtons.OK)
+            End If
+        Catch ex As Exception
+            MDIMessageBox.Show("Errore durante l'autenticazione: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+        End Try
 
     End Sub
 

@@ -48,7 +48,7 @@ Public Class CreaLettAssegnazione
         End Try
     End Sub
 
-    Private Sub btnCreaLett_Click(sender As Object, e As EventArgs) Handles btnCreaLett.Click
+    Private Sub BtnCreaLett_Click(sender As Object, e As EventArgs) Handles btnCreaLett.Click
         Try
             If _idAssegnazione <= 0 Then
                 If _recordCorrente IsNot Nothing AndAlso _recordCorrente.ContainsKey("IdAssegnazione") Then
@@ -198,14 +198,13 @@ Public Class CreaLettAssegnazione
             ' --- Risolvi variabili anche nell'oggetto (supporta <BR>, <@PercorsoStudio>, <@Campo ...>) ---
             oggetto = If(oggetto, "")
             oggetto = oggetto.Replace("<BR>", Environment.NewLine)
-            If Not String.IsNullOrWhiteSpace(percorsoStudio) Then oggetto = oggetto.Replace("<@PercorsoStudio>", percorsoStudio)
-            oggetto = RisolviCampiInline(oggetto, _idAssegnazione, _recordCorrente, soc)
+            oggetto = RisolviCampiInline(oggetto, _idAssegnazione, _recordCorrente, soc, percorsoStudio)
 
             ' --- Prepara messaggio e risolvi campi inline ---
             Dim messaggio As String = If(testoTemplate, "")
             messaggio = messaggio.Replace("<BR>", Environment.NewLine)
-            If Not String.IsNullOrWhiteSpace(percorsoStudio) Then messaggio = messaggio.Replace("<@PercorsoStudio>", percorsoStudio)
-            messaggio = RisolviCampiInline(messaggio, _idAssegnazione, _recordCorrente, soc)
+            messaggio = RisolviCampiInline(messaggio, _idAssegnazione, _recordCorrente, soc, percorsoStudio)
+
 
             ' --- Split al tag <@Tabella> ---
             Dim parts = messaggio.Split(New String() {"<@Tabella>"}, StringSplitOptions.None)
@@ -423,8 +422,6 @@ Public Class CreaLettAssegnazione
         End Try
     End Sub
 
-    ' ---------- Helper OpenXML e DB ----------
-
     Private Function CreateParaProps(Optional line As String = "240", Optional before As String = "0", Optional after As String = "0") As ParagraphProperties
         Dim pp As New ParagraphProperties()
         pp.Append(New SpacingBetweenLines() With {
@@ -491,7 +488,6 @@ Public Class CreaLettAssegnazione
     )
         table.AppendChild(tblProps)
 
-        ' calcola larghezze
         Dim lengths As New List(Of Integer)
         For Each c In cols
             Dim maxLen As Integer = If(etichette.ContainsKey(c), etichette(c).Length, c.Length)
@@ -505,7 +501,6 @@ Public Class CreaLettAssegnazione
         Dim totalLen As Integer = lengths.Sum()
         If totalLen = 0 Then totalLen = cols.Count
 
-        ' Header row (font 10pt bold, centrato)
         Dim hdrRow = New TableRow()
         For i = 0 To cols.Count - 1
             Dim colName = cols(i)
@@ -534,7 +529,6 @@ Public Class CreaLettAssegnazione
         Next
         table.Append(hdrRow)
 
-        ' Data rows (font 9pt, allineamenti e centratura verticale)
         For Each dr As DataRow In dt.Rows
             Dim tr = New TableRow()
             For i = 0 To cols.Count - 1
@@ -598,8 +592,6 @@ Public Class CreaLettAssegnazione
         body.Append(table)
     End Sub
 
-
-    ' helper: formatta il valore pct per TableCellWidth (deve essere stringa) - manteniamo numerico
     Private Function pct_width_to_string(value As Integer) As String
         ' la libreria usa stringhe numeriche per pct (es "2500")
         Return value.ToString()
@@ -660,7 +652,6 @@ Public Class CreaLettAssegnazione
         Try
             Using conn As New SqlConnection(ConnString)
                 conn.Open()
-                ' Aggiunte colonne SecondiScena, FrameScena, TotFrameScena
                 Dim sql As String =
                     "SELECT A.EpisodioId, A.NumScena, L.Descrizione AS Lavorazione, A.DataPrevistaFirstRun AS DataPrevistaFirstRun, A.DataPrevistaChiusura AS DataPrevistaChiusura, " &
                     "A.SecondiScena, A.FrameScena, A.TotFrameScena " &
@@ -762,13 +753,27 @@ Public Class CreaLettAssegnazione
         End Try
     End Function
 
-    ' ---------- Risoluzione campi inline (incluso <@Campo Tabella;Campo>) ----------
-    Private Function RisolviCampiInline(input As String, idAssegnazione As Integer, rec As Dictionary(Of String, Object), soc As Dictionary(Of String, String)) As String
+    Private Function RisolviCampiInline(input As String,
+                                    idAssegnazione As Integer,
+                                    rec As Dictionary(Of String, Object),
+                                    soc As Dictionary(Of String, String),
+                                    Optional percorsoStudio As String = "") As String
+
         If String.IsNullOrEmpty(input) Then Return String.Empty
 
         Dim result As String = input
 
-        ' accetta <@Campo Tabella;Campo> o <@Campo Tabella.Campo>
+        ' --- Gestione speciale per <@PercorsoStudio> ---
+        If result.Contains("<@PercorsoStudio>") Then
+            If String.IsNullOrWhiteSpace(percorsoStudio) Then
+                ' Inserisco un marker speciale che poi verrà convertito in Run evidenziato
+                result = result.Replace("<@PercorsoStudio>", "[[MancaPercorso]]")
+            Else
+                result = result.Replace("<@PercorsoStudio>", percorsoStudio)
+            End If
+        End If
+
+        ' --- Gestione campi generici <@Campo Tab.Colonna> ---
         Dim rx As New Regex("<@Campo\s+([A-Za-z0-9_\.\-]+)[\.;]([A-Za-z0-9_]+)>", RegexOptions.IgnoreCase)
 
         result = rx.Replace(result, Function(m)
@@ -786,7 +791,7 @@ Public Class CreaLettAssegnazione
                                         End If
 
                                         If String.Equals(tab, "Sys_SocietàDiProduzione", StringComparison.OrdinalIgnoreCase) OrElse
-                                           String.Equals(tab, "Sys_SocietaDiProduzione", StringComparison.OrdinalIgnoreCase) Then
+                                       String.Equals(tab, "Sys_SocietaDiProduzione", StringComparison.OrdinalIgnoreCase) Then
                                             Return If(soc IsNot Nothing AndAlso soc.ContainsKey(col), soc(col), "")
                                         End If
 
@@ -801,7 +806,6 @@ Public Class CreaLettAssegnazione
         Return result
     End Function
 
-    ' ---------- Simple HTML -> Runs converter (supporta <b>, <i>, <u>) ----------
     Private Iterator Function CreateRunsFromHtml(html As String) As IEnumerable(Of OpenXmlElement)
         If String.IsNullOrEmpty(html) Then
             Yield New Run(New Text("") With {.Space = SpaceProcessingModeValues.Preserve})
@@ -853,7 +857,6 @@ Public Class CreaLettAssegnazione
         SalvaPosizioneForm(Me)
     End Sub
 
-    ' Classe per tenere traccia degli oggetti copiati
     Private Class CopiedItem
         Public Property ModelPackId As String
         Public Property TipoOggettoLavorazioneId As String
@@ -906,7 +909,6 @@ Public Class CreaLettAssegnazione
             Using cn As New SqlConnection(ConnString)
                 cn.Open()
 
-                ' 1) Recupera OperatoreAssegnatario e DataAssegnazione dalla testata Mov_Assegnazioni
                 Dim operatoreRaw As Object = Nothing
                 Dim dataAssegnazioneObj As Object = Nothing
                 Using cmd As New SqlCommand("SELECT OperatoreAssegnatario, DataAssegnazione FROM Mov_Assegnazioni WHERE IdAssegnazione = @Id", cn)
@@ -941,7 +943,6 @@ Public Class CreaLettAssegnazione
                     End If
                 End If
 
-                ' 2) Recupera CartellaAssegnata per il fornitore (Tab_Fornitori)
                 Dim cartellaAssegnata As String = Nothing
                 Using cmd As New SqlCommand("SELECT CartellaAssegnata FROM Tab_Fornitori WHERE IdFornitore = @key OR Descrizione = @key", cn)
                     cmd.Parameters.Add("@key", SqlDbType.NVarChar, 100).Value = operatoreKeyStr
@@ -956,7 +957,6 @@ Public Class CreaLettAssegnazione
                 End If
                 If Not Directory.Exists(cartellaAssegnata) Then Directory.CreateDirectory(cartellaAssegnata)
 
-                ' 3) Recupera righe Mov_AssegnazioniLavA (NumScena) e Mov_AssegnazioniLavD (LavorazioneId) filtrate per questa assegnazione
                 Dim lavA_Scenes As New List(Of (EpisodioId As String, NumScena As String))
                 Dim lavD_List As New List(Of (EpisodioId As String, LavorazioneId As String))
 
@@ -992,7 +992,6 @@ Public Class CreaLettAssegnazione
                     GoTo EndProcess
                 End If
 
-                ' 4) Con i NumScena recuperati, prendi gli IdModelPack da Mov_ModelPack (solo per queste scene)
                 Dim modelPackInfo As New Dictionary(Of String, (EpisodioId As String, NumScena As String))
                 Dim paramNames As New List(Of String)
                 Dim parameters As New List(Of SqlParameter)
@@ -1025,7 +1024,6 @@ Public Class CreaLettAssegnazione
                     GoTo EndProcess
                 End If
 
-                ' 5) Per ogni ModelPackId prendi gli oggetti e copia SOLO quegli oggetti (unico ModelPack per iterazione)
                 Using cmd As New SqlCommand("
                 SELECT ModelPackId, TipoOggettoLavorazioneId, OggettoLavorazioneId, FileOggettoLavorazione 
                 FROM Mov_ModelPackOggetti 
@@ -1105,7 +1103,6 @@ EndProcess:
                 cn.Close()
             End Using
 
-            ' 6) Log su Desktop (sintesi)
             Dim desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
             Dim logFilePath = Path.Combine(desktopPath, $"CaricaAllegati_Log_{_idAssegnazione}_{DateTime.Now:yyyyMMdd_HHmmss}.txt")
             Try
@@ -1132,7 +1129,6 @@ EndProcess:
                 progressForm.AddMessage($"Impossibile creare log: {ex.Message}")
             End Try
 
-            ' 7) Genera Word report
             If copiedItems.Count > 0 Then
                 Dim wordFilePath = Path.Combine(desktopPath, $"CaricaAllegati_List_{_idAssegnazione}_{DateTime.Now:yyyyMMdd_HHmmss}.docx")
                 Try
@@ -1156,9 +1152,6 @@ EndProcess:
         End Try
     End Sub
 
-    ' -------------------------
-    ' CreateWordReport_OpenXml
-    ' -------------------------
     Private Sub CreateWordReport_OpenXml(items As List(Of CopiedItem), outputPath As String)
         If File.Exists(outputPath) Then
             Try
