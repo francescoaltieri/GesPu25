@@ -256,7 +256,7 @@ Public Class GesPu25
     End Sub
 
     Private Sub SceneAssegnateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SceneAssegnateToolStripMenuItem.Click
-        ApriModuloConPermessi("Mov_Scene", Me)
+        ApriModuloConPermessi("Mov_ConsegneScene", Me)
     End Sub
 
     Private Sub AutorizzazioniScenaToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AutorizzazioniScenaToolStripMenuItem.Click
@@ -264,11 +264,11 @@ Public Class GesPu25
     End Sub
 
     Private Sub ListaRevisioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ListaRevisioniToolStripMenuItem.Click
-        ApriModuloConPermessi("Mov_Revisione", Me)
+        ApriModuloConPermessi("Mov_Revisioni", Me)
     End Sub
 
     Private Sub AutorizzazioniRevisioneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AutorizzazioniRevisioneToolStripMenuItem.Click
-        ApriModuloConPermessi("Mov_UtenteRevisione", Me)
+        ApriModuloConPermessi("Mov_RevisioniUtente", Me)
     End Sub
 
     Private Sub AnnotazioniSuiFramesToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AnnotazioniSuiFramesToolStripMenuItem.Click

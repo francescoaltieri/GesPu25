@@ -31,9 +31,9 @@ Public Class SceltaVideo
             R.Stato,
             R.Approvato,
             R.Note
-        FROM Mov_Revisione R
-        INNER JOIN Mov_Scene V ON R.VideoID = V.VideoID
-        INNER JOIN Mov_UtenteRevisione UR ON R.RevisioneID = UR.RevisioneID
+        FROM Mov_Revisioni R
+        INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
+        INNER JOIN Mov_RevisioniUtente UR ON R.RevisioneID = UR.RevisioneID
         WHERE UR.NomeUtente = @NomeUtente
         ORDER BY V.Titolo, R.DataRevisione ASC;"
 
@@ -107,8 +107,8 @@ Public Class SceltaVideo
             ' Recupera VideoID e Titolo
             Dim queryInfo As String = "
             SELECT V.Titolo
-            FROM Mov_Revisione R
-            INNER JOIN Mov_Scene V ON R.VideoID = V.VideoID
+            FROM Mov_Revisioni R
+            INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
             WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(queryInfo, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
@@ -120,14 +120,14 @@ Public Class SceltaVideo
             End Using
 
             ' Elimina record dipendenti
-            Dim queryDipendenti As String = "DELETE FROM Mov_UtenteRevisione WHERE RevisioneID = @RevisioneID"
+            Dim queryDipendenti As String = "DELETE FROM Mov_RevisioniUtente WHERE RevisioneID = @RevisioneID"
             Using cmdDip As New SqlCommand(queryDipendenti, conn)
                 cmdDip.Parameters.AddWithValue("@RevisioneID", revisioneID)
                 cmdDip.ExecuteNonQuery()
             End Using
 
             ' Elimina revisione
-            Dim queryDelete As String = "DELETE FROM Mov_Revisione WHERE RevisioneID = @RevisioneID"
+            Dim queryDelete As String = "DELETE FROM Mov_Revisioni WHERE RevisioneID = @RevisioneID"
             Using cmdDel As New SqlCommand(queryDelete, conn)
                 cmdDel.Parameters.AddWithValue("@RevisioneID", revisioneID)
                 cmdDel.ExecuteNonQuery()
@@ -181,8 +181,8 @@ Public Class SceltaVideo
             Dim titoloVideo As String = ""
             Dim queryInfo As String = "
             SELECT V.VideoID, V.Titolo
-            FROM Mov_Revisione R
-            INNER JOIN Mov_Scene V ON R.VideoID = V.VideoID
+            FROM Mov_Revisioni R
+            INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
             WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(queryInfo, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
@@ -199,7 +199,7 @@ Public Class SceltaVideo
             ' Verifica che non esistano revisioni successive
             Dim querySucc = "
             SELECT COUNT(*) 
-            FROM Mov_Revisione 
+            FROM Mov_Revisioni 
             WHERE VideoID = @VideoID AND RevisioneID > @RevisioneID"
             Using cmdSucc As New SqlCommand(querySucc, conn)
                 cmdSucc.Parameters.AddWithValue("@VideoID", videoID)
@@ -217,8 +217,8 @@ Public Class SceltaVideo
             conn.Open()
             Dim query As String = "
             SELECT V.Titolo, R.RevisioneID
-            FROM Mov_Revisione R
-            INNER JOIN Mov_Scene V ON R.VideoID = V.VideoID
+            FROM Mov_Revisioni R
+            INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
             WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
@@ -239,7 +239,7 @@ Public Class SceltaVideo
             conn.Open()
             Dim query As String = "
             SELECT ROW_NUMBER() OVER (PARTITION BY VideoID ORDER BY DataRevisione ASC) - 1 AS Numero
-            FROM Mov_Revisione
+            FROM Mov_Revisioni
             WHERE RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)

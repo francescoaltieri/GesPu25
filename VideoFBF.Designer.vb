@@ -93,20 +93,20 @@ Partial Class VideoFBF
         ' 
         ' btnPrecedente
         ' 
-        btnPrecedente.Location = New Point(12, 788)
+        btnPrecedente.Location = New Point(280, 790)
         btnPrecedente.Name = "btnPrecedente"
-        btnPrecedente.Size = New Size(120, 41)
+        btnPrecedente.Size = New Size(127, 41)
         btnPrecedente.TabIndex = 4
-        btnPrecedente.Text = "Frame Precedente"
+        btnPrecedente.Text = "< Frame Precedente"
         btnPrecedente.UseVisualStyleBackColor = True
         ' 
         ' btnSuccessivo
         ' 
-        btnSuccessivo.Location = New Point(138, 788)
+        btnSuccessivo.Location = New Point(413, 789)
         btnSuccessivo.Name = "btnSuccessivo"
-        btnSuccessivo.Size = New Size(120, 41)
+        btnSuccessivo.Size = New Size(127, 41)
         btnSuccessivo.TabIndex = 5
-        btnSuccessivo.Text = "Frame Successivo"
+        btnSuccessivo.Text = "Frame Successivo >"
         btnSuccessivo.UseVisualStyleBackColor = True
         ' 
         ' OpenFileDialog1
@@ -124,43 +124,43 @@ Partial Class VideoFBF
         ' 
         ' btnPrimoFrame
         ' 
-        btnPrimoFrame.Location = New Point(273, 789)
+        btnPrimoFrame.Location = New Point(12, 788)
         btnPrimoFrame.Name = "btnPrimoFrame"
         btnPrimoFrame.Size = New Size(120, 41)
         btnPrimoFrame.TabIndex = 12
-        btnPrimoFrame.Text = "Primo Frame"
+        btnPrimoFrame.Text = "|< Primo Frame"
         btnPrimoFrame.UseVisualStyleBackColor = True
         ' 
         ' btnUltimoFrame
         ' 
-        btnUltimoFrame.Location = New Point(399, 789)
+        btnUltimoFrame.Location = New Point(138, 788)
         btnUltimoFrame.Name = "btnUltimoFrame"
         btnUltimoFrame.Size = New Size(120, 41)
         btnUltimoFrame.TabIndex = 13
-        btnUltimoFrame.Text = "Ultimo Frame"
+        btnUltimoFrame.Text = "Ultimo Frame >|"
         btnUltimoFrame.UseVisualStyleBackColor = True
         ' 
         ' btnAvantiVeloce
         ' 
-        btnAvantiVeloce.Location = New Point(538, 789)
+        btnAvantiVeloce.Location = New Point(693, 789)
         btnAvantiVeloce.Name = "btnAvantiVeloce"
         btnAvantiVeloce.Size = New Size(120, 41)
         btnAvantiVeloce.TabIndex = 14
-        btnAvantiVeloce.Text = "Avanti Veloce"
+        btnAvantiVeloce.Text = "Avanti Veloce >>"
         btnAvantiVeloce.UseVisualStyleBackColor = True
         ' 
         ' btnIndietroVeloce
         ' 
-        btnIndietroVeloce.Location = New Point(664, 789)
+        btnIndietroVeloce.Location = New Point(567, 789)
         btnIndietroVeloce.Name = "btnIndietroVeloce"
         btnIndietroVeloce.Size = New Size(120, 41)
         btnIndietroVeloce.TabIndex = 15
-        btnIndietroVeloce.Text = "Indietro Veloce"
+        btnIndietroVeloce.Text = "<< Indietro Veloce"
         btnIndietroVeloce.UseVisualStyleBackColor = True
         ' 
         ' TrackFrame
         ' 
-        TrackFrame.Location = New Point(12, 741)
+        TrackFrame.Location = New Point(12, 737)
         TrackFrame.Name = "TrackFrame"
         TrackFrame.Size = New Size(1299, 45)
         TrackFrame.TabIndex = 16
