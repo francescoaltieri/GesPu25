@@ -54,7 +54,12 @@ Partial Class VideoFBF
         btnApprovazione = New Button()
         Label2 = New Label()
         GroupBox4 = New GroupBox()
-        lstNoteFrame = New ListBox()
+        LstNoteFrame = New ListView()
+        BtnRipristinaFrame = New Button()
+        Label5 = New Label()
+        lblFrameAttivo = New Label()
+        Label6 = New Label()
+        lblTotFrames = New Label()
         CType(picFrame, ComponentModel.ISupportInitialize).BeginInit()
         CType(TrackFrame, ComponentModel.ISupportInitialize).BeginInit()
         GroupBox1.SuspendLayout()
@@ -93,20 +98,20 @@ Partial Class VideoFBF
         ' 
         ' btnPrecedente
         ' 
-        btnPrecedente.Location = New Point(280, 790)
+        btnPrecedente.Location = New Point(138, 789)
         btnPrecedente.Name = "btnPrecedente"
         btnPrecedente.Size = New Size(127, 41)
         btnPrecedente.TabIndex = 4
-        btnPrecedente.Text = "< Frame Precedente"
+        btnPrecedente.Text = "⟨ Frame Precedente"
         btnPrecedente.UseVisualStyleBackColor = True
         ' 
         ' btnSuccessivo
         ' 
-        btnSuccessivo.Location = New Point(413, 789)
+        btnSuccessivo.Location = New Point(271, 789)
         btnSuccessivo.Name = "btnSuccessivo"
         btnSuccessivo.Size = New Size(127, 41)
         btnSuccessivo.TabIndex = 5
-        btnSuccessivo.Text = "Frame Successivo >"
+        btnSuccessivo.Text = "Frame Successivo ⟩"
         btnSuccessivo.UseVisualStyleBackColor = True
         ' 
         ' OpenFileDialog1
@@ -115,7 +120,7 @@ Partial Class VideoFBF
         ' 
         ' btnAnnulla
         ' 
-        btnAnnulla.Location = New Point(1191, 789)
+        btnAnnulla.Location = New Point(1045, 790)
         btnAnnulla.Name = "btnAnnulla"
         btnAnnulla.Size = New Size(120, 42)
         btnAnnulla.TabIndex = 10
@@ -128,39 +133,39 @@ Partial Class VideoFBF
         btnPrimoFrame.Name = "btnPrimoFrame"
         btnPrimoFrame.Size = New Size(120, 41)
         btnPrimoFrame.TabIndex = 12
-        btnPrimoFrame.Text = "|< Primo Frame"
+        btnPrimoFrame.Text = "│⟨ Primo Frame"
         btnPrimoFrame.UseVisualStyleBackColor = True
         ' 
         ' btnUltimoFrame
         ' 
-        btnUltimoFrame.Location = New Point(138, 788)
+        btnUltimoFrame.Location = New Point(404, 788)
         btnUltimoFrame.Name = "btnUltimoFrame"
         btnUltimoFrame.Size = New Size(120, 41)
         btnUltimoFrame.TabIndex = 13
-        btnUltimoFrame.Text = "Ultimo Frame >|"
+        btnUltimoFrame.Text = "Ultimo Frame ⟩│"
         btnUltimoFrame.UseVisualStyleBackColor = True
         ' 
         ' btnAvantiVeloce
         ' 
-        btnAvantiVeloce.Location = New Point(693, 789)
+        btnAvantiVeloce.Location = New Point(706, 789)
         btnAvantiVeloce.Name = "btnAvantiVeloce"
         btnAvantiVeloce.Size = New Size(120, 41)
         btnAvantiVeloce.TabIndex = 14
-        btnAvantiVeloce.Text = "Avanti Veloce >>"
+        btnAvantiVeloce.Text = "Avanti Veloce ⟩⟩"
         btnAvantiVeloce.UseVisualStyleBackColor = True
         ' 
         ' btnIndietroVeloce
         ' 
-        btnIndietroVeloce.Location = New Point(567, 789)
+        btnIndietroVeloce.Location = New Point(580, 789)
         btnIndietroVeloce.Name = "btnIndietroVeloce"
         btnIndietroVeloce.Size = New Size(120, 41)
         btnIndietroVeloce.TabIndex = 15
-        btnIndietroVeloce.Text = "<< Indietro Veloce"
+        btnIndietroVeloce.Text = "⟨⟨ Indietro Veloce"
         btnIndietroVeloce.UseVisualStyleBackColor = True
         ' 
         ' TrackFrame
         ' 
-        TrackFrame.Location = New Point(12, 737)
+        TrackFrame.Location = New Point(12, 741)
         TrackFrame.Name = "TrackFrame"
         TrackFrame.Size = New Size(1299, 45)
         TrackFrame.TabIndex = 16
@@ -345,7 +350,7 @@ Partial Class VideoFBF
         ' 
         ' GroupBox4
         ' 
-        GroupBox4.Controls.Add(lstNoteFrame)
+        GroupBox4.Controls.Add(LstNoteFrame)
         GroupBox4.Location = New Point(1317, 45)
         GroupBox4.Name = "GroupBox4"
         GroupBox4.Size = New Size(259, 187)
@@ -353,16 +358,66 @@ Partial Class VideoFBF
         GroupBox4.TabStop = False
         GroupBox4.Text = "Lista Annotazioni"
         ' 
-        ' lstNoteFrame
+        ' LstNoteFrame
         ' 
-        lstNoteFrame.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Right
-        lstNoteFrame.BorderStyle = BorderStyle.None
-        lstNoteFrame.FormattingEnabled = True
-        lstNoteFrame.ItemHeight = 15
-        lstNoteFrame.Location = New Point(11, 16)
-        lstNoteFrame.Name = "lstNoteFrame"
-        lstNoteFrame.Size = New Size(242, 165)
-        lstNoteFrame.TabIndex = 25
+        LstNoteFrame.Location = New Point(11, 22)
+        LstNoteFrame.Name = "LstNoteFrame"
+        LstNoteFrame.Size = New Size(242, 159)
+        LstNoteFrame.TabIndex = 26
+        LstNoteFrame.UseCompatibleStateImageBehavior = False
+        ' 
+        ' BtnRipristinaFrame
+        ' 
+        BtnRipristinaFrame.Location = New Point(1171, 790)
+        BtnRipristinaFrame.Name = "BtnRipristinaFrame"
+        BtnRipristinaFrame.Size = New Size(120, 42)
+        BtnRipristinaFrame.TabIndex = 31
+        BtnRipristinaFrame.Text = "Ripristina Frame Originale"
+        BtnRipristinaFrame.UseVisualStyleBackColor = True
+        ' 
+        ' Label5
+        ' 
+        Label5.AutoSize = True
+        Label5.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label5.ForeColor = SystemColors.HotTrack
+        Label5.Location = New Point(629, 13)
+        Label5.Name = "Label5"
+        Label5.Size = New Size(86, 17)
+        Label5.TabIndex = 32
+        Label5.Text = "Frame n/tot:"
+        ' 
+        ' lblFrameAttivo
+        ' 
+        lblFrameAttivo.AutoSize = True
+        lblFrameAttivo.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblFrameAttivo.ForeColor = SystemColors.HotTrack
+        lblFrameAttivo.Location = New Point(721, 13)
+        lblFrameAttivo.Name = "lblFrameAttivo"
+        lblFrameAttivo.Size = New Size(60, 17)
+        lblFrameAttivo.TabIndex = 33
+        lblFrameAttivo.Text = "N.Frame"
+        ' 
+        ' Label6
+        ' 
+        Label6.AutoSize = True
+        Label6.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label6.ForeColor = SystemColors.HotTrack
+        Label6.Location = New Point(787, 13)
+        Label6.Name = "Label6"
+        Label6.Size = New Size(14, 17)
+        Label6.TabIndex = 34
+        Label6.Text = "/"
+        ' 
+        ' lblTotFrames
+        ' 
+        lblTotFrames.AutoSize = True
+        lblTotFrames.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblTotFrames.ForeColor = SystemColors.HotTrack
+        lblTotFrames.Location = New Point(807, 13)
+        lblTotFrames.Name = "lblTotFrames"
+        lblTotFrames.Size = New Size(70, 17)
+        lblTotFrames.TabIndex = 35
+        lblTotFrames.Text = "Tot Frame"
         ' 
         ' VideoFBF
         ' 
@@ -370,6 +425,11 @@ Partial Class VideoFBF
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(1585, 843)
+        Controls.Add(lblTotFrames)
+        Controls.Add(Label6)
+        Controls.Add(lblFrameAttivo)
+        Controls.Add(Label5)
+        Controls.Add(BtnRipristinaFrame)
         Controls.Add(GroupBox4)
         Controls.Add(Label2)
         Controls.Add(btnApprovazione)
@@ -441,6 +501,11 @@ Partial Class VideoFBF
     Friend WithEvents Label4 As Label
     Friend WithEvents Label3 As Label
     Friend WithEvents GroupBox4 As GroupBox
-    Friend WithEvents lstNoteFrame As ListBox
+    Friend WithEvents BtnRipristinaFrame As Button
+    Friend WithEvents LstNoteFrame As ListView
+    Friend WithEvents Label5 As Label
+    Friend WithEvents lblFrameAttivo As Label
+    Friend WithEvents Label6 As Label
+    Friend WithEvents lblTotFrames As Label
 
 End Class

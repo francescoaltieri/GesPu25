@@ -27,9 +27,8 @@ Public Class CaricaOggettiModelPack
     Private BtnSalva As Button
     Private BtnChiudi As Button
 
-    ' =======================
+
     ' Stato
-    ' =======================
     Private _currentModelPackId As String
     Private _currentTipoId As String
     Private _items As New List(Of OggettoItem)
@@ -40,9 +39,7 @@ Public Class CaricaOggettiModelPack
     Private _isLoading As Boolean = False
     Private _isClosing As Boolean = False
 
-    ' =======================
     ' Layout
-    ' =======================
     Private Const Columns As Integer = 4
     Private Const CellWidth As Integer = 240
     Private Const CellHeight As Integer = 240
@@ -57,9 +54,7 @@ Public Class CaricaOggettiModelPack
 
     Private _initialModelPackId As String
 
-    ' =======================
     ' Costruttore
-    ' =======================
     Public Sub New()
         Me.Text = "Carica Oggetti Model Pack"
         Me.StartPosition = FormStartPosition.CenterScreen
