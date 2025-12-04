@@ -55,6 +55,9 @@ Partial Class VideoFBF
         Label2 = New Label()
         GroupBox4 = New GroupBox()
         LstNoteFrame = New ListView()
+        Frame = New ColumnHeader()
+        Nota = New ColumnHeader()
+        Utente = New ColumnHeader()
         BtnRipristinaFrame = New Button()
         Label5 = New Label()
         lblFrameAttivo = New Label()
@@ -80,7 +83,7 @@ Partial Class VideoFBF
         ' 
         ' btnSalvaVideo
         ' 
-        btnSalvaVideo.Location = New Point(1456, 788)
+        btnSalvaVideo.Location = New Point(1456, 817)
         btnSalvaVideo.Name = "btnSalvaVideo"
         btnSalvaVideo.Size = New Size(120, 42)
         btnSalvaVideo.TabIndex = 2
@@ -92,13 +95,13 @@ Partial Class VideoFBF
         picFrame.BorderStyle = BorderStyle.Fixed3D
         picFrame.Location = New Point(12, 40)
         picFrame.Name = "picFrame"
-        picFrame.Size = New Size(1299, 695)
+        picFrame.Size = New Size(1299, 700)
         picFrame.TabIndex = 3
         picFrame.TabStop = False
         ' 
         ' btnPrecedente
         ' 
-        btnPrecedente.Location = New Point(138, 789)
+        btnPrecedente.Location = New Point(138, 818)
         btnPrecedente.Name = "btnPrecedente"
         btnPrecedente.Size = New Size(127, 41)
         btnPrecedente.TabIndex = 4
@@ -107,7 +110,7 @@ Partial Class VideoFBF
         ' 
         ' btnSuccessivo
         ' 
-        btnSuccessivo.Location = New Point(271, 789)
+        btnSuccessivo.Location = New Point(271, 818)
         btnSuccessivo.Name = "btnSuccessivo"
         btnSuccessivo.Size = New Size(127, 41)
         btnSuccessivo.TabIndex = 5
@@ -120,7 +123,7 @@ Partial Class VideoFBF
         ' 
         ' btnAnnulla
         ' 
-        btnAnnulla.Location = New Point(1045, 790)
+        btnAnnulla.Location = New Point(1045, 819)
         btnAnnulla.Name = "btnAnnulla"
         btnAnnulla.Size = New Size(120, 42)
         btnAnnulla.TabIndex = 10
@@ -129,7 +132,7 @@ Partial Class VideoFBF
         ' 
         ' btnPrimoFrame
         ' 
-        btnPrimoFrame.Location = New Point(12, 788)
+        btnPrimoFrame.Location = New Point(12, 817)
         btnPrimoFrame.Name = "btnPrimoFrame"
         btnPrimoFrame.Size = New Size(120, 41)
         btnPrimoFrame.TabIndex = 12
@@ -138,7 +141,7 @@ Partial Class VideoFBF
         ' 
         ' btnUltimoFrame
         ' 
-        btnUltimoFrame.Location = New Point(404, 788)
+        btnUltimoFrame.Location = New Point(404, 817)
         btnUltimoFrame.Name = "btnUltimoFrame"
         btnUltimoFrame.Size = New Size(120, 41)
         btnUltimoFrame.TabIndex = 13
@@ -147,7 +150,7 @@ Partial Class VideoFBF
         ' 
         ' btnAvantiVeloce
         ' 
-        btnAvantiVeloce.Location = New Point(706, 789)
+        btnAvantiVeloce.Location = New Point(706, 818)
         btnAvantiVeloce.Name = "btnAvantiVeloce"
         btnAvantiVeloce.Size = New Size(120, 41)
         btnAvantiVeloce.TabIndex = 14
@@ -156,7 +159,7 @@ Partial Class VideoFBF
         ' 
         ' btnIndietroVeloce
         ' 
-        btnIndietroVeloce.Location = New Point(580, 789)
+        btnIndietroVeloce.Location = New Point(580, 818)
         btnIndietroVeloce.Name = "btnIndietroVeloce"
         btnIndietroVeloce.Size = New Size(120, 41)
         btnIndietroVeloce.TabIndex = 15
@@ -165,7 +168,7 @@ Partial Class VideoFBF
         ' 
         ' TrackFrame
         ' 
-        TrackFrame.Location = New Point(12, 741)
+        TrackFrame.Location = New Point(12, 766)
         TrackFrame.Name = "TrackFrame"
         TrackFrame.Size = New Size(1299, 45)
         TrackFrame.TabIndex = 16
@@ -182,12 +185,12 @@ Partial Class VideoFBF
         ' 
         GroupBox1.Controls.Add(btnSalvaNote)
         GroupBox1.Controls.Add(txtNote)
-        GroupBox1.Location = New Point(1317, 347)
+        GroupBox1.Location = New Point(1317, 238)
         GroupBox1.Name = "GroupBox1"
         GroupBox1.Size = New Size(259, 225)
         GroupBox1.TabIndex = 18
         GroupBox1.TabStop = False
-        GroupBox1.Text = "Note"
+        GroupBox1.Text = "Annotazione Frame"
         ' 
         ' btnSalvaNote
         ' 
@@ -195,7 +198,7 @@ Partial Class VideoFBF
         btnSalvaNote.Name = "btnSalvaNote"
         btnSalvaNote.Size = New Size(245, 25)
         btnSalvaNote.TabIndex = 19
-        btnSalvaNote.Text = "Salva Note"
+        btnSalvaNote.Text = "Salva Annotazione"
         btnSalvaNote.UseVisualStyleBackColor = True
         ' 
         ' numSpessorePennino
@@ -222,7 +225,7 @@ Partial Class VideoFBF
         GroupBox2.Controls.Add(btnColorePennino)
         GroupBox2.Controls.Add(Label1)
         GroupBox2.Controls.Add(numSpessorePennino)
-        GroupBox2.Location = New Point(1317, 238)
+        GroupBox2.Location = New Point(1317, 679)
         GroupBox2.Name = "GroupBox2"
         GroupBox2.Size = New Size(259, 103)
         GroupBox2.TabIndex = 22
@@ -255,7 +258,7 @@ Partial Class VideoFBF
         GroupBox3.Controls.Add(lstUtentiCondivisi)
         GroupBox3.Controls.Add(lblDataNota)
         GroupBox3.Controls.Add(lblAutore)
-        GroupBox3.Location = New Point(1317, 578)
+        GroupBox3.Location = New Point(1317, 469)
         GroupBox3.Name = "GroupBox3"
         GroupBox3.Size = New Size(259, 204)
         GroupBox3.TabIndex = 25
@@ -321,7 +324,7 @@ Partial Class VideoFBF
         lblRevAttiva.AutoSize = True
         lblRevAttiva.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblRevAttiva.ForeColor = SystemColors.HotTrack
-        lblRevAttiva.Location = New Point(104, 13)
+        lblRevAttiva.Location = New Point(89, 13)
         lblRevAttiva.Name = "lblRevAttiva"
         lblRevAttiva.Size = New Size(74, 17)
         lblRevAttiva.TabIndex = 27
@@ -344,9 +347,9 @@ Partial Class VideoFBF
         Label2.ForeColor = SystemColors.HotTrack
         Label2.Location = New Point(12, 13)
         Label2.Name = "Label2"
-        Label2.Size = New Size(86, 17)
+        Label2.Size = New Size(71, 17)
         Label2.TabIndex = 29
-        Label2.Text = "Lavorazione:"
+        Label2.Text = "Revisione:"
         ' 
         ' GroupBox4
         ' 
@@ -360,6 +363,7 @@ Partial Class VideoFBF
         ' 
         ' LstNoteFrame
         ' 
+        LstNoteFrame.Columns.AddRange(New ColumnHeader() {Frame, Nota, Utente})
         LstNoteFrame.Location = New Point(11, 22)
         LstNoteFrame.Name = "LstNoteFrame"
         LstNoteFrame.Size = New Size(242, 159)
@@ -368,7 +372,7 @@ Partial Class VideoFBF
         ' 
         ' BtnRipristinaFrame
         ' 
-        BtnRipristinaFrame.Location = New Point(1171, 790)
+        BtnRipristinaFrame.Location = New Point(1171, 819)
         BtnRipristinaFrame.Name = "BtnRipristinaFrame"
         BtnRipristinaFrame.Size = New Size(120, 42)
         BtnRipristinaFrame.TabIndex = 31
@@ -424,7 +428,7 @@ Partial Class VideoFBF
         AllowDrop = True
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(1585, 843)
+        ClientSize = New Size(1585, 871)
         Controls.Add(lblTotFrames)
         Controls.Add(Label6)
         Controls.Add(lblFrameAttivo)
@@ -439,7 +443,6 @@ Partial Class VideoFBF
         Controls.Add(btnCaricaRevisione)
         Controls.Add(GroupBox2)
         Controls.Add(GroupBox1)
-        Controls.Add(TrackFrame)
         Controls.Add(btnIndietroVeloce)
         Controls.Add(btnAvantiVeloce)
         Controls.Add(btnUltimoFrame)
@@ -450,7 +453,7 @@ Partial Class VideoFBF
         Controls.Add(picFrame)
         Controls.Add(btnSalvaVideo)
         Controls.Add(btnCaricaVideo)
-        FormBorderStyle = FormBorderStyle.Fixed3D
+        Controls.Add(TrackFrame)
         Name = "VideoFBF"
         SizeGripStyle = SizeGripStyle.Hide
         StartPosition = FormStartPosition.CenterParent
@@ -507,5 +510,8 @@ Partial Class VideoFBF
     Friend WithEvents lblFrameAttivo As Label
     Friend WithEvents Label6 As Label
     Friend WithEvents lblTotFrames As Label
+    Friend WithEvents Frame As ColumnHeader
+    Friend WithEvents Nota As ColumnHeader
+    Friend WithEvents Utente As ColumnHeader
 
 End Class

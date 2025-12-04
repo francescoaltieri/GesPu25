@@ -44,6 +44,184 @@ Public Class VideoFBF
         btnUltimoFrame.Enabled = False
         btnAvantiVeloce.Enabled = False
         btnIndietroVeloce.Enabled = False
+
+        ' COLLEGA l’evento Paint una sola volta
+        Try
+            RemoveHandler TrackFrame.Paint, AddressOf DisegnaSegnaliniNote
+        Catch
+        End Try
+        AddHandler TrackFrame.Paint, AddressOf DisegnaSegnaliniNote
+
+        InitLstNoteFrameColumns()
+        ' Inizializza tooltip e handler per la ListView
+        Try
+            If LstNoteFrame IsNot Nothing Then
+                ' ToolTip per mostrare la nota completa al passaggio del mouse
+                Dim lvToolTip As New ToolTip()
+                lvToolTip.AutoPopDelay = 10000
+                lvToolTip.InitialDelay = 300
+                lvToolTip.ReshowDelay = 100
+                lvToolTip.ShowAlways = True
+                LstNoteFrame.Tag = lvToolTip
+
+                AddHandler LstNoteFrame.MouseMove, AddressOf LstNoteFrame_MouseMove_ShowTooltip
+                AddHandler LstNoteFrame.MouseLeave, AddressOf LstNoteFrame_MouseLeave_HideTooltip
+                AddHandler LstNoteFrame.DoubleClick, AddressOf LstNoteFrame_DoubleClick_OpenViewer
+            End If
+        Catch
+        End Try
+
+    End Sub
+
+    Private Sub LstNoteFrame_MouseMove_ShowTooltip(sender As Object, e As MouseEventArgs)
+        Try
+            Dim lv = TryCast(sender, ListView)
+            If lv Is Nothing Then Return
+            Dim tt = TryCast(lv.Tag, ToolTip)
+            If tt Is Nothing Then Return
+
+            Dim info = lv.HitTest(e.Location)
+            If info Is Nothing OrElse info.Item Is Nothing Then
+                tt.Hide(lv)
+                Return
+            End If
+
+            Dim item = info.Item
+            Dim noteInfo = TryCast(item.Tag, NotaFrameInfo)
+            Dim testoCompleto As String = String.Empty
+            If noteInfo IsNot Nothing Then
+                testoCompleto = noteInfo.TestoNota
+                If String.IsNullOrWhiteSpace(testoCompleto) Then
+                    testoCompleto = "(nota vuota)"
+                End If
+            Else
+                ' fallback: usa subitem Nota se presente
+                If item.SubItems.Count > 1 Then
+                    testoCompleto = item.SubItems(1).Text
+                End If
+            End If
+
+            ' Mostra tooltip vicino al mouse
+            If Not String.IsNullOrEmpty(testoCompleto) Then
+                tt.Show(testoCompleto, lv, e.Location.X + 15, e.Location.Y + 15, 10000)
+            Else
+                tt.Hide(lv)
+            End If
+        Catch
+            ' ignore
+        End Try
+    End Sub
+
+    ' Aggiorna il double-click per passare anche il numero revisione al viewer
+    Private Sub LstNoteFrame_DoubleClick_OpenViewer(sender As Object, e As EventArgs)
+        Try
+            Dim lv = TryCast(sender, ListView)
+            If lv Is Nothing OrElse lv.SelectedItems.Count = 0 Then Return
+            Dim item = lv.SelectedItems(0)
+            Dim info = TryCast(item.Tag, NotaFrameInfo)
+
+            Dim frameIndex As Integer = -1
+            Dim testo As String = String.Empty
+            Dim autore As String = String.Empty
+            Dim dataNota As DateTime = DateTime.MinValue
+
+            If info IsNot Nothing Then
+                frameIndex = info.FrameIndex
+                testo = info.TestoNota
+                autore = info.Autore
+                dataNota = info.DataNota
+            Else
+                Integer.TryParse(item.SubItems(0).Text, frameIndex)
+                frameIndex = Math.Max(1, frameIndex) - 1
+                If item.SubItems.Count > 1 Then testo = item.SubItems(1).Text
+                If item.SubItems.Count > 2 Then autore = item.SubItems(2).Text
+            End If
+
+            ' Ottieni numero revisione dalla label (fallback -1 se non parseable)
+            Dim revisioneNum As Integer = -1
+            Integer.TryParse(lblRevAttiva.Text, revisioneNum)
+
+            ' Apri form modale con i dettagli e numero revisione
+            Using viewer As New NoteViewerForm(revisioneNum, frameIndex, testo, autore, dataNota)
+                viewer.StartPosition = FormStartPosition.CenterParent
+                viewer.ShowDialog(Me)
+            End Using
+        Catch
+            ' ignore
+        End Try
+    End Sub
+
+
+    ' NoteViewerForm esteso per mostrare anche il numero revisione
+    Public Class NoteViewerForm
+        Inherits Form
+
+        Private txtFullNote As TextBox
+        Private lblInfo As Label
+        Private lblRevisione As Label
+        Private btnClose As Button
+
+        ' Nuovo costruttore: revisioneNumber può essere -1 se non disponibile
+        Public Sub New(revisioneNumber As Integer, frameIndex As Integer, testo As String, autore As String, dataNota As DateTime)
+            Me.Text = If(frameIndex >= 0, $"Nota Frame {frameIndex + 1}", "Nota")
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MaximizeBox = False
+            Me.MinimizeBox = False
+            Me.ClientSize = New Size(760, 380)
+
+            ' Label revisione in alto a sinistra
+            lblRevisione = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 8),
+            .Size = New Size(300, 20),
+            .Font = New Font("Segoe UI", 9, FontStyle.Bold),
+            .Text = If(revisioneNumber >= 0, $"Revisione: {revisioneNumber}", "Revisione: -")
+        }
+            Me.Controls.Add(lblRevisione)
+
+            ' Info autore/data a destra
+            lblInfo = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(320, 8),
+            .Size = New Size(420, 20),
+            .TextAlign = ContentAlignment.MiddleRight,
+            .Text = $"Autore: {If(String.IsNullOrEmpty(autore), "-", autore)}    Data: {If(dataNota = DateTime.MinValue, "-", dataNota.ToString("dd/MM/yyyy HH:mm"))}"
+        }
+            Me.Controls.Add(lblInfo)
+
+            txtFullNote = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .ScrollBars = ScrollBars.Vertical,
+            .Location = New Point(10, 36),
+            .Size = New Size(740, 290),
+            .Font = New Font("Segoe UI", 10),
+            .Text = If(String.IsNullOrEmpty(testo), "(nota vuota)", testo)
+        }
+            Me.Controls.Add(txtFullNote)
+
+            btnClose = New Button() With {
+            .Text = "Chiudi",
+            .DialogResult = DialogResult.OK,
+            .Size = New Size(100, 30),
+            .Location = New Point(Me.ClientSize.Width - 110, Me.ClientSize.Height - 40)
+        }
+            Me.Controls.Add(btnClose)
+
+            Me.AcceptButton = btnClose
+        End Sub
+    End Class
+
+
+
+    Private Sub LstNoteFrame_MouseLeave_HideTooltip(sender As Object, e As EventArgs)
+        Try
+            Dim lv = TryCast(sender, ListView)
+            If lv Is Nothing Then Return
+            Dim tt = TryCast(lv.Tag, ToolTip)
+            If tt IsNot Nothing Then tt.Hide(lv)
+        Catch
+        End Try
     End Sub
 
     ' --- Utility TrackBar sicura ---
@@ -119,14 +297,14 @@ Public Class VideoFBF
             Try
                 Await Task.Run(Sub() tempEditor.ExtractFrames())
             Catch exInner As Exception
-                MessageBox.Show("Errore durante l'estrazione dei frame: " & exInner.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                MDIMessageBox.Show("Errore durante l'estrazione dei frame: " & exInner.Message, Me.MdiParent, MessageBoxButtons.OK)
                 Exit Sub
             End Try
 
             ' 5) Verifica frame estratti
             Dim filesEstratti = Directory.GetFiles(revisioneDir)
             If filesEstratti Is Nothing OrElse filesEstratti.Length = 0 Then
-                MessageBox.Show($"Estrazione completata ma nessun frame trovato in: {revisioneDir}", "Nessun frame", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                MDIMessageBox.Show($"Estrazione completata ma nessun frame trovato in: {revisioneDir}", Me.MdiParent, MessageBoxButtons.OK)
                 Exit Sub
             End If
 
@@ -136,13 +314,13 @@ Public Class VideoFBF
                                    EnsureOriginalBackupFolder(nomeVideo, revisioneDir)
                                End Sub)
             Catch ex As Exception
-                MessageBox.Show("Attenzione: impossibile creare backup Revisione_0000: " & ex.Message)
+                MDIMessageBox.Show("Attenzione: impossibile creare backup Revisione_0000: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
             End Try
 
             ' 7) Inserisci permesso utente con FK coerente
             Await Task.Run(Sub() InserisciPermessoUtente(newRevisioneID, SessioneUtente.NomeUtenteCorrente))
 
-            MessageBox.Show($"Video caricato, frame estratti, Revisione_{newRevisioneID:D4} registrata e backup {nomeVideo}_0000 creato.", "Operazione completata", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MDIMessageBox.Show($"Video caricato, frame estratti, Revisione_{newRevisioneID:D4} registrata e backup {nomeVideo}_0000 creato.", Me.MdiParent, MessageBoxButtons.OK)
 
             ' 8) Aggiorna UI
             lblRevAttiva.Text = newRevisioneID.ToString()
@@ -179,7 +357,7 @@ Public Class VideoFBF
             Me.AggiornaRevisioneAttiva()
 
         Catch ex As Exception
-            MessageBox.Show("Errore durante il caricamento: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Errore durante il caricamento: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
             lblRevAttiva.Text = "Errore"
         Finally
             Application.UseWaitCursor = previousUseWait
@@ -297,9 +475,11 @@ Public Class VideoFBF
                 End While
 
                 If Not deleted Then
-                    Try : File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Warning: unable to delete overlay {overlayPath}: {If(lastEx IsNot Nothing, lastEx.Message, "unknown")}{Environment.NewLine}") : Catch : End Try
-                    MessageBox.Show("Impossibile eliminare il file overlay. Riprova più tardi.", "Ripristino", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                    ' procediamo comunque a pulire lo stato in memoria e ricaricare il frame base
+                    Try
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Warning: unable to delete overlay {overlayPath}: {If(lastEx IsNot Nothing, lastEx.Message, "unknown")}{Environment.NewLine}")
+                    Catch
+                    End Try
+                    MDIMessageBox.Show("Impossibile eliminare il file overlay. Riprova più tardi.", Me.MdiParent, MessageBoxButtons.OK)
                 End If
             End If
 
@@ -324,6 +504,7 @@ Public Class VideoFBF
                 Dim revID As Integer
                 If TryParseRevisioneID(lblRevAttiva.Text, revID) Then
                     AggiornaNoteDaDatabase(revID)
+                    UpdateSegnaliniNote()
                 Else
                     RefreshLstNoteFrame()
                 End If
@@ -358,11 +539,13 @@ Public Class VideoFBF
             Dim overlayCtrlFinal = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
             If overlayCtrlFinal IsNot Nothing Then overlayCtrlFinal.Invalidate()
 
-            MessageBox.Show("Frame ripristinato: overlay eliminato e appunti rimossi in memoria.", "Ripristino completato", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MDIMessageBox.Show("Frame ripristinato: overlay eliminato e appunti rimossi in memoria.", Me.MdiParent, MessageBoxButtons.OK)
 
         Catch ex As Exception
-            Try : File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - ERRORE: {ex.Message}{Environment.NewLine}{ex.StackTrace}{Environment.NewLine}") : Catch : End Try
-            MessageBox.Show("Errore durante il ripristino del frame: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Try : File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - ERRORE: {ex.Message}{Environment.NewLine}{ex.StackTrace}{Environment.NewLine}")
+            Catch
+            End Try
+            MDIMessageBox.Show("Errore durante il ripristino del frame: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
         Finally
             Try : UpdateRipristinaButton() : Catch : End Try
             Try
@@ -500,7 +683,7 @@ Public Class VideoFBF
                            Dim nomeUtente = item.Key
                            Dim revisioneID As Integer
                            If Not TryParseRevisioneID(lblRevAttiva.Text, revisioneID) Then
-                               MessageBox.Show("Revisione non valida.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                               MDIMessageBox.Show("Revisione non valida", Me.MdiParent, MessageBoxButtons.OK)
                                Return
                            End If
                            If e.NewValue = CheckState.Checked Then
@@ -841,14 +1024,14 @@ Public Class VideoFBF
                 If result IsNot Nothing Then
                     videoPath = result.ToString()
                 Else
-                    MessageBox.Show("Video non trovato.")
+                    MDIMessageBox.Show("Video non trovato", Me.MdiParent, MessageBoxButtons.OK)
                     Exit Sub
                 End If
             End Using
         End Using
 
         If Not Directory.Exists(frameDir) OrElse Directory.GetFiles(frameDir).Length = 0 Then
-            MessageBox.Show("Frame non trovati per la revisione selezionata.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Nessun Frame trovato per la revisione selezionata", Me.MdiParent, MessageBoxButtons.OK)
             Exit Sub
         End If
 
@@ -856,6 +1039,7 @@ Public Class VideoFBF
         editor.CurrentIndex = 0
 
         AggiornaNoteDaDatabase(revisioneID)
+        UpdateSegnaliniNote(revisioneID)
 
         Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
         overlay?.Invalidate()
@@ -908,7 +1092,7 @@ Public Class VideoFBF
         editor.CurrentIndex = idx
         picFrame.Image = editor.LoadFrame(idx)
         AggiornaFrameCorrente(idx)
-        'UpdateFrameLabels()
+        UpdateFrameLabels()
     End Sub
 
     Private Sub btnSuccessivo_Click(sender As Object, e As EventArgs) Handles btnSuccessivo.Click
@@ -952,7 +1136,7 @@ Public Class VideoFBF
     Private Sub btnUltimoFrame_Click(sender As Object, e As EventArgs) Handles btnUltimoFrame.Click
         If editor Is Nothing Then Return
         If editor.FrameList Is Nothing OrElse editor.FrameList.Count = 0 Then
-            MessageBox.Show("Nessun frame disponibile.", "Attenzione", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MDIMessageBox.Show("Nessun Frame disponibile", Me.MdiParent, MessageBoxButtons.OK)
             TrackFrame.Enabled = False
             btnSuccessivo.Enabled = False
             btnPrecedente.Enabled = False
@@ -977,7 +1161,7 @@ Public Class VideoFBF
 
     Private Sub btnAvantiVeloce_Click(sender As Object, e As EventArgs) Handles btnAvantiVeloce.Click
         If editor Is Nothing Then
-            MessageBox.Show("Impossibile caricare il frame.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Impossibile caricare il frame", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
 
@@ -995,7 +1179,7 @@ Public Class VideoFBF
 
     Private Sub btnIndietroVeloce_Click(sender As Object, e As EventArgs) Handles btnIndietroVeloce.Click
         If editor Is Nothing Then
-            MessageBox.Show("Impossibile caricare il frame.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Impossibile caricare il frame", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
 
@@ -1106,7 +1290,7 @@ Public Class VideoFBF
     End Sub
 
     Private Sub SalvaFrame()
-        editor.SaveFrame()
+        editor.SaveFrame(editor.CurrentIndex, editor.DrawingBitmap)
         hasUnsavedChanges = False
         editor.HasUnsavedChanges = False
 
@@ -1116,12 +1300,12 @@ Public Class VideoFBF
 
     Private Sub btnSalvaVideo_Click(sender As Object, e As EventArgs) Handles btnSalvaVideo.Click
         If picFrame.Image Is Nothing Then
-            MessageBox.Show("Caricare prima i Frames", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Caricare prima i Frame", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
         Dim outputPath = "C:\VideoEditor\output.mp4"
         editor.RebuildVideo(outputPath)
-        MessageBox.Show("Video salvato in: " & outputPath)
+        MDIMessageBox.Show("Video salvato in: " & outputPath, Me.MdiParent, MessageBoxButtons.OK)
     End Sub
 
     ' --- Lista annotazioni ---
@@ -1180,104 +1364,86 @@ Public Class VideoFBF
 
     Public Sub AggiornaNoteDaDatabase(revisioneID As Integer)
         Try
+            If FrameConNote Is Nothing Then FrameConNote = New List(Of Integer)()
             FrameConNote.Clear()
 
-            ' Assicurati che lstNoteFrame sia un ListView
             If LstNoteFrame Is Nothing Then Return
-            LstNoteFrame.BeginUpdate()
-            LstNoteFrame.Items.Clear()
 
-            Using conn As New SqlConnection(ConnString)
-                Dim query As String = "
-                SELECT FrameIndex, TestoNota, NomeUtente, DataNota
-                FROM Mov_FrameNote
-                WHERE RevisioneID = @RevID
-                ORDER BY FrameIndex"
-                Using cmd As New SqlCommand(query, conn)
-                    cmd.Parameters.Add("@RevID", SqlDbType.Int).Value = revisioneID
-                    conn.Open()
-                    Using reader As SqlDataReader = cmd.ExecuteReader()
-                        While reader.Read()
-                            Dim frameIndex = Convert.ToInt32(reader("FrameIndex"))
-                            Dim testo = reader("TestoNota").ToString()
-                            Dim autore = reader("NomeUtente").ToString()
-                            Dim data = Convert.ToDateTime(reader("DataNota"))
-
-                            ' Registra che il frame ha note (per overlay)
-                            If Not FrameConNote.Contains(frameIndex) Then FrameConNote.Add(frameIndex)
-
-                            ' Prepara DTO
-                            Dim info As New NotaFrameInfo With {
-                            .FrameIndex = frameIndex,
-                            .TestoNota = testo,
-                            .Autore = autore,
-                            .DataNota = data
-                        }
-
-                            ' Anteprima e testo visualizzato
-                            Dim anteprima = If(testo.Length > 60, testo.Substring(0, 60) & " ...", testo)
-                            Dim voce = $"Frame {frameIndex + 1} : {anteprima}"
-
-                            ' Crea ListViewItem e assegna Tag
-                            Dim item As New ListViewItem(voce) With {
-                            .Tag = info,
-                            .ToolTipText = $"Autore: {autore}{Environment.NewLine}Data: {data:dd/MM/yyyy HH:mm}"
-                        }
-
-                            LstNoteFrame.Items.Add(item)
-                        End While
-                    End Using
-                End Using
-            End Using
-        Catch ex As Exception
-            ' Ignora errori di popolamento per non interrompere il flusso
-        Finally
-            Try
-                LstNoteFrame.EndUpdate()
-            Catch
-            End Try
-            ' Aggiorna overlay/segnalini
-            Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
-            If overlay IsNot Nothing Then overlay.Invalidate()
-        End Try
-    End Sub
-
-    Private Sub lstNoteFrame_SelectedIndexChanged(sender As Object, e As EventArgs) Handles LstNoteFrame.SelectedIndexChanged
-        Try
-            If LstNoteFrame.SelectedItems.Count = 0 Then Return
-            Dim item = LstNoteFrame.SelectedItems(0)
-            Dim info = TryCast(item.Tag, NotaFrameInfo)
-            If info Is Nothing Then Return
-
-            If Not ConfirmSaveChanges() Then
-                ' Ripristina selezione precedente: cerca l'item corrispondente all'indice corrente
-                For Each it As ListViewItem In LstNoteFrame.Items
-                    Dim inf = TryCast(it.Tag, NotaFrameInfo)
-                    If inf IsNot Nothing AndAlso inf.FrameIndex = editor.CurrentIndex Then
-                        it.Selected = True
-                        Exit For
-                    End If
-                Next
+            ' Thread-safe invoke
+            If Me.InvokeRequired Then
+                Me.BeginInvoke(New Action(Of Integer)(AddressOf AggiornaNoteDaDatabase), revisioneID)
                 Return
             End If
 
-            Dim frameIndex = info.FrameIndex
-            If editor Is Nothing Then Return
-            If frameIndex < 0 OrElse frameIndex >= editor.FrameList.Count Then Return
+            ' Assicurati colonne
+            If LstNoteFrame.Columns.Count < 3 Then InitLstNoteFrameColumns()
 
-            editor.CurrentIndex = frameIndex
-            SafeSetTrackFrameValue(frameIndex)
-            picFrame.Image = editor.LoadFrame(frameIndex)
+            LstNoteFrame.BeginUpdate()
+            Try
+                LstNoteFrame.Items.Clear()
 
-            txtNote.Text = info.TestoNota
-            lblAutore.Text = info.Autore
-            lblDataNota.Text = $"{info.DataNota:dd/MM/yyyy HH:mm}"
+                Using conn As New SqlConnection(ConnString)
+                    Dim query As String = "
+                    SELECT FrameIndex, TestoNota, NomeUtente, DataNota
+                    FROM Mov_FrameNote
+                    WHERE RevisioneID = @RevID
+                    ORDER BY FrameIndex"
+                    Using cmd As New SqlCommand(query, conn)
+                        cmd.Parameters.Add("@RevID", SqlDbType.Int).Value = revisioneID
+                        conn.Open()
+                        Using reader As SqlDataReader = cmd.ExecuteReader()
+                            While reader.Read()
+                                Dim frameIndex = Convert.ToInt32(reader("FrameIndex"))
+                                Dim testo = If(reader("TestoNota") Is DBNull.Value, String.Empty, reader("TestoNota").ToString())
+                                Dim autore = If(reader("NomeUtente") Is DBNull.Value, String.Empty, reader("NomeUtente").ToString())
+                                Dim data = If(reader("DataNota") Is DBNull.Value, DateTime.MinValue, Convert.ToDateTime(reader("DataNota")))
 
-            hasUnsavedChanges = False
-            editor.HasUnsavedChanges = False
+                                If Not FrameConNote.Contains(frameIndex) Then FrameConNote.Add(frameIndex)
+
+                                Dim displayNota = If(testo.Length > 120, testo.Substring(0, 120) & " ...", testo)
+                                Dim item As New ListViewItem((frameIndex + 1).ToString()) ' colonna Frame (1-based)
+                                item.SubItems.Add(displayNota)                            ' colonna Nota (anteprima)
+                                item.SubItems.Add(autore)                                 ' colonna Utente
+                                item.Tag = New NotaFrameInfo With {
+                                .FrameIndex = frameIndex,
+                                .TestoNota = testo,
+                                .Autore = autore,
+                                .DataNota = data
+                            }
+                                LstNoteFrame.Items.Add(item)
+                            End While
+                        End Using
+                    End Using
+                End Using
+            Finally
+                Try : LstNoteFrame.EndUpdate() : Catch : End Try
+            End Try
+
+            ' Ridisegna overlay/segnalini
+            Try
+                Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
+                If overlay IsNot Nothing Then overlay.Invalidate()
+            Catch
+            End Try
+
         Catch ex As Exception
-            ' ignora errori minori
+            Try
+                Dim logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "VideoFBF_debug_notes.log")
+                System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - AggiornaNoteDaDatabase ERROR: {ex.Message}{Environment.NewLine}")
+            Catch : End Try
         End Try
+    End Sub
+
+    ' Chiamare una volta in Load per impostare la ListView in Details e creare le colonne
+    Private Sub InitLstNoteFrameColumns()
+        If LstNoteFrame Is Nothing Then Return
+        LstNoteFrame.View = View.Details
+        LstNoteFrame.FullRowSelect = True
+        LstNoteFrame.GridLines = True
+        LstNoteFrame.Columns.Clear()
+        LstNoteFrame.Columns.Add("Frame", 70, HorizontalAlignment.Left)
+        LstNoteFrame.Columns.Add("Nota", 420, HorizontalAlignment.Left)
+        LstNoteFrame.Columns.Add("Utente", 150, HorizontalAlignment.Left)
     End Sub
 
     ' Aggiorna la ListBox lstNoteFrame per il frame corrente in modo thread-safe
@@ -1287,31 +1453,36 @@ Public Class VideoFBF
         Dim action = Sub()
                          Try
                              If LstNoteFrame Is Nothing Then Return
+                             If LstNoteFrame.Columns.Count < 3 Then InitLstNoteFrameColumns()
+
                              LstNoteFrame.BeginUpdate()
-                             LstNoteFrame.Items.Clear()
+                             Try
+                                 LstNoteFrame.Items.Clear()
+                                 If editor Is Nothing Then Return
 
-                             If editor Is Nothing Then Return
-                             Dim idx As Integer = editor.CurrentIndex
+                                 Dim idx As Integer = editor.CurrentIndex
 
-                             ' Se le note sono caricate in memoria in FrameNote (VideoEditor), usale
-                             If editor.FrameNote IsNot Nothing AndAlso editor.FrameNote.ContainsKey(idx) Then
-                                 Dim fn = editor.FrameNote(idx)
-                                 Dim display = $"{fn.Data:yyyy-MM-dd HH:mm} - {fn.Autore}: {If(fn.Testo.Length > 80, fn.Testo.Substring(0, 80) & " ...", fn.Testo)}"
-                                 Dim info As New NotaFrameInfo With {
-                                 .FrameIndex = idx,
-                                 .TestoNota = fn.Testo,
-                                 .Autore = fn.Autore,
-                                 .DataNota = fn.Data
-                             }
-                                 Dim item As New ListViewItem(display) With {
-                                 .Tag = info,
-                                 .ToolTipText = $"Autore: {info.Autore}{Environment.NewLine}Data: {info.DataNota:dd/MM/yyyy HH:mm}"
-                             }
-                                 LstNoteFrame.Items.Add(item)
-                             End If
+                                 ' Se ci sono note in memoria per il frame corrente
+                                 If editor.FrameNote IsNot Nothing AndAlso editor.FrameNote.ContainsKey(idx) Then
+                                     Dim fn = editor.FrameNote(idx)
+                                     Dim displayNota = If(fn.Testo.Length > 120, fn.Testo.Substring(0, 120) & " ...", fn.Testo)
+                                     Dim item As New ListViewItem((idx + 1).ToString())
+                                     item.SubItems.Add(displayNota)
+                                     item.SubItems.Add(fn.Autore)
+                                     item.Tag = New NotaFrameInfo With {
+                                     .FrameIndex = idx,
+                                     .TestoNota = fn.Testo,
+                                     .Autore = fn.Autore,
+                                     .DataNota = fn.Data
+                                 }
+                                     LstNoteFrame.Items.Add(item)
+                                 Else
+                                     ' Nessuna nota in memoria per il frame corrente: lascia vuoto
+                                 End If
+                             Finally
+                                 Try : LstNoteFrame.EndUpdate() : Catch : End Try
+                             End Try
                          Catch
-                             ' ignora
-                         Finally
                              Try : LstNoteFrame.EndUpdate() : Catch : End Try
                          End Try
                      End Sub
@@ -1323,6 +1494,64 @@ Public Class VideoFBF
         End If
     End Sub
 
+    Private Sub LstNoteFrame_SelectedIndexChanged(sender As Object, e As EventArgs) Handles LstNoteFrame.SelectedIndexChanged
+        Try
+            If LstNoteFrame.SelectedItems.Count = 0 Then Return
+            Dim item = LstNoteFrame.SelectedItems(0)
+            Dim info = TryCast(item.Tag, NotaFrameInfo)
+            If info Is Nothing Then
+                ' Se Tag non è presente, ricava dai SubItems (fallback)
+                Dim frameStr = item.SubItems(0).Text
+                Dim frameIndex As Integer = 0
+                Integer.TryParse(frameStr, frameIndex)
+                frameIndex = Math.Max(1, frameIndex) - 1
+                Dim testo = If(item.SubItems.Count > 1, item.SubItems(1).Text, String.Empty)
+                Dim autore = If(item.SubItems.Count > 2, item.SubItems(2).Text, String.Empty)
+                txtNote.Text = testo
+                lblAutore.Text = autore
+                lblDataNota.Text = ""
+                ' Aggiorna immagine/frame
+                If editor IsNot Nothing AndAlso frameIndex >= 0 AndAlso frameIndex < editor.FrameList.Count Then
+                    editor.CurrentIndex = frameIndex
+                    SafeSetTrackFrameValue(frameIndex)
+                    picFrame.Image = editor.LoadFrame(frameIndex)
+                End If
+                Return
+            End If
+
+            ' Se ci sono modifiche non salvate, chiedi conferma (mantieni la logica esistente)
+            If Not ConfirmSaveChanges() Then
+                ' ripristina selezione precedente: cerca l'item corrispondente all'indice corrente
+                For Each it As ListViewItem In LstNoteFrame.Items
+                    Dim inf = TryCast(it.Tag, NotaFrameInfo)
+                    If inf IsNot Nothing AndAlso inf.FrameIndex = editor.CurrentIndex Then
+                        it.Selected = True
+                        Exit For
+                    End If
+                Next
+                Return
+            End If
+
+            ' Applica selezione: carica frame e dettagli
+            Dim frameIndexSel = info.FrameIndex
+            If editor Is Nothing Then Return
+            If frameIndexSel < 0 OrElse frameIndexSel >= editor.FrameList.Count Then Return
+
+            editor.CurrentIndex = frameIndexSel
+            SafeSetTrackFrameValue(frameIndexSel)
+            picFrame.Image = editor.LoadFrame(frameIndexSel)
+
+            txtNote.Text = info.TestoNota
+            lblAutore.Text = info.Autore
+            lblDataNota.Text = If(info.DataNota = DateTime.MinValue, "", $"{info.DataNota:dd/MM/yyyy HH:mm}")
+
+            hasUnsavedChanges = False
+            Try : editor.HasUnsavedChanges = False : Catch : End Try
+        Catch ex As Exception
+            ' ignora errori minori
+        End Try
+    End Sub
+
     Private Sub EliminaNotaSelezionata()
         If LstNoteFrame.SelectedItems.Count = 0 Then Return
         Dim item = LstNoteFrame.SelectedItems(0)
@@ -1332,7 +1561,7 @@ Public Class VideoFBF
         ' Parse revisione
         Dim revisioneID As Integer
         If Not TryParseRevisioneID(lblRevAttiva.Text, revisioneID) Then
-            MessageBox.Show("Revisione non valida.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Revisione non valida", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
 
@@ -1357,7 +1586,7 @@ Public Class VideoFBF
                 End Using
             End Using
         Catch ex As Exception
-            MessageBox.Show("Errore durante l'eliminazione della nota: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Errore durante l'eliminazione della nota: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
             Return
         End Try
 
@@ -1395,7 +1624,7 @@ Public Class VideoFBF
                 ' Prova a cancellare con retry
                 Dim deleted = SafeDeleteFile(overlayPath, maxAttempts:=6)
                 If Not deleted Then
-                    MessageBox.Show("Non è stato possibile eliminare il file overlay. Riprova più tardi.", "Attenzione", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    MDIMessageBox.Show("Non è stato possibile eliminare il file overlay. Riprova più tardi.", Me.MdiParent, MessageBoxButtons.OK)
                 End If
             End If
         End If
@@ -1403,6 +1632,7 @@ Public Class VideoFBF
         ' Ricarica note dal DB per coerenza
         Try
             AggiornaNoteDaDatabase(revisioneID)
+            UpdateSegnaliniNote(revisioneID)
         Catch
             Try : RefreshLstNoteFrame() : Catch : End Try
         End Try
@@ -1505,10 +1735,10 @@ Public Class VideoFBF
             Try
                 Dim revisioneID As Integer
                 If Not TryParseRevisioneID(lblRevAttiva.Text, revisioneID) Then
-                    MessageBox.Show("Revisione non valida.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                    MDIMessageBox.Show("Revisione non valida", Me.MdiParent, MessageBoxButtons.OK)
                     Return False
                 End If
-                editor.SaveFrame()
+                editor.SaveFrame(editor.CurrentIndex, editor.DrawingBitmap)
                 hasUnsavedChanges = False
                 editor.HasUnsavedChanges = False
 
@@ -1547,7 +1777,7 @@ Public Class VideoFBF
                 hasUnsavedChanges = False
                 editor.HasUnsavedChanges = False
             Catch ex As Exception
-                MessageBox.Show("Errore durante il ripristino del frame: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                MDIMessageBox.Show("Errore durante il salvataggio: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
                 Return False
             End Try
             Return True
@@ -1555,20 +1785,6 @@ Public Class VideoFBF
             Return False
         End If
     End Function
-
-    ' --- Overlay note sulla trackbar ---
-    Private Sub DisegnaSegnaliniNote(sender As Object, e As PaintEventArgs)
-        If FrameConNote Is Nothing OrElse FrameConNote.Count = 0 Then Exit Sub
-        Dim totale = TrackFrame.Maximum - TrackFrame.Minimum
-        If totale <= 0 Then Exit Sub
-        Dim larghezza = TrackFrame.Width - 28
-        For Each index In FrameConNote
-            If index < TrackFrame.Minimum OrElse index > TrackFrame.Maximum Then Continue For
-            Dim percentuale = (index - TrackFrame.Minimum) / totale
-            Dim x = CInt(percentuale * larghezza)
-            e.Graphics.FillRectangle(Brushes.Red, x + 11, 0, 5, 10)
-        Next
-    End Sub
 
     ' --- Attivazione form: ricarica revisione se presente ---
     Private Sub VideoFBF_Activated(sender As Object, e As EventArgs) Handles Me.Activated
@@ -1579,13 +1795,14 @@ Public Class VideoFBF
             Dim permesso = param.Permesso
             CaricaRevisione(videoID, revisioneID)
             AggiornaNoteDaDatabase(revisioneID)
+            UpdateSegnaliniNote(revisioneID)
         End If
     End Sub
 
     ' --- Gestione click per il pulsante Ripristina Frame ---
     Private Sub BtnRipristinaFrame_Click(sender As Object, e As EventArgs) Handles BtnRipristinaFrame.Click
         If editor Is Nothing Then
-            MessageBox.Show("Nessun video caricato.", "Ripristino frame", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            MDIMessageBox.Show("Nessun video caricato", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
 
@@ -1594,7 +1811,7 @@ Public Class VideoFBF
         Dim baseDir = Path.Combine(OttieniPercorsoFrames(), nomeVideo)
         Dim originalDir = Path.Combine(baseDir, "Revisione_0000")
         If Not Directory.Exists(originalDir) Then
-            MessageBox.Show("Cartella di backup Revisione_0000 non trovata.", "Ripristino frame", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            MDIMessageBox.Show("Cartella di backup Revisione_0000 non trovato", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
 
@@ -1632,7 +1849,7 @@ Public Class VideoFBF
             End If
             AggiornaOverlayEStato() ' chiamata opzionale per aggiornare overlay/segnalini
         Catch ex As Exception
-            MessageBox.Show("Errore durante il ripristino: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Errore durante il ripristino: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
         End Try
     End Sub
 
@@ -1675,200 +1892,27 @@ Public Class VideoFBF
 
     ' Nuovo handler integrato per aprire la form di scelta revisione
     Private Sub btnCaricaRevisione_Click(sender As Object, e As EventArgs) Handles btnCaricaRevisione.Click
+        Cursor.Current = Cursors.WaitCursor
+        Application.DoEvents()
         Try
             If Me.MdiParent Is Nothing Then
-                MessageBox.Show("Form principale non disponibile.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                MDIMessageBox.Show("Form Principale non disponibile", Me.MdiParent, MessageBoxButtons.OK)
                 Return
             End If
 
             If TypeOf Me.MdiParent Is GesPu25 Then
                 Dim mainForm As GesPu25 = CType(Me.MdiParent, GesPu25)
                 Dim scelta As New SceltaVideo(Me)
-
-                ' Se vuoi aprire come MDI child:
                 scelta.MdiParent = mainForm
                 scelta.Show()
-
             Else
-                MessageBox.Show("Form principale non è del tipo atteso.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                MDIMessageBox.Show("Form Principale non è del tipo atteso", Me.MdiParent, MessageBoxButtons.OK)
             End If
         Catch ex As Exception
-            MessageBox.Show("Errore durante l'apertura della finestra di scelta: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show("Errore durante l'apertura della finestra di scelta: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
         End Try
-    End Sub
-
-    ' --- DTO ListView Note ---
-    Public Class NotaFrameInfo
-        Public Property FrameIndex As Integer
-        Public Property TestoNota As String
-        Public Property Autore As String
-        Public Property DataNota As DateTime
-    End Class
-
-    Private Sub btnSalvaNote_Click(sender As Object, e As EventArgs) Handles btnSalvaNote.Click
-        If picFrame.Image Is Nothing Then Return
-
-        Dim frameIndex = editor.CurrentIndex
-        Dim nota = If(txtNote.Text, String.Empty).Trim()
-        Dim nomeUtente = NomeUtenteCorrente
-        Dim revisioneID As Integer
-        If Not TryParseRevisioneID(lblRevAttiva.Text, revisioneID) Then
-            MessageBox.Show("Revisione non valida.", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return
-        End If
-
-        ' Percorso overlay per il frame corrente
-        Dim dstBase As String = Nothing
-        If editor IsNot Nothing AndAlso frameIndex >= 0 AndAlso frameIndex < editor.FrameList.Count Then
-            dstBase = editor.FrameList(frameIndex)
-        End If
-        Dim overlayPath As String = Nothing
-        If Not String.IsNullOrWhiteSpace(dstBase) Then
-            overlayPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(dstBase), System.IO.Path.GetFileNameWithoutExtension(dstBase) & "_overlay.png")
-        End If
-
-        ' Controlli preliminari: drawing vuoto? overlay esistente? overlay identico?
-        Dim drawingEmpty As Boolean = True
-        Try
-            drawingEmpty = IsBitmapFullyTransparent(editor.DrawingBitmap)
-        Catch
-            drawingEmpty = True
-        End Try
-
-        Dim overlayExists As Boolean = (Not String.IsNullOrWhiteSpace(overlayPath) AndAlso System.IO.File.Exists(overlayPath))
-        Dim overlayIdentical As Boolean = False
-        If overlayExists Then
-            Try
-                Dim fileChecksum = ComputeFileChecksum(overlayPath)
-                Dim bmpChecksum = ComputeBitmapChecksum(editor.DrawingBitmap)
-                If Not String.IsNullOrEmpty(fileChecksum) AndAlso Not String.IsNullOrEmpty(bmpChecksum) AndAlso fileChecksum = bmpChecksum Then
-                    overlayIdentical = True
-                End If
-            Catch
-                overlayIdentical = False
-            End Try
-        End If
-
-        ' Caso 1: niente da salvare (nessun testo, drawing vuoto, nessun overlay)
-        If String.IsNullOrWhiteSpace(nota) AndAlso drawingEmpty AndAlso Not overlayExists Then
-            MessageBox.Show("Nessuna modifica da salvare.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            Return
-        End If
-
-        ' Caso 2: testo vuoto, drawing vuoto, overlay esistente identico -> niente da salvare
-        If String.IsNullOrWhiteSpace(nota) AndAlso drawingEmpty AndAlso overlayExists AndAlso overlayIdentical Then
-            MessageBox.Show("Nessuna modifica da salvare.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            Return
-        End If
-
-        Try
-            ' Se testo vuoto e drawing vuoto ma esisteva una nota nel DB -> cancellala
-            If String.IsNullOrWhiteSpace(nota) AndAlso drawingEmpty Then
-                Dim hadNote As Boolean = False
-                Try
-                    Using conn As New SqlConnection(ConnString)
-                        conn.Open()
-                        Using cmd As New SqlCommand("SELECT COUNT(*) FROM Mov_FrameNote WHERE RevisioneID = @RevID AND FrameIndex = @FrameIndex", conn)
-                            cmd.Parameters.Add("@RevID", SqlDbType.Int).Value = revisioneID
-                            cmd.Parameters.Add("@FrameIndex", SqlDbType.Int).Value = frameIndex
-                            Dim cnt = Convert.ToInt32(cmd.ExecuteScalar())
-                            hadNote = (cnt > 0)
-                        End Using
-
-                        If hadNote Then
-                            Using del As New SqlCommand("DELETE FROM Mov_FrameNote WHERE RevisioneID = @RevID AND FrameIndex = @FrameIndex", conn)
-                                del.Parameters.Add("@RevID", SqlDbType.Int).Value = revisioneID
-                                del.Parameters.Add("@FrameIndex", SqlDbType.Int).Value = frameIndex
-                                del.ExecuteNonQuery()
-                            End Using
-                        End If
-                    End Using
-                Catch ex As Exception
-                    ' se la cancellazione fallisce, log e prosegui (non bloccare l'utente)
-                    Try : System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "VideoFBF_save.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Errore DELETE nota: {ex.Message}{Environment.NewLine}") : Catch : End Try
-                    Throw
-                End Try
-
-                ' Se non ci sono appunti da salvare, aggiorna UI e esci
-                If drawingEmpty Then
-                    ' Se esisteva un overlay e lo vogliamo rimuovere quando non ci sono appunti, cancellalo (opzionale)
-                    If overlayExists Then
-                        Try
-                            ' prova a rimuovere l'overlay (senza forzare se bloccato)
-                            SafeWriteBitmapAtomic(New System.Drawing.Bitmap(1, 1), overlayPath) ' sovrascrive con 1x1 trasparente come fallback
-                            ' oppure usare SafeDeleteFileEnhanced se preferisci cancellare
-                        Catch
-                            ' ignora errori di cancellazione
-                        End Try
-                    End If
-
-                    AggiornaNoteDaDatabase(revisioneID)
-                    UpdateFrameLabels(frameIndex)
-                    MessageBox.Show("Nota rimossa (nessun contenuto).", "Operazione completata", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                    Return
-                End If
-            End If
-
-            ' Se ci sono appunti non trasparenti, salva overlay
-            If Not drawingEmpty Then
-                editor.SaveFrame()
-                hasUnsavedChanges = False
-                editor.HasUnsavedChanges = False
-            ElseIf overlayExists AndAlso Not overlayIdentical Then
-                ' Se drawing vuoto ma overlay su disco differente, sovrascrivi con overlay trasparente per coerenza
-                Try
-                    Dim baseWidth As Integer = 0, baseHeight As Integer = 0
-                    Using fs As New System.IO.FileStream(dstBase, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read)
-                        Using ms As New System.IO.MemoryStream()
-                            fs.CopyTo(ms)
-                            ms.Position = 0
-                            Using tmpImg As System.Drawing.Image = System.Drawing.Image.FromStream(ms)
-                                baseWidth = tmpImg.Width
-                                baseHeight = tmpImg.Height
-                            End Using
-                        End Using
-                    End Using
-                    Using emptyBmp As New System.Drawing.Bitmap(Math.Max(1, baseWidth), Math.Max(1, baseHeight), System.Drawing.Imaging.PixelFormat.Format32bppArgb)
-                        Using g As System.Drawing.Graphics = System.Drawing.Graphics.FromImage(emptyBmp)
-                            g.Clear(System.Drawing.Color.Transparent)
-                        End Using
-                        SafeWriteBitmapAtomic(emptyBmp, overlayPath)
-                    End Using
-                Catch
-                    ' fallback silenzioso
-                End Try
-            End If
-
-            ' Salva/aggiorna la nota nel DB solo se il testo non è vuoto
-            If Not String.IsNullOrWhiteSpace(nota) Then
-                Using conn As New SqlConnection(ConnString)
-                    conn.Open()
-                    Using cmd As New SqlCommand("
-                    MERGE INTO Mov_FrameNote AS target
-                    USING (SELECT @RevID AS RevisioneID, @FrameIndex AS FrameIndex) AS source
-                    ON target.RevisioneID = source.RevisioneID AND target.FrameIndex = source.FrameIndex
-                    WHEN MATCHED THEN
-                        UPDATE SET TestoNota = @TestoNota, NomeUtente = @NomeUtente, DataNota = @DataNota
-                    WHEN NOT MATCHED THEN
-                        INSERT (RevisioneID, FrameIndex, TestoNota, NomeUtente, DataNota)
-                        VALUES (@RevID, @FrameIndex, @TestoNota, @NomeUtente, @DataNota);", conn)
-                        cmd.Parameters.Add("@RevID", SqlDbType.Int).Value = revisioneID
-                        cmd.Parameters.Add("@FrameIndex", SqlDbType.Int).Value = frameIndex
-                        cmd.Parameters.Add("@TestoNota", SqlDbType.NVarChar, 2000).Value = nota
-                        cmd.Parameters.Add("@NomeUtente", SqlDbType.NVarChar, 100).Value = nomeUtente
-                        cmd.Parameters.Add("@DataNota", SqlDbType.DateTime).Value = DateTime.Now
-                        cmd.ExecuteNonQuery()
-                    End Using
-                End Using
-            End If
-
-            ' Aggiorna UI e lista note
-            AggiornaNoteDaDatabase(revisioneID)
-            UpdateFrameLabels(frameIndex)
-            MDIMessageBox.Show("Operazione completata", GesPu25, MessageBoxButtons.OK)
-        Catch ex As Exception
-            MDIMessageBox.Show("Errore durante il salvataggio: " & ex.Message, GesPu25, MessageBoxButtons.OK)
-        End Try
+        Cursor.Current = Cursors.Default
+        Application.DoEvents()
     End Sub
 
     Private Function ComputeBitmapChecksum(bmp As System.Drawing.Bitmap) As String
@@ -1894,6 +1938,7 @@ Public Class VideoFBF
 
     Private Function IsBitmapFullyTransparent(bmp As System.Drawing.Bitmap) As Boolean
         If bmp Is Nothing Then Return True
+
         Dim pf = bmp.PixelFormat
         If pf <> System.Drawing.Imaging.PixelFormat.Format32bppArgb AndAlso pf <> System.Drawing.Imaging.PixelFormat.Format32bppPArgb Then
             Using tmp As New System.Drawing.Bitmap(bmp.Width, bmp.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb)
@@ -1912,11 +1957,17 @@ Public Class VideoFBF
             Dim total = stride * bmp.Height
             Dim raw(total - 1) As Byte
             System.Runtime.InteropServices.Marshal.Copy(data.Scan0, raw, 0, total)
-            For i As Integer = 0 To raw.Length - bytesPerPixel Step bytesPerPixel
-                Dim alpha As Byte = raw(i + 3)
-                If alpha <> 0 Then
-                    Return False
-                End If
+
+            ' Per Format32bpp* l'ordine in memoria è B G R A (alpha all'offset +3)
+            For y As Integer = 0 To bmp.Height - 1
+                Dim rowStart = y * stride
+                For x As Integer = 0 To bmp.Width - 1
+                    Dim i = rowStart + x * bytesPerPixel
+                    Dim alpha As Byte = raw(i + 3)
+                    If alpha <> 0 Then
+                        Return False
+                    End If
+                Next
             Next
             Return True
         Finally
@@ -1924,42 +1975,131 @@ Public Class VideoFBF
         End Try
     End Function
 
-    Private Sub SafeWriteBitmapAtomic(bmp As System.Drawing.Bitmap, dstPath As String)
-        Dim dir = System.IO.Path.GetDirectoryName(dstPath)
-        If Not System.IO.Directory.Exists(dir) Then System.IO.Directory.CreateDirectory(dir)
+    Private Function BitmapsAreIdentical(bmpA As System.Drawing.Bitmap, bmpB As System.Drawing.Bitmap) As Boolean
+        If bmpA Is Nothing AndAlso bmpB Is Nothing Then Return True
+        If bmpA Is Nothing OrElse bmpB Is Nothing Then Return False
+        If bmpA.Width <> bmpB.Width OrElse bmpA.Height <> bmpB.Height Then Return False
 
-        Dim tmp = System.IO.Path.Combine(dir, System.IO.Path.GetFileNameWithoutExtension(dstPath) & "_tmp" & System.IO.Path.GetExtension(dstPath))
+        Dim rect = New System.Drawing.Rectangle(0, 0, bmpA.Width, bmpA.Height)
+        Dim dataA = bmpA.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+        Dim dataB = bmpB.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb)
         Try
-            If System.IO.File.Exists(tmp) Then
-                Try : System.IO.File.Delete(tmp) : Catch : End Try
-            End If
+            Dim strideA = Math.Abs(dataA.Stride)
+            Dim strideB = Math.Abs(dataB.Stride)
+            If strideA <> strideB Then Return False
 
-            bmp.Save(tmp, System.Drawing.Imaging.ImageFormat.Png)
+            Dim total = strideA * bmpA.Height
+            Dim rawA(total - 1) As Byte
+            Dim rawB(total - 1) As Byte
+            System.Runtime.InteropServices.Marshal.Copy(dataA.Scan0, rawA, 0, total)
+            System.Runtime.InteropServices.Marshal.Copy(dataB.Scan0, rawB, 0, total)
 
-            If System.IO.File.Exists(dstPath) Then
-                Try
-                    System.IO.File.Replace(tmp, dstPath, Nothing)
-                Catch ex As PlatformNotSupportedException
-                    If System.IO.File.Exists(dstPath) Then System.IO.File.Delete(dstPath)
-                    System.IO.File.Move(tmp, dstPath)
-                End Try
-            Else
-                System.IO.File.Move(tmp, dstPath)
-            End If
+            For i As Integer = 0 To total - 1
+                If rawA(i) <> rawB(i) Then
+                    Return False
+                End If
+            Next
+            Return True
         Finally
-            If System.IO.File.Exists(tmp) Then
-                Try : System.IO.File.Delete(tmp) : Catch : End Try
-            End If
+            bmpA.UnlockBits(dataA)
+            bmpB.UnlockBits(dataB)
         End Try
-    End Sub
+    End Function
+
+    Private Function IsOverlayEmpty(ed As VideoEditor, frameIndex As Integer) As Boolean
+        Try
+            If ed Is Nothing Then Return True
+            If frameIndex < 0 OrElse frameIndex >= ed.FrameList.Count Then Return True
+
+            Dim basePath = ed.FrameList(frameIndex)
+            If String.IsNullOrWhiteSpace(basePath) Then Return True
+
+            ' Carica il base in memoria senza lock
+            Dim baseBmp As System.Drawing.Bitmap = Nothing
+            Using fs As New System.IO.FileStream(basePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read)
+                Using ms As New System.IO.MemoryStream()
+                    fs.CopyTo(ms)
+                    ms.Position = 0
+                    Using tmpImg As System.Drawing.Image = System.Drawing.Image.FromStream(ms)
+                        baseBmp = New System.Drawing.Bitmap(tmpImg)
+                    End Using
+                End Using
+            End Using
+
+            ' Se drawingBitmap è nulla o 1x1 trasparente consideralo vuoto
+            If ed.DrawingBitmap Is Nothing Then
+                baseBmp.Dispose()
+                Return True
+            End If
+
+            ' Se le dimensioni differiscono, normalizza: crea copia del drawing con le dimensioni del base
+            Dim drawingCopy As System.Drawing.Bitmap = Nothing
+            If ed.DrawingBitmap.Width = baseBmp.Width AndAlso ed.DrawingBitmap.Height = baseBmp.Height Then
+                drawingCopy = CType(ed.DrawingBitmap.Clone(), System.Drawing.Bitmap)
+            Else
+                drawingCopy = New System.Drawing.Bitmap(baseBmp.Width, baseBmp.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+                Using g As System.Drawing.Graphics = System.Drawing.Graphics.FromImage(drawingCopy)
+                    g.Clear(System.Drawing.Color.Transparent)
+                    g.DrawImage(ed.DrawingBitmap, 0, 0, Math.Min(ed.DrawingBitmap.Width, baseBmp.Width), Math.Min(ed.DrawingBitmap.Height, baseBmp.Height))
+                End Using
+            End If
+
+            Dim identical = BitmapsAreIdentical(baseBmp, drawingCopy)
+
+            drawingCopy.Dispose()
+            baseBmp.Dispose()
+
+            Return identical ' True => overlay vuoto (nessuna differenza)
+        Catch
+            ' In caso di errore, per sicurezza considera overlay non vuoto (evita cancellare)
+            Return False
+        End Try
+    End Function
 
 
     Private Sub btnApprovazione_Click(sender As Object, e As EventArgs) Handles btnApprovazione.Click
+        If picFrame.Image Is Nothing Then
+            MessageBox.Show("Caricare prima i Frames", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' Ignora il click se non ci sono frame
+            Return
+        End If
+        Dim revisioneID As Integer = Int(Me.lblRevAttiva.Text)
+
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query As String = "
+            UPDATE Mov_Revisione
+            SET Stato = 'Conforme', Approvato = 1
+            WHERE RevisioneID = @RevisioneID"
+
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
+                cmd.ExecuteNonQuery()
+            End Using
+        End Using
 
     End Sub
 
     Private Sub btnRetake_Click(sender As Object, e As EventArgs) Handles btnRetake.Click
+        If picFrame.Image Is Nothing Then
+            MessageBox.Show("Caricare prima i Frames", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' Ignora il click se non ci sono frame
+            Return
+        End If
+        Dim revisioneID As Integer = Int(Me.lblRevAttiva.Text)
 
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Dim query As String = "
+            UPDATE Mov_Revisione
+            SET Stato = 'Non Conforme', Approvato = 0
+            WHERE RevisioneID = @RevisioneID"
+
+            Using cmd As New SqlCommand(query, conn)
+                cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
+                cmd.ExecuteNonQuery()
+            End Using
+        End Using
     End Sub
 
     Private Sub LstNoteFrame_KeyDown(sender As Object, e As KeyEventArgs) Handles LstNoteFrame.KeyDown
@@ -1967,4 +2107,360 @@ Public Class VideoFBF
             EliminaNotaSelezionata()
         End If
     End Sub
+
+    Private Sub btnSalvaNote_Click(sender As Object, e As EventArgs) Handles btnSalvaNote.Click
+        If picFrame.Image Is Nothing OrElse editor Is Nothing Then
+            MDIMessageBox.Show("Caricare prima i Frame", Me.MdiParent, MessageBoxButtons.OK)
+            Return
+        End If
+
+        Dim frameIndex = editor.CurrentIndex
+        Dim nota = If(txtNote.Text, String.Empty).Trim()
+        Dim nomeUtente = NomeUtenteCorrente
+        Dim revisioneID As Integer
+        If Not TryParseRevisioneID(lblRevAttiva.Text, revisioneID) Then
+            MDIMessageBox.Show("Revisione non valida", Me.MdiParent, MessageBoxButtons.OK)
+            Return
+        End If
+
+        ' Percorso base e overlay
+        Dim dstBase As String = Nothing
+        If editor IsNot Nothing AndAlso frameIndex >= 0 AndAlso frameIndex < editor.FrameList.Count Then
+            dstBase = editor.FrameList(frameIndex)
+        End If
+
+        Dim overlayPath As String = Nothing
+        If Not String.IsNullOrWhiteSpace(dstBase) Then
+            overlayPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(dstBase), System.IO.Path.GetFileNameWithoutExtension(dstBase) & "_overlay.png")
+        End If
+
+        ' Determina se il drawing è vuoto (se non è possibile valutare, consideralo vuoto per sicurezza)
+        Dim drawingEmpty As Boolean = True
+        Try
+            drawingEmpty = IsOverlayEmpty(editor, frameIndex)
+        Catch
+            ' se non possiamo valutare, assumiamo vuoto per evitare salvataggi indesiderati
+            drawingEmpty = True
+        End Try
+
+        ' NUOVA REGOLA: se non c'è testo e non c'è disegno -> NON SALVARE
+        If String.IsNullOrWhiteSpace(nota) AndAlso drawingEmpty Then
+            MDIMessageBox.Show("Nessuna modifica da salvare: inserire testo o disegnare sull'immagine prima di salvare.", Me.MdiParent, MessageBoxButtons.OK)
+            Return
+        End If
+
+        ' Altrimenti procedi con il salvataggio coerente:
+        Try
+            ' 1) Se c'è disegno, salva overlay (anche se testo vuoto)
+            If Not drawingEmpty Then
+                Try
+                    ' usa overload compatibile (wrapper SaveFrame() o SaveFrame(frameIndex, bitmap))
+                    If editor IsNot Nothing Then
+                        ' preferiamo chiamare l'overload esplicito se disponibile
+                        Try
+                            editor.SaveFrame(frameIndex, editor.DrawingBitmap)
+                        Catch
+                            ' fallback alla wrapper senza parametri
+                            editor.SaveFrame(frameIndex, editor.DrawingBitmap)
+                        End Try
+                    End If
+                Catch ex As Exception
+                    Throw New Exception("Impossibile salvare l'overlay: " & ex.Message)
+                End Try
+
+                ' azzera flag solo dopo salvataggio overlay
+                hasUnsavedChanges = False
+                Try : editor.HasUnsavedChanges = False : Catch : End Try
+            End If
+
+            ' 2) Salva/aggiorna la nota nel DB (se testo non vuoto oppure se c'è disegno vogliamo comunque registrare la nota)
+            If Not String.IsNullOrWhiteSpace(nota) OrElse Not drawingEmpty Then
+                Using conn As New SqlConnection(ConnString)
+                    conn.Open()
+                    Using cmd As New SqlCommand("
+MERGE INTO Mov_FrameNote AS target
+USING (SELECT @RevID AS RevisioneID, @FrameIndex AS FrameIndex) AS source
+ON target.RevisioneID = source.RevisioneID AND target.FrameIndex = source.FrameIndex
+WHEN MATCHED THEN
+    UPDATE SET TestoNota = @TestoNota, NomeUtente = @NomeUtente, DataNota = @DataNota
+WHEN NOT MATCHED THEN
+    INSERT (RevisioneID, FrameIndex, TestoNota, NomeUtente, DataNota)
+    VALUES (@RevID, @FrameIndex, @TestoNota, @NomeUtente, @DataNota);", conn)
+                        cmd.Parameters.Add("@RevID", SqlDbType.Int).Value = revisioneID
+                        cmd.Parameters.Add("@FrameIndex", SqlDbType.Int).Value = frameIndex
+                        cmd.Parameters.Add("@TestoNota", SqlDbType.NVarChar, 2000).Value = If(String.IsNullOrEmpty(nota), String.Empty, nota)
+                        cmd.Parameters.Add("@NomeUtente", SqlDbType.NVarChar, 100).Value = nomeUtente
+                        cmd.Parameters.Add("@DataNota", SqlDbType.DateTime).Value = DateTime.Now
+                        cmd.ExecuteNonQuery()
+                    End Using
+                End Using
+            End If
+
+            ' 3) Aggiorna UI e segnalini
+            If Me.InvokeRequired Then
+                Me.BeginInvoke(New Action(Sub()
+                                              AggiornaNoteDaDatabase(revisioneID)
+                                              RefreshLstNoteFrame()
+                                              UpdateSegnaliniNote(revisioneID)
+                                          End Sub))
+            Else
+                AggiornaNoteDaDatabase(revisioneID)
+                RefreshLstNoteFrame()
+                UpdateSegnaliniNote(revisioneID)
+            End If
+
+            ' 4) Assicura che i flag siano azzerati dopo salvataggio
+            hasUnsavedChanges = False
+            Try : editor.HasUnsavedChanges = False : Catch : End Try
+
+            MDIMessageBox.Show("Operazione completata: nota e/o overlay salvati.", Me.MdiParent, MessageBoxButtons.OK)
+        Catch ex As Exception
+            MDIMessageBox.Show("Errore durante il salvataggio: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+        End Try
+    End Sub
+
+
+    ' Disegna i segnalini rossi sopra la TrackBar
+    Private Sub DisegnaSegnaliniNote(sender As Object, e As PaintEventArgs)
+        Try
+            If FrameConNote Is Nothing OrElse FrameConNote.Count = 0 Then Return
+            If TrackFrame Is Nothing Then Return
+
+            Dim minVal = TrackFrame.Minimum
+            Dim maxVal = TrackFrame.Maximum
+            ' se non ci sono range validi, esci
+            If maxVal <= minVal Then Return
+
+            ' larghezza utile: togli spazio per thumb e bordi (aggiusta se necessario)
+            Dim trackClientWidth = Math.Max(1, TrackFrame.Width - 22)
+            Dim totale = maxVal - minVal
+
+            Dim g = e.Graphics
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias
+
+            For Each index In FrameConNote
+                If index < minVal OrElse index > maxVal Then Continue For
+                Dim percentuale As Double = (index - minVal) / CDbl(totale)
+                Dim x = CInt(percentuale * trackClientWidth)
+                Dim rectX = x + 11 ' offset per allineare con il centro della thumb
+                Dim rect = New System.Drawing.Rectangle(rectX, 0, 6, 10)
+                Using b As New System.Drawing.SolidBrush(System.Drawing.Color.Red)
+                    g.FillRectangle(b, rect)
+                End Using
+            Next
+        Catch ex As Exception
+            ' non bloccare UI: loggare se serve
+            Try
+                Dim logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "VideoFBF_draw.log")
+                System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - DisegnaSegnaliniNote error: {ex.Message}{Environment.NewLine}")
+            Catch : End Try
+        End Try
+    End Sub
+
+    ' Aggiorna i segnalini: ricarica note e forza ridisegno overlay e trackbar
+    Private Sub UpdateSegnaliniNote(Optional revisioneID As Integer = -1)
+        Try
+            Dim revID As Integer = revisioneID
+            If revID < 0 Then
+                If Not TryParseRevisioneID(lblRevAttiva.Text, revID) Then revID = -1
+            End If
+
+            If revID >= 0 Then
+                AggiornaNoteDaDatabase(revID)
+            Else
+                RefreshLstNoteFrame()
+            End If
+        Catch
+            ' ignora errori di popolamento
+        End Try
+
+        ' Forza creazione/posizionamento del pannello overlay e ridisegno
+        Try
+            Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
+            If overlay Is Nothing Then
+                Dim nuovoOverlay As New Panel With {
+                .Width = TrackFrame.Width,
+                .Height = 10,
+                .Location = New Point(TrackFrame.Left, TrackFrame.Top - 10),
+                .BackColor = System.Drawing.Color.Transparent,
+                .Name = "OverlayNotePanel"
+            }
+                Me.Controls.Add(nuovoOverlay)
+                AddHandler nuovoOverlay.Paint, AddressOf DisegnaSegnaliniNote
+                nuovoOverlay.BringToFront()
+            Else
+                ' aggiorna dimensione/posizione in caso di resize o spostamento
+                overlay.Width = TrackFrame.Width
+                overlay.Location = New Point(TrackFrame.Left, TrackFrame.Top - overlay.Height)
+                overlay.Invalidate()
+                overlay.BringToFront()
+            End If
+        Catch
+        End Try
+
+        Try
+            TrackFrame.Invalidate()
+            TrackFrame.Update()
+        Catch
+        End Try
+    End Sub
+
+
+    ' ---------------------------
+    ' SaveOverlayAnchored helper (fallback)
+    ' ---------------------------
+    Private Sub SaveOverlayAnchored(drawingBmp As Bitmap, baseFramePath As String, overlayPath As String)
+        If drawingBmp Is Nothing Then Return
+        If String.IsNullOrWhiteSpace(baseFramePath) Then Return
+
+        Dim baseWidth As Integer = 1, baseHeight As Integer = 1
+        Try
+            Using fs As New FileStream(baseFramePath, FileMode.Open, FileAccess.Read, FileShare.Read)
+                Using ms As New MemoryStream()
+                    fs.CopyTo(ms)
+                    ms.Position = 0
+                    Using tmpImg As Image = Image.FromStream(ms)
+                        baseWidth = Math.Max(1, tmpImg.Width)
+                        baseHeight = Math.Max(1, tmpImg.Height)
+                    End Using
+                End Using
+            End Using
+        Catch
+            baseWidth = Math.Max(1, drawingBmp.Width)
+            baseHeight = Math.Max(1, drawingBmp.Height)
+        End Try
+
+        Using bmpToSave As New Bitmap(baseWidth, baseHeight, Imaging.PixelFormat.Format32bppArgb)
+            Using g As Graphics = Graphics.FromImage(bmpToSave)
+                g.Clear(Color.Transparent)
+                Dim drawW = Math.Min(drawingBmp.Width, baseWidth)
+                Dim drawH = Math.Min(drawingBmp.Height, baseHeight)
+                g.DrawImage(drawingBmp, 0, 0, drawW, drawH)
+            End Using
+            SafeWriteBitmapAtomic(bmpToSave, overlayPath)
+        End Using
+    End Sub
+
+    ' ---------------------------
+    ' SafeDeleteFileEnhanced (VideoFBF)
+    ' ---------------------------
+    Private Function SafeDeleteFileEnhanced(path As String, Optional maxAttempts As Integer = 6) As Boolean
+        If String.IsNullOrWhiteSpace(path) Then Return False
+        If Not System.IO.File.Exists(path) Then Return True
+
+        Dim attempts As Integer = 0
+        Dim lastEx As Exception = Nothing
+
+        While attempts < maxAttempts
+            attempts += 1
+            Try
+                System.IO.File.Delete(path)
+                Return True
+            Catch ex As System.IO.IOException
+                lastEx = ex
+                Threading.Thread.Sleep(100 * attempts)
+            Catch ex As UnauthorizedAccessException
+                lastEx = ex
+                Threading.Thread.Sleep(100 * attempts)
+            Catch ex As Exception
+                lastEx = ex
+                Exit While
+            End Try
+        End While
+
+        ' Prova a sovrascrivere con 1x1 PNG trasparente e poi cancellare
+        Try
+            Dim dir = System.IO.Path.GetDirectoryName(path)
+            If String.IsNullOrWhiteSpace(dir) Then dir = System.IO.Path.GetTempPath()
+            If Not System.IO.Directory.Exists(dir) Then System.IO.Directory.CreateDirectory(dir)
+
+            Dim tmp = System.IO.Path.Combine(dir, System.IO.Path.GetFileNameWithoutExtension(path) & "_tmp" & System.IO.Path.GetExtension(path))
+            Try
+                Using emptyBmp As New System.Drawing.Bitmap(1, 1, System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+                    Using g As System.Drawing.Graphics = System.Drawing.Graphics.FromImage(emptyBmp)
+                        g.Clear(System.Drawing.Color.Transparent)
+                    End Using
+                    emptyBmp.Save(tmp, System.Drawing.Imaging.ImageFormat.Png)
+                End Using
+
+                If System.IO.File.Exists(path) Then
+                    Try
+                        System.IO.File.Replace(tmp, path, Nothing)
+                    Catch ex As PlatformNotSupportedException
+                        Try : System.IO.File.Delete(path) : Catch : End Try
+                        System.IO.File.Move(tmp, path)
+                    End Try
+                Else
+                    System.IO.File.Move(tmp, path)
+                End If
+
+                Try
+                    System.IO.File.Delete(path)
+                    Return True
+                Catch
+                    ' fallthrough: tenteremo altre strategie/logging
+                End Try
+            Finally
+                If System.IO.File.Exists(tmp) Then
+                    Try : System.IO.File.Delete(tmp) : Catch : End Try
+                End If
+            End Try
+        Catch ex As Exception
+            lastEx = ex
+        End Try
+
+        Try
+            Dim logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "VideoFBF_delete.log")
+            Dim msg = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - SafeDeleteFileEnhanced failed for {path} : {If(lastEx IsNot Nothing, lastEx.Message, "unknown")}{Environment.NewLine}"
+            System.IO.File.AppendAllText(logPath, msg)
+        Catch
+            ' ignore logging errors
+        End Try
+
+        Return False
+    End Function
+
+
+    ' ---------------------------
+    ' SafeWriteBitmapAtomic (VideoFBF)
+    ' ---------------------------
+    Private Sub SafeWriteBitmapAtomic(bmp As System.Drawing.Bitmap, dstPath As String)
+        If bmp Is Nothing OrElse String.IsNullOrWhiteSpace(dstPath) Then Return
+        Dim dir = Path.GetDirectoryName(dstPath)
+        If Not Directory.Exists(dir) Then Directory.CreateDirectory(dir)
+        Dim tmp = Path.Combine(dir, Path.GetFileNameWithoutExtension(dstPath) & "_tmp" & Path.GetExtension(dstPath))
+        Try
+            If File.Exists(tmp) Then
+                Try : File.Delete(tmp) : Catch : End Try
+            End If
+            bmp.Save(tmp, Imaging.ImageFormat.Png)
+            If File.Exists(dstPath) Then
+                Try
+                    File.Replace(tmp, dstPath, Nothing)
+                Catch ex As PlatformNotSupportedException
+                    If File.Exists(dstPath) Then
+                        Try : File.Delete(dstPath) : Catch : End Try
+                    End If
+                    File.Move(tmp, dstPath)
+                End Try
+            Else
+                File.Move(tmp, dstPath)
+            End If
+        Finally
+            If File.Exists(tmp) Then
+                Try : File.Delete(tmp) : Catch : End Try
+            End If
+        End Try
+    End Sub
+
+
+    ' --- DTO ListView Note ---
+    Public Class NotaFrameInfo
+        Public Property FrameIndex As Integer
+        Public Property TestoNota As String
+        Public Property Autore As String
+        Public Property DataNota As DateTime
+    End Class
+
+
 End Class

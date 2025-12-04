@@ -79,91 +79,100 @@ Public Class VideoEditor
         End SyncLock
     End Function
 
-    Public Sub SaveFrame()
-        Dim idx = Me.CurrentIndex
-        If idx < 0 OrElse idx >= FrameList.Count Then Return
-        If String.IsNullOrWhiteSpace(VideoFBF.txtNote.Text) Then
-            MDIMessageBox.Show("Nessuna nota da salvare", GesPu25, MessageBoxButtons.OK)
+    ' -----------------------------
+    ' SaveFrame overload: salva overlay in modo atomico
+    ' -----------------------------
+    Public Sub SaveFrame(frameIndex As Integer, drawingBmp As Bitmap)
+        If frameIndex < 0 OrElse FrameList Is Nothing OrElse frameIndex >= FrameList.Count Then
+            Throw New ArgumentOutOfRangeException(NameOf(frameIndex))
+        End If
+
+        If drawingBmp Is Nothing Then
+            ' Non c'è disegno: niente da salvare qui (gestione DB rimane a chiama)
             Return
         End If
 
-        Dim framePath = FrameList(idx)
-        If Microsoft.VisualBasic.Strings.Right(framePath, 12) = "_overlay.png" Then
-            framePath = Microsoft.VisualBasic.Strings.Left(framePath, Len(framePath) - 12)
-        End If
-        Dim overlayPath = Path.Combine(Path.GetDirectoryName(framePath), Path.GetFileNameWithoutExtension(framePath) & "_overlay.png")
-        Dim tempOverlay = Path.Combine(Path.GetDirectoryName(framePath), Path.GetFileNameWithoutExtension(framePath) & "_overlay_tmp.png")
-        Dim logPath = Path.Combine(Path.GetTempPath(), "VideoEditor_save.log")
+        Dim basePath = FrameList(frameIndex)
+        Dim overlayPath = Path.Combine(Path.GetDirectoryName(basePath), Path.GetFileNameWithoutExtension(basePath) & "_overlay.png")
+        Dim tempPath As String = Nothing
 
         SyncLock Me
             Try
-                ' Verifica che DrawingBitmap esista
-                If DrawingBitmap Is Nothing Then Return
-
-                ' Carica dimensioni del base per garantire che l'overlay abbia la stessa risoluzione
-                Dim baseWidth As Integer = 0
-                Dim baseHeight As Integer = 0
+                ' Determina dimensioni del base (fallback alle dimensioni del drawing)
+                Dim baseWidth As Integer = Math.Max(1, drawingBmp.Width)
+                Dim baseHeight As Integer = Math.Max(1, drawingBmp.Height)
                 Try
-                    Using fs As New FileStream(framePath, FileMode.Open, FileAccess.Read, FileShare.Read)
-                        Using tmpMs As New MemoryStream()
-                            fs.CopyTo(tmpMs)
-                            tmpMs.Position = 0
-                            Using tmpImg As Image = Image.FromStream(tmpMs)
-                                baseWidth = tmpImg.Width
-                                baseHeight = tmpImg.Height
+                    Using fs As New FileStream(basePath, FileMode.Open, FileAccess.Read, FileShare.Read)
+                        Using ms As New MemoryStream()
+                            fs.CopyTo(ms)
+                            ms.Position = 0
+                            Using tmpImg As Image = Image.FromStream(ms)
+                                baseWidth = Math.Max(1, tmpImg.Width)
+                                baseHeight = Math.Max(1, tmpImg.Height)
                             End Using
                         End Using
                     End Using
-                Catch ex As Exception
-                    ' Se non riusciamo a leggere il base, usiamo le dimensioni del DrawingBitmap
-                    baseWidth = DrawingBitmap.Width
-                    baseHeight = DrawingBitmap.Height
+                Catch
+                    ' se non riesce a leggere il base, usiamo dimensioni del drawing
+                    baseWidth = Math.Max(1, drawingBmp.Width)
+                    baseHeight = Math.Max(1, drawingBmp.Height)
                 End Try
 
-                ' Prepara bitmap da salvare: non comporre overlay precedente, crea una bitmap trasparente delle dimensioni del base
+                ' Crea bitmap trasparente delle dimensioni del base e disegna il drawing in alto a sinistra
                 Using bmpToSave As New Bitmap(baseWidth, baseHeight, Imaging.PixelFormat.Format32bppArgb)
                     Using g As Graphics = Graphics.FromImage(bmpToSave)
-                        g.Clear(System.Drawing.Color.FromArgb(0, 0, 0, 0))   ' ARGB: alpha = 0 (completamente trasparente)
-                        ' Se DrawingBitmap ha dimensioni diverse, scala o posiziona al centro a seconda delle esigenze
-                        If DrawingBitmap.Width = baseWidth AndAlso DrawingBitmap.Height = baseHeight Then
-                            g.DrawImage(DrawingBitmap, 0, 0)
-                        Else
-                            ' disegna in alto a sinistra senza scalare (evita composizioni multiple)
-                            g.DrawImage(DrawingBitmap, 0, 0, Math.Min(DrawingBitmap.Width, baseWidth), Math.Min(DrawingBitmap.Height, baseHeight))
-                        End If
+                        g.Clear(System.Drawing.Color.Transparent)
+                        Dim drawW = Math.Min(drawingBmp.Width, baseWidth)
+                        Dim drawH = Math.Min(drawingBmp.Height, baseHeight)
+                        g.DrawImage(drawingBmp, 0, 0, drawW, drawH)
                     End Using
 
-                    ' Salva su file temporaneo (sovrascrive temp se esiste)
-                    If File.Exists(tempOverlay) Then
-                        Try : File.Delete(tempOverlay) : Catch : End Try
+                    ' Salvataggio atomico su file (tmp -> replace/move)
+                    Dim dir = Path.GetDirectoryName(overlayPath)
+                    If Not Directory.Exists(dir) Then Directory.CreateDirectory(dir)
+                    tempPath = Path.Combine(dir, Path.GetFileNameWithoutExtension(overlayPath) & "_tmp" & Path.GetExtension(overlayPath))
+
+                    ' Rimuovi tmp precedente se esiste
+                    If File.Exists(tempPath) Then
+                        Try : File.Delete(tempPath) : Catch : End Try
                     End If
-                    bmpToSave.Save(tempOverlay, ImageFormat.Png)
+
+                    bmpToSave.Save(tempPath, Imaging.ImageFormat.Png)
+
+                    ' Sostituzione atomica
+                    If File.Exists(overlayPath) Then
+                        Try
+                            File.Replace(tempPath, overlayPath, Nothing)
+                        Catch ex As PlatformNotSupportedException
+                            ' fallback: delete + move
+                            Try : File.Delete(overlayPath) : Catch : End Try
+                            File.Move(tempPath, overlayPath)
+                        End Try
+                    Else
+                        File.Move(tempPath, overlayPath)
+                    End If
                 End Using
 
-                ' Sostituzione atomica dell'overlay
+                ' Pulizia stato undo/state stack: dopo il salvataggio consideriamo lo stato salvato
                 Try
-                    If File.Exists(overlayPath) Then
-                        File.Replace(tempOverlay, overlayPath, Nothing)
-                    Else
-                        File.Move(tempOverlay, overlayPath)
+                    If stateStack IsNot Nothing Then
+                        For Each b In stateStack
+                            Try : b.Dispose() : Catch : End Try
+                        Next
+                        stateStack.Clear()
                     End If
-                Catch ex As PlatformNotSupportedException
-                    If File.Exists(overlayPath) Then File.Delete(overlayPath)
-                    File.Move(tempOverlay, overlayPath)
+                Catch
                 End Try
 
-                ' Pulisci stack e stato
-                If stateStack IsNot Nothing Then
-                    For Each b In stateStack
-                        Try : b.Dispose() : Catch : End Try
-                    Next
-                    stateStack.Clear()
-                End If
+                ' Aggiorna flag
                 HasUnsavedChanges = False
-
+                Try : UndoStack.Clear() : Catch : End Try
             Catch ex As Exception
+                ' Se qualcosa va storto, tenta di rimuovere tmp e rilancia per far gestire l'errore al chiamante
                 Try
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - SaveFrame error: {ex.Message}{Environment.NewLine}")
+                    If Not String.IsNullOrEmpty(tempPath) AndAlso File.Exists(tempPath) Then
+                        Try : File.Delete(tempPath) : Catch : End Try
+                    End If
                 Catch
                 End Try
                 Throw
@@ -172,11 +181,9 @@ Public Class VideoEditor
     End Sub
 
 
-    ' Public method to clear any in-memory annotations for a specific frame index
     Public Sub ClearFrameAnnotations(index As Integer)
         If index < 0 OrElse index >= FrameList.Count Then Return
 
-        ' Remove FrameNote entry if present
         Try
             If FrameNote IsNot Nothing AndAlso FrameNote.ContainsKey(index) Then
                 FrameNote.Remove(index)
@@ -184,9 +191,7 @@ Public Class VideoEditor
         Catch
         End Try
 
-        ' Clear any undo/state entries that refer to this frame (if you store per-frame stacks)
         Try
-            ' If you keep a global stateStack for the current frame, clear it
             If stateStack IsNot Nothing Then
                 For Each b In stateStack
                     Try : CType(b, Bitmap).Dispose() : Catch : End Try
@@ -196,7 +201,6 @@ Public Class VideoEditor
         Catch
         End Try
 
-        ' Reset drawing bitmap for safety
         Try
             If DrawingBitmap IsNot Nothing Then
                 DrawingBitmap.Dispose()
@@ -208,16 +212,12 @@ Public Class VideoEditor
         HasUnsavedChanges = False
     End Sub
 
-    ' ----------------------------
-    ' LoadFrame (carica base + overlay se presente, robusto)
-    ' ----------------------------
     Public Function LoadFrame(index As Integer) As Bitmap
         If index < 0 OrElse index >= FrameList.Count Then Return Nothing
 
         Dim basePath = FrameList(index)
         Dim baseBmp As Bitmap = Nothing
 
-        ' Carica immagine principale senza lock del file
         Try
             Using fs As New FileStream(basePath, FileMode.Open, FileAccess.Read, FileShare.Read)
                 Using ms As New MemoryStream()
@@ -232,7 +232,6 @@ Public Class VideoEditor
             Throw New IOException($"Impossibile caricare il frame: {basePath}", ex)
         End Try
 
-        ' Applica overlay se presente (file *_overlay.png)
         Try
             Dim overlayPath = Path.Combine(Path.GetDirectoryName(basePath), Path.GetFileNameWithoutExtension(basePath) & "_overlay.png")
             If File.Exists(overlayPath) Then
@@ -251,18 +250,17 @@ Public Class VideoEditor
                         End Using
                     End Using
                 Catch ex As FileNotFoundException
-                    ' overlay cancellato tra Exists e Open: ignoriamo
+                    ' overlay cancellato 
                 Catch ex As IOException
-                    ' lock o I/O temporaneo: ignoriamo overlay
+                    ' lock o I/O temporaneo
                 Catch
-                    ' altri errori: non bloccare il caricamento del frame base
+                    ' altri errori
                 End Try
             End If
         Catch
-            ' sicurezza: non propagare errori di overlay
+            ' sicurezza
         End Try
 
-        ' Aggiorna DrawingBitmap
         If DrawingBitmap IsNot Nothing Then
             Try : DrawingBitmap.Dispose() : Catch : End Try
             DrawingBitmap = Nothing
@@ -297,13 +295,8 @@ Public Class VideoEditor
         Return 30.0 ' fallback
     End Function
 
-    Public Sub RebuildVideo(outputPath As String)
-        ' Implementazione esistente per ricostruire il video dai frame
-    End Sub
-
     Public Sub PrepareDrawingBitmapForEditing(frameIndex As Integer)
         If frameIndex < 0 OrElse FrameList Is Nothing OrElse frameIndex >= FrameList.Count Then
-            ' fallback: crea una 1x1 trasparente per evitare NullReference
             Try
                 If DrawingBitmap IsNot Nothing Then
                     DrawingBitmap.Dispose()
@@ -319,7 +312,7 @@ Public Class VideoEditor
                 End If
             Catch
             End Try
-        Return
+            Return
         End If
 
         Dim basePath = FrameList(frameIndex)
@@ -338,10 +331,9 @@ Public Class VideoEditor
                 End Using
             End Using
         Catch
-            ' se non riesce a leggere il base, mantieni fallback 1x1
+            ' se non riesce a leggere base
         End Try
 
-        ' Sostituisci DrawingBitmap in modo sicuro
         Try
             If DrawingBitmap IsNot Nothing Then
                 Try : DrawingBitmap.Dispose() : Catch : End Try
@@ -378,9 +370,18 @@ Public Class VideoEditor
         HasUnsavedChanges = False
     End Sub
 
+    Public Sub RebuildVideo(outputPath As String)
+        Dim ffmpegArgs As String = $"-framerate {framerate.ToString(CultureInfo.InvariantCulture)} -i ""{FrameDirectory}\frame_%04d.png"" -c:v libx264 -pix_fmt yuv420p ""{outputPath}"""
+        Dim proc As New Process()
+        proc.StartInfo = New ProcessStartInfo("ffmpeg.exe", ffmpegArgs) With {
+            .CreateNoWindow = True,
+            .UseShellExecute = False
+        }
+        proc.Start()
+        proc.WaitForExit()
+    End Sub
 
 End Class
-
 
 Public Class FrameNota
     Public Property Testo As String

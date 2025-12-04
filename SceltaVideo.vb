@@ -16,6 +16,9 @@ Public Class SceltaVideo
     End Sub
 
     Private Sub CaricaRevisioni()
+        Cursor.Current = Cursors.WaitCursor
+        Application.DoEvents()
+
         Dim nomeUtente As String = SessioneUtente.NomeUtenteCorrente
         Dim dt As New DataTable()
 
@@ -66,6 +69,8 @@ Public Class SceltaVideo
 
         dgvRevisioni.ReadOnly = True
 
+        Cursor.Current = Cursors.Default
+        Application.DoEvents()
     End Sub
 
     Private Sub dgvRevisioni_KeyDown(sender As Object, e As KeyEventArgs) Handles dgvRevisioni.KeyDown
@@ -249,6 +254,10 @@ Public Class SceltaVideo
     End Function
 
     Private Sub dgvRevisioni_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvRevisioni.CellDoubleClick
+
+        Cursor.Current = Cursors.WaitCursor
+        Application.DoEvents()
+
         If e.RowIndex < 0 Then Exit Sub
 
         Dim row = dgvRevisioni.Rows(e.RowIndex)
@@ -286,7 +295,11 @@ Public Class SceltaVideo
         Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
         overlay?.Invalidate()
 
+        Cursor.Current = Cursors.Default
+        Application.DoEvents()
+
         Me.Close()
+
     End Sub
 
     Private Sub txtFiltro_TextChanged(sender As Object, e As EventArgs) Handles txtFiltro.TextChanged
