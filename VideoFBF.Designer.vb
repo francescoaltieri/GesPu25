@@ -63,6 +63,8 @@ Partial Class VideoFBF
         lblFrameAttivo = New Label()
         Label6 = New Label()
         lblTotFrames = New Label()
+        ChkZoom = New CheckBox()
+        panelViewer = New Panel()
         CType(picFrame, ComponentModel.ISupportInitialize).BeginInit()
         CType(TrackFrame, ComponentModel.ISupportInitialize).BeginInit()
         GroupBox1.SuspendLayout()
@@ -70,6 +72,7 @@ Partial Class VideoFBF
         GroupBox2.SuspendLayout()
         GroupBox3.SuspendLayout()
         GroupBox4.SuspendLayout()
+        panelViewer.SuspendLayout()
         SuspendLayout()
         ' 
         ' btnCaricaVideo
@@ -83,9 +86,9 @@ Partial Class VideoFBF
         ' 
         ' btnSalvaVideo
         ' 
-        btnSalvaVideo.Location = New Point(1456, 817)
+        btnSalvaVideo.Location = New Point(1325, 842)
         btnSalvaVideo.Name = "btnSalvaVideo"
-        btnSalvaVideo.Size = New Size(120, 42)
+        btnSalvaVideo.Size = New Size(251, 42)
         btnSalvaVideo.TabIndex = 2
         btnSalvaVideo.Text = "Esporta Video"
         btnSalvaVideo.UseVisualStyleBackColor = True
@@ -93,15 +96,15 @@ Partial Class VideoFBF
         ' picFrame
         ' 
         picFrame.BorderStyle = BorderStyle.Fixed3D
-        picFrame.Location = New Point(12, 40)
+        picFrame.Location = New Point(3, 3)
         picFrame.Name = "picFrame"
-        picFrame.Size = New Size(1299, 700)
+        picFrame.Size = New Size(1026, 606)
         picFrame.TabIndex = 3
         picFrame.TabStop = False
         ' 
         ' btnPrecedente
         ' 
-        btnPrecedente.Location = New Point(138, 818)
+        btnPrecedente.Location = New Point(138, 843)
         btnPrecedente.Name = "btnPrecedente"
         btnPrecedente.Size = New Size(127, 41)
         btnPrecedente.TabIndex = 4
@@ -110,7 +113,7 @@ Partial Class VideoFBF
         ' 
         ' btnSuccessivo
         ' 
-        btnSuccessivo.Location = New Point(271, 818)
+        btnSuccessivo.Location = New Point(271, 843)
         btnSuccessivo.Name = "btnSuccessivo"
         btnSuccessivo.Size = New Size(127, 41)
         btnSuccessivo.TabIndex = 5
@@ -123,7 +126,7 @@ Partial Class VideoFBF
         ' 
         ' btnAnnulla
         ' 
-        btnAnnulla.Location = New Point(1045, 819)
+        btnAnnulla.Location = New Point(1045, 844)
         btnAnnulla.Name = "btnAnnulla"
         btnAnnulla.Size = New Size(120, 42)
         btnAnnulla.TabIndex = 10
@@ -132,7 +135,7 @@ Partial Class VideoFBF
         ' 
         ' btnPrimoFrame
         ' 
-        btnPrimoFrame.Location = New Point(12, 817)
+        btnPrimoFrame.Location = New Point(12, 842)
         btnPrimoFrame.Name = "btnPrimoFrame"
         btnPrimoFrame.Size = New Size(120, 41)
         btnPrimoFrame.TabIndex = 12
@@ -141,7 +144,7 @@ Partial Class VideoFBF
         ' 
         ' btnUltimoFrame
         ' 
-        btnUltimoFrame.Location = New Point(404, 817)
+        btnUltimoFrame.Location = New Point(404, 842)
         btnUltimoFrame.Name = "btnUltimoFrame"
         btnUltimoFrame.Size = New Size(120, 41)
         btnUltimoFrame.TabIndex = 13
@@ -150,7 +153,7 @@ Partial Class VideoFBF
         ' 
         ' btnAvantiVeloce
         ' 
-        btnAvantiVeloce.Location = New Point(706, 818)
+        btnAvantiVeloce.Location = New Point(706, 843)
         btnAvantiVeloce.Name = "btnAvantiVeloce"
         btnAvantiVeloce.Size = New Size(120, 41)
         btnAvantiVeloce.TabIndex = 14
@@ -159,7 +162,7 @@ Partial Class VideoFBF
         ' 
         ' btnIndietroVeloce
         ' 
-        btnIndietroVeloce.Location = New Point(580, 818)
+        btnIndietroVeloce.Location = New Point(580, 843)
         btnIndietroVeloce.Name = "btnIndietroVeloce"
         btnIndietroVeloce.Size = New Size(120, 41)
         btnIndietroVeloce.TabIndex = 15
@@ -168,7 +171,7 @@ Partial Class VideoFBF
         ' 
         ' TrackFrame
         ' 
-        TrackFrame.Location = New Point(12, 766)
+        TrackFrame.Location = New Point(12, 781)
         TrackFrame.Name = "TrackFrame"
         TrackFrame.Size = New Size(1299, 45)
         TrackFrame.TabIndex = 16
@@ -372,7 +375,7 @@ Partial Class VideoFBF
         ' 
         ' BtnRipristinaFrame
         ' 
-        BtnRipristinaFrame.Location = New Point(1171, 819)
+        BtnRipristinaFrame.Location = New Point(1171, 844)
         BtnRipristinaFrame.Name = "BtnRipristinaFrame"
         BtnRipristinaFrame.Size = New Size(120, 42)
         BtnRipristinaFrame.TabIndex = 31
@@ -423,12 +426,34 @@ Partial Class VideoFBF
         lblTotFrames.TabIndex = 35
         lblTotFrames.Text = "Tot Frame"
         ' 
+        ' ChkZoom
+        ' 
+        ChkZoom.AutoSize = True
+        ChkZoom.Location = New Point(1327, 807)
+        ChkZoom.Name = "ChkZoom"
+        ChkZoom.Size = New Size(201, 19)
+        ChkZoom.TabIndex = 36
+        ChkZoom.Text = "Abilita Zoom e Disabilita Disegno"
+        ChkZoom.UseVisualStyleBackColor = True
+        ' 
+        ' panelViewer
+        ' 
+        panelViewer.AutoScroll = True
+        panelViewer.Controls.Add(picFrame)
+        panelViewer.Location = New Point(12, 40)
+        panelViewer.Name = "panelViewer"
+        panelViewer.Size = New Size(1289, 729)
+        panelViewer.TabIndex = 37
+        ' 
         ' VideoFBF
         ' 
         AllowDrop = True
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(1585, 871)
+        AutoScroll = True
+        ClientSize = New Size(1585, 894)
+        Controls.Add(panelViewer)
+        Controls.Add(ChkZoom)
         Controls.Add(lblTotFrames)
         Controls.Add(Label6)
         Controls.Add(lblFrameAttivo)
@@ -450,7 +475,6 @@ Partial Class VideoFBF
         Controls.Add(btnAnnulla)
         Controls.Add(btnSuccessivo)
         Controls.Add(btnPrecedente)
-        Controls.Add(picFrame)
         Controls.Add(btnSalvaVideo)
         Controls.Add(btnCaricaVideo)
         Controls.Add(TrackFrame)
@@ -468,6 +492,7 @@ Partial Class VideoFBF
         GroupBox3.ResumeLayout(False)
         GroupBox3.PerformLayout()
         GroupBox4.ResumeLayout(False)
+        panelViewer.ResumeLayout(False)
         ResumeLayout(False)
         PerformLayout()
     End Sub
@@ -513,5 +538,7 @@ Partial Class VideoFBF
     Friend WithEvents Frame As ColumnHeader
     Friend WithEvents Nota As ColumnHeader
     Friend WithEvents Utente As ColumnHeader
+    Friend WithEvents ChkZoom As CheckBox
+    Friend WithEvents panelViewer As Panel
 
 End Class

@@ -18,7 +18,7 @@ Public Class Login
 
     Private Sub BtnLogin_Click(sender As Object, e As EventArgs) Handles BtnLogin.Click
         Try
-            Dim query As String = "SELECT NomeUtente FROM Sys_Utenti WHERE NomeUtente = @nome AND Password = @password"
+            Dim query As String = "SELECT NomeUtente FROM Tab_Utenti WHERE NomeUtente = @nome AND Password = @password"
             Dim Cripta As New CriptaHash
             Dim hashedPassword = Cripta.HashPassword(txtPassword.Text)
             Dim utenteAutenticato As Object = Nothing

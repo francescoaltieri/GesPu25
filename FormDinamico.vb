@@ -2953,7 +2953,7 @@ Public Class DynamicDataForm
                 conn.Open()
 
                 Dim isAdmin As Boolean = False
-                Dim queryAdmin = "SELECT ISNULL(Amministratore, 0) FROM Sys_Utenti WHERE NomeUtente = @utente"
+                Dim queryAdmin = "SELECT ISNULL(Amministratore, 0) FROM Tab_Utenti WHERE NomeUtente = @utente"
 
                 Using cmdAdmin As New SqlCommand(queryAdmin, conn)
                     cmdAdmin.Parameters.AddWithValue("@utente", nomeUtente)

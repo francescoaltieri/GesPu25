@@ -1,10 +1,20 @@
 ﻿Imports System.IO
+Imports System.Data
+Imports System.Linq
+Imports System.Threading
 Imports Microsoft.Data.SqlClient
 
 Public Class SceltaVideo
 
     Public Property RevisioneSelezionata As RevisioneParametri
     Private videoFormDestinazione As VideoFBF
+
+    ' Cache per PercorsoFrames e PercrsoTempFolder
+    Private _cachedPercorsoFrames As String = Nothing
+    Private _cachedPercorsoFramesLoaded As Boolean = False
+    Private _cachedPercorsoTemp As String = Nothing
+    Private _cachedPercorsoTempLoaded As Boolean = False
+    Private ReadOnly _cacheLock As New Object()
 
     Public Sub New(destinazione As VideoFBF)
         InitializeComponent()
@@ -24,21 +34,21 @@ Public Class SceltaVideo
 
         Using conn As New SqlConnection(ConnString)
             Dim query As String = "
-        SELECT 
-            R.RevisioneID,
-            R.DataRevisione,
-            V.VideoID,
-            V.Titolo AS TitoloVideo,
-            R.Autore,
-            R.NumRetake,
-            R.Stato,
-            R.Approvato,
-            R.Note
-        FROM Mov_Revisioni R
-        INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
-        INNER JOIN Mov_RevisioniUtente UR ON R.RevisioneID = UR.RevisioneID
-        WHERE UR.NomeUtente = @NomeUtente
-        ORDER BY V.Titolo, R.DataRevisione ASC;"
+SELECT
+    R.RevisioneID,
+    R.DataRevisione,
+    V.VideoID,
+    V.Titolo AS TitoloVideo,
+    R.Autore,
+    R.NumRetake,
+    R.Stato,
+    R.Approvato,
+    R.Note
+FROM Mov_Revisioni R
+INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
+INNER JOIN Mov_RevisioniUtente UR ON R.RevisioneID = UR.RevisioneID
+WHERE UR.NomeUtente = @NomeUtente
+ORDER BY V.Titolo, R.DataRevisione ASC;"
 
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
@@ -49,22 +59,22 @@ Public Class SceltaVideo
             End Using
         End Using
 
-        ' Aggiungi colonna calcolata: NumeroRevisione
-        dt.Columns.Add("NumeroRevisione", GetType(String))
+        If Not dt.Columns.Contains("NumeroRevisione") Then
+            dt.Columns.Add("NumeroRevisione", GetType(String))
+        End If
+
         For Each row As DataRow In dt.Rows
             Dim revisioneID As Integer = CInt(row("RevisioneID"))
             row("NumeroRevisione") = $"Revisione_{revisioneID:000}"
         Next
 
         dgvRevisioni.DataSource = dt
-        dgvRevisioni.Columns("VideoID").Visible = False
-        dgvRevisioni.Columns("RevisioneID").Visible = False
-        dgvRevisioni.Columns("NumeroRevisione").DisplayIndex = 0
+        If dgvRevisioni.Columns.Contains("VideoID") Then dgvRevisioni.Columns("VideoID").Visible = False
+        If dgvRevisioni.Columns.Contains("RevisioneID") Then dgvRevisioni.Columns("RevisioneID").Visible = False
+        If dgvRevisioni.Columns.Contains("NumeroRevisione") Then dgvRevisioni.Columns("NumeroRevisione").DisplayIndex = 0
 
         For Each col As DataGridViewColumn In dgvRevisioni.Columns
-            If col.Visible Then
-                col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
-            End If
+            If col.Visible Then col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
         Next
 
         dgvRevisioni.ReadOnly = True
@@ -81,7 +91,7 @@ Public Class SceltaVideo
             Dim revisioneID = CInt(row.Cells("RevisioneID").Value)
 
             If Not RevisioneCancellabile(revisioneID) Then
-                MDIMessageBox.Show("La Revisione " & revisioneID & " non può essere cancellata perché esistono altre revisioni per questo video.", Me.MdiParent, MessageBoxButtons.OK, "Operazione non consentita")
+                MDIMessageBox.Show($"La Revisione {revisioneID} non può essere cancellata perché esistono altre revisioni per questo video.", Me.MdiParent, MessageBoxButtons.OK, "Operazione non consentita")
                 Exit Sub
             End If
 
@@ -93,119 +103,331 @@ Public Class SceltaVideo
             If MDIMessageBox.Show("Vuoi davvero eliminare questa revisione?", Me.MdiParent, MessageBoxButtons.YesNo, "Conferma 1") <> DialogResult.Yes Then Exit Sub
             If MDIMessageBox.Show("Conferma definitiva: la revisione sarà eliminata in modo permanente.", Me.MdiParent, MessageBoxButtons.YesNo, "Conferma 2") <> DialogResult.Yes Then Exit Sub
 
-
             CancellaRevisione(revisioneID)
-
             CaricaRevisioni()
         End If
     End Sub
 
+    ''' <summary>
+    ''' Cancella la revisione dal DB e la cartella associata usando la strategia: sposta in temp -> elimina DB in transazione -> elimina temp.
+    ''' Se il DB fallisce, ripristina la cartella.
+    ''' </summary>
     Private Sub CancellaRevisione(revisioneID As Integer)
-
         Dim titoloVideo As String = ""
-        Dim percorsoRevisione As String = ""
         Dim percorsoVideo As String = ""
+        Dim percorsoRevisione As String = ""
 
+        ' Recupera titolo e costruisci percorsi
         Using conn As New SqlConnection(ConnString)
             conn.Open()
 
-            ' Recupera VideoID e Titolo
             Dim queryInfo As String = "
-            SELECT V.Titolo
-            FROM Mov_Revisioni R
-            INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
-            WHERE R.RevisioneID = @RevisioneID"
+SELECT V.Titolo
+FROM Mov_Revisioni R
+INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
+WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(queryInfo, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
                 Using reader = cmd.ExecuteReader()
                     If reader.Read() Then
-                        titoloVideo = reader("Titolo").ToString()
+                        titoloVideo = reader("Titolo").ToString().Trim()
                     End If
                 End Using
             End Using
+        End Using
 
-            ' Elimina record dipendenti
-            Dim queryDipendenti As String = "DELETE FROM Mov_RevisioniUtente WHERE RevisioneID = @RevisioneID"
-            Using cmdDip As New SqlCommand(queryDipendenti, conn)
-                cmdDip.Parameters.AddWithValue("@RevisioneID", revisioneID)
-                cmdDip.ExecuteNonQuery()
-            End Using
+        Dim baseFrames As String = GetPercorsoFramesCached()
+        percorsoVideo = Path.Combine(baseFrames, titoloVideo)
+        percorsoRevisione = Path.Combine(percorsoVideo, $"Revisione_{revisioneID:000}")
 
-            ' Elimina revisione
-            Dim queryDelete As String = "DELETE FROM Mov_Revisioni WHERE RevisioneID = @RevisioneID"
-            Using cmdDel As New SqlCommand(queryDelete, conn)
-                cmdDel.Parameters.AddWithValue("@RevisioneID", revisioneID)
-                cmdDel.ExecuteNonQuery()
+        ' Se la cartella esiste, prova a spostarla in temp (quarantena)
+        Dim tempFolder As String = Nothing
+        Dim moved As Boolean = False
+        Try
+            If Directory.Exists(percorsoRevisione) Then
+                Dim tempBase = GetPercorsoTempCached()
+                ' crea una sottocartella unica in tempBase
+                tempFolder = Path.Combine(tempBase, "VideoFBF_RevisioneBackup_" & Guid.NewGuid().ToString("N"))
+                ' assicurati che tempFolder non esista
+                If Directory.Exists(tempFolder) Then
+                    tempFolder = Path.Combine(tempBase, "VideoFBF_RevisioneBackup_" & Guid.NewGuid().ToString("N"))
+                End If
+                moved = MoveDirectorySafe(percorsoRevisione, tempFolder)
+            End If
+        Catch ex As Exception
+            moved = False
+            Try
+                File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_delete.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Move to temp failed for {percorsoRevisione}: {ex.Message}{Environment.NewLine}")
+            Catch : End Try
+        End Try
+
+        ' Esegui cancellazioni DB in transazione
+        Dim dbDeleted As Boolean = False
+        Using conn As New SqlConnection(ConnString)
+            conn.Open()
+            Using tx = conn.BeginTransaction()
+                Try
+                    ' Elimina record dipendenti
+                    Using cmdDip As New SqlCommand("DELETE FROM Mov_RevisioniUtente WHERE RevisioneID = @RevisioneID", conn, tx)
+                        cmdDip.Parameters.AddWithValue("@RevisioneID", revisioneID)
+                        cmdDip.ExecuteNonQuery()
+                    End Using
+
+                    ' Elimina note associate
+                    Using cmdNote As New SqlCommand("DELETE FROM Mov_FrameNote WHERE RevisioneID = @RevisioneID", conn, tx)
+                        cmdNote.Parameters.AddWithValue("@RevisioneID", revisioneID)
+                        cmdNote.ExecuteNonQuery()
+                    End Using
+
+                    ' Elimina revisione
+                    Using cmdDel As New SqlCommand("DELETE FROM Mov_Revisioni WHERE RevisioneID = @RevisioneID", conn, tx)
+                        cmdDel.Parameters.AddWithValue("@RevisioneID", revisioneID)
+                        cmdDel.ExecuteNonQuery()
+                    End Using
+
+                    tx.Commit()
+                    dbDeleted = True
+                Catch ex As Exception
+                    Try
+                        tx.Rollback()
+                    Catch : End Try
+                    dbDeleted = False
+                    Try
+                        File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_delete.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - DB delete failed for RevisioneID {revisioneID}: {ex.Message}{Environment.NewLine}")
+                    Catch : End Try
+                End Try
             End Using
         End Using
 
-        ' Percorsi
-        percorsoVideo = Path.Combine("C:\VideoEditor\Frames", titoloVideo)
-        percorsoRevisione = Path.Combine(percorsoVideo, $"Revisione_{revisioneID:000}")
-
-        ' Elimina cartella della revisione
-        If Directory.Exists(percorsoRevisione) Then
+        ' Se DB cancellato: elimina definitivamente la cartella temporanea (se spostata) o la cartella originale
+        If dbDeleted Then
             Try
-                Directory.Delete(percorsoRevisione, True)
-            Catch ex As Exception
-                MDIMessageBox.Show($"Impossibile eliminare la cartella della revisione: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, "Attenzione")
-            End Try
-        End If
+                If moved AndAlso Not String.IsNullOrWhiteSpace(tempFolder) AndAlso Directory.Exists(tempFolder) Then
+                    SafeDeleteDirectoryRecursive(tempFolder)
+                ElseIf Directory.Exists(percorsoRevisione) Then
+                    SafeDeleteDirectoryRecursive(percorsoRevisione)
+                End If
 
-        ' Se revisione 0, controlla se la cartella del video è vuota
-        If revisioneID = 0 AndAlso Directory.Exists(percorsoVideo) Then
-            If Directory.GetDirectories(percorsoVideo).Length = 0 AndAlso Directory.GetFiles(percorsoVideo).Length = 0 Then
+                ' Se la cartella del video è vuota, prova a rimuoverla
+                If Directory.Exists(percorsoVideo) Then
+                    If Directory.GetDirectories(percorsoVideo).Length = 0 AndAlso Directory.GetFiles(percorsoVideo).Length = 0 Then
+                        Try
+                            Directory.Delete(percorsoVideo, True)
+                        Catch ex As Exception
+                            Try
+                                File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_delete.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Could not delete empty video folder {percorsoVideo}: {ex.Message}{Environment.NewLine}")
+                            Catch : End Try
+                        End Try
+                    End If
+                End If
+
+                ' Aggiorna UI: chiudi VideoFBF se necessario
+                For Each f As Form In Application.OpenForms
+                    If TypeOf f Is VideoFBF Then
+                        Dim videoForm = DirectCast(f, VideoFBF)
+                        If videoForm.lblRevAttiva.Text = revisioneID.ToString() Then
+                            Try
+                                If videoForm.picFrame.Image IsNot Nothing Then
+                                    videoForm.picFrame.Image.Dispose()
+                                    videoForm.picFrame.Image = Nothing
+                                End If
+                            Catch : End Try
+                            Exit For
+                        End If
+                    End If
+                Next
+
+                MDIMessageBox.Show("Revisione eliminata correttamente.", Me.MdiParent, MessageBoxButtons.OK, "Operazione completata")
+                Return
+            Catch ex As Exception
                 Try
-                    Directory.Delete(percorsoVideo, True)
+                    File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_delete.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Delete folder failed after DB delete for RevisioneID {revisioneID}: {ex.Message}{Environment.NewLine}")
+                Catch : End Try
+                MDIMessageBox.Show("La revisione è stata rimossa dal database, ma non è stato possibile eliminare completamente la cartella. Controlla i log e rimuovi manualmente: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, "Attenzione")
+                Return
+            End Try
+        Else
+            ' DB non cancellato: se abbiamo spostato la cartella, proviamo a ripristinarla
+            If moved AndAlso Not String.IsNullOrWhiteSpace(tempFolder) Then
+                Try
+                    If Not Directory.Exists(percorsoRevisione) Then
+                        Directory.Move(tempFolder, percorsoRevisione)
+                    Else
+                        ' se la destinazione esiste, sposta in fallback
+                        Dim fallback = Path.Combine(GetPercorsoTempCached(), "VideoFBF_RevisioneRestore_" & Guid.NewGuid().ToString("N"))
+                        Directory.Move(tempFolder, fallback)
+                        Try
+                            File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_delete.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Temp moved to fallback {fallback}{Environment.NewLine}")
+                        Catch : End Try
+                    End If
                 Catch ex As Exception
-                    MDIMessageBox.Show($"La revisione è stata cancellata, ma non è stato possibile eliminare la cartella del video: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK, "Attenzione")
+                    Try
+                        File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_delete.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Restore move failed for {tempFolder}: {ex.Message}{Environment.NewLine}")
+                    Catch : End Try
                 End Try
             End If
-        End If
 
-        ' Chiudi VideoFBF se la revisione cancellata è quella attiva
-        For Each f As Form In Application.OpenForms
-            If TypeOf f Is VideoFBF Then
-                Dim videoForm = DirectCast(f, VideoFBF)
-                If videoForm.lblRevAttiva.Text = revisioneID.ToString() Then
-                    VideoFBF.picFrame.Image = Nothing
-                    Exit For
-                End If
+            MDIMessageBox.Show("Impossibile eliminare la revisione dal database. Operazione annullata.", Me.MdiParent, MessageBoxButtons.OK, "Errore")
+            Return
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Sposta una directory in modo sicuro anche tra volumi diversi.
+    ''' Tenta Directory.Move; se fallisce per radici diverse, copia ricorsivamente e poi elimina la sorgente.
+    ''' </summary>
+    Public Function MoveDirectorySafe(sourceDir As String, destDir As String, Optional maxAttempts As Integer = 6) As Boolean
+        If String.IsNullOrWhiteSpace(sourceDir) OrElse String.IsNullOrWhiteSpace(destDir) Then Return False
+        If Not Directory.Exists(sourceDir) Then Return False
+
+        Try
+            ' Se la destinazione esiste, fallisci (non sovrascrivere)
+            If Directory.Exists(destDir) Then
+                Return False
             End If
+
+            ' Primo tentativo: Directory.Move (veloce se nello stesso volume)
+            Try
+                Directory.Move(sourceDir, destDir)
+                Return True
+            Catch
+                ' prosegui con copia se necessario
+            End Try
+
+            ' Controllo radici
+            Dim rootSrc = Path.GetPathRoot(Path.GetFullPath(sourceDir))
+            Dim rootDst = Path.GetPathRoot(Path.GetFullPath(destDir))
+            If String.Equals(rootSrc, rootDst, StringComparison.OrdinalIgnoreCase) Then
+                ' stesso volume: riprova con retry
+                Dim attempts = 0
+                While attempts < maxAttempts
+                    Try
+                        Directory.Move(sourceDir, destDir)
+                        Return True
+                    Catch
+                        attempts += 1
+                        Thread.Sleep(100)
+                    End Try
+                End While
+                Return False
+            End If
+
+            ' Radici diverse: copia ricorsiva e poi elimina sorgente
+            CopyDirectoryRecursive(sourceDir, destDir, maxAttempts)
+
+            If Not Directory.Exists(destDir) Then Return False
+
+            SafeDeleteDirectoryRecursive(sourceDir, maxAttempts)
+            Return True
+        Catch ex As Exception
+            Try
+                File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_move.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - MoveDirectorySafe unexpected error for {sourceDir} -> {destDir}: {ex.Message}{Environment.NewLine}")
+            Catch : End Try
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Copia ricorsivamente una directory preservando struttura; tenta retry su file bloccati.
+    ''' </summary>
+    Public Sub CopyDirectoryRecursive(sourceDir As String, destDir As String, Optional maxAttempts As Integer = 6)
+        If String.IsNullOrWhiteSpace(sourceDir) OrElse Not Directory.Exists(sourceDir) Then Throw New DirectoryNotFoundException($"Source not found: {sourceDir}")
+        If String.IsNullOrWhiteSpace(destDir) Then Throw New ArgumentException("destDir is empty")
+
+        Directory.CreateDirectory(destDir)
+
+        For Each filePath In Directory.GetFiles(sourceDir)
+            Dim fileName = Path.GetFileName(filePath)
+            Dim destFile = Path.Combine(destDir, fileName)
+            Dim attempts = 0
+            While attempts < maxAttempts
+                Try
+                    File.Copy(filePath, destFile, True)
+                    Exit While
+                Catch
+                    attempts += 1
+                    Thread.Sleep(100)
+                    If attempts >= maxAttempts Then Throw
+                End Try
+            End While
         Next
 
-        MDIMessageBox.Show("Revisione eliminata correttamente.", Me.MdiParent, MessageBoxButtons.OK, "Operazione completata")
+        For Each dirPath In Directory.GetDirectories(sourceDir)
+            Dim dirName = Path.GetFileName(dirPath)
+            Dim destSub = Path.Combine(destDir, dirName)
+            CopyDirectoryRecursive(dirPath, destSub, maxAttempts)
+        Next
+    End Sub
+
+    ''' <summary>
+    ''' Cancella ricorsivamente una directory con retry su file bloccati.
+    ''' </summary>
+    Public Sub SafeDeleteDirectoryRecursive(dir As String, Optional maxAttempts As Integer = 6)
+        If String.IsNullOrWhiteSpace(dir) OrElse Not Directory.Exists(dir) Then Return
+
+        Try
+            For Each f In Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
+                Dim attempts = 0
+                While attempts < maxAttempts
+                    Try
+                        File.SetAttributes(f, FileAttributes.Normal)
+                        File.Delete(f)
+                        Exit While
+                    Catch
+                        attempts += 1
+                        Thread.Sleep(100)
+                    End Try
+                End While
+            Next
+
+            Dim attemptsDir = 0
+            While attemptsDir < maxAttempts
+                Try
+                    Directory.Delete(dir, True)
+                    Exit While
+                Catch
+                    attemptsDir += 1
+                    Thread.Sleep(200)
+                End Try
+            End While
+
+            If Directory.Exists(dir) Then
+                Try
+                    File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_delete.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - SafeDeleteDirectoryRecursive: directory still exists {dir}{Environment.NewLine}")
+                Catch : End Try
+            End If
+        Catch ex As Exception
+            Try
+                File.AppendAllText(Path.Combine(GetPercorsoTempCached(), "VideoFBF_delete.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - SafeDeleteDirectoryRecursive error for {dir}: {ex.Message}{Environment.NewLine}")
+            Catch : End Try
+        End Try
     End Sub
 
     Private Function RevisioneCancellabile(revisioneID As Integer) As Boolean
         Using conn As New SqlConnection(ConnString)
             conn.Open()
 
-            ' Recupera VideoID e Titolo della revisione
             Dim videoID As Integer = 0
-            Dim titoloVideo As String = ""
             Dim queryInfo As String = "
-            SELECT V.VideoID, V.Titolo
-            FROM Mov_Revisioni R
-            INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
-            WHERE R.RevisioneID = @RevisioneID"
+SELECT V.VideoID
+FROM Mov_Revisioni R
+INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
+WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(queryInfo, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
                 Using reader = cmd.ExecuteReader()
                     If reader.Read() Then
                         videoID = CInt(reader("VideoID"))
-                        titoloVideo = reader("Titolo").ToString()
                     Else
-                        Return False ' Revisione non trovata
+                        Return False
                     End If
                 End Using
             End Using
 
-            ' Verifica che non esistano revisioni successive
             Dim querySucc = "
-            SELECT COUNT(*) 
-            FROM Mov_Revisioni 
-            WHERE VideoID = @VideoID AND RevisioneID > @RevisioneID"
+SELECT COUNT(*)
+FROM Mov_Revisioni
+WHERE VideoID = @VideoID AND RevisioneID > @RevisioneID"
             Using cmdSucc As New SqlCommand(querySucc, conn)
                 cmdSucc.Parameters.AddWithValue("@VideoID", videoID)
                 cmdSucc.Parameters.AddWithValue("@RevisioneID", revisioneID)
@@ -221,31 +443,134 @@ Public Class SceltaVideo
         Using conn As New SqlConnection(ConnString)
             conn.Open()
             Dim query As String = "
-            SELECT V.Titolo, R.RevisioneID
-            FROM Mov_Revisioni R
-            INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
-            WHERE R.RevisioneID = @RevisioneID"
+SELECT V.Titolo, R.RevisioneID
+FROM Mov_Revisioni R
+INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
+WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
                 Using reader = cmd.ExecuteReader()
                     If reader.Read() Then
-                        Dim titolo = reader("Titolo").ToString()
-                        Dim numero = CInt(reader("RevisioneID")) ' Usa direttamente RevisioneID
-                        Return Path.Combine("C:\VideoEditor\Frames", titolo, $"Revisione_{numero:000}")
+                        Dim titolo = reader("Titolo").ToString().Trim()
+                        Dim numero = CInt(reader("RevisioneID"))
+                        Dim base = GetPercorsoFramesCached()
+                        Return Path.Combine(base, titolo, $"Revisione_{numero:000}")
                     End If
                 End Using
             End Using
         End Using
-        Return ""
+        Return String.Empty
     End Function
+
+    ' Lettura parametro da Sys_Parametri
+    Private Function GetSysParametro(descrizione As String) As String
+        Try
+            Using conn As New SqlConnection(ConnString)
+                conn.Open()
+                Using cmd As New SqlCommand("SELECT Valore FROM Sys_Parametri WHERE Descrizione = @Descrizione", conn)
+                    cmd.Parameters.AddWithValue("@Descrizione", descrizione)
+                    Dim result = cmd.ExecuteScalar()
+                    If result IsNot Nothing AndAlso Not Convert.IsDBNull(result) Then
+                        Return result.ToString().Trim()
+                    End If
+                End Using
+            End Using
+        Catch ex As Exception
+            ' Log su temp (fallback)
+            Try
+                Dim fallback = Path.GetTempPath()
+                File.AppendAllText(Path.Combine(fallback, "VideoFBF_params.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - GetSysParametro error for '{descrizione}': {ex.Message}{Environment.NewLine}")
+            Catch : End Try
+        End Try
+        Return String.Empty
+    End Function
+
+    ' PercorsoFrames con fallback
+    Private Function GetPercorsoFrames() As String
+        Dim valore = GetSysParametro("PercorsoFrames")
+        If String.IsNullOrWhiteSpace(valore) Then
+            Return "C:\VideoEditor\Frames"
+        End If
+        Return valore
+    End Function
+
+    ' Versione cached per evitare query ripetute
+    Private Function GetPercorsoFramesCached() As String
+        If _cachedPercorsoFramesLoaded Then
+            Return _cachedPercorsoFrames
+        End If
+
+        SyncLock _cacheLock
+            If Not _cachedPercorsoFramesLoaded Then
+                Try
+                    _cachedPercorsoFrames = GetPercorsoFrames()
+                    _cachedPercorsoFramesLoaded = True
+                Catch
+                    _cachedPercorsoFrames = "C:\VideoEditor\Frames"
+                    _cachedPercorsoFramesLoaded = True
+                End Try
+            End If
+        End SyncLock
+
+        Return _cachedPercorsoFrames
+    End Function
+
+    ' Percorso temporaneo parametrizzato (Descrizione = PercrsoTempFolder)
+    Private Function GetPercorsoTemp() As String
+        ' Nota: usa la stringa esatta che hai indicato nel DB: "PercrsoTempFolder"
+        Dim valore = GetSysParametro("PercrsoTempFolder")
+        If String.IsNullOrWhiteSpace(valore) Then
+            Return Path.GetTempPath()
+        End If
+        Return valore
+    End Function
+
+    ' Cached version for temp path
+    Private Function GetPercorsoTempCached() As String
+        If _cachedPercorsoTempLoaded Then
+            Return _cachedPercorsoTemp
+        End If
+
+        SyncLock _cacheLock
+            If Not _cachedPercorsoTempLoaded Then
+                Try
+                    Dim p = GetPercorsoTemp()
+                    ' assicurati che la cartella esista; se non esiste prova a crearla
+                    If Not String.IsNullOrWhiteSpace(p) Then
+                        Try
+                            If Not Directory.Exists(p) Then Directory.CreateDirectory(p)
+                            _cachedPercorsoTemp = p
+                        Catch
+                            _cachedPercorsoTemp = Path.GetTempPath()
+                        End Try
+                    Else
+                        _cachedPercorsoTemp = Path.GetTempPath()
+                    End If
+                Catch
+                    _cachedPercorsoTemp = Path.GetTempPath()
+                End Try
+                _cachedPercorsoTempLoaded = True
+            End If
+        End SyncLock
+
+        Return _cachedPercorsoTemp
+    End Function
+
+    ' Forza refresh della cache (se necessario)
+    Private Sub RefreshPercorsoFramesCache()
+        SyncLock _cacheLock
+            _cachedPercorsoFramesLoaded = False
+            _cachedPercorsoFrames = Nothing
+        End SyncLock
+    End Sub
 
     Private Function CalcolaNumeroRevisionexxxxx(revisioneID As Integer) As Integer
         Using conn As New SqlConnection(ConnString)
             conn.Open()
             Dim query As String = "
-            SELECT ROW_NUMBER() OVER (PARTITION BY VideoID ORDER BY DataRevisione ASC) - 1 AS Numero
-            FROM Mov_Revisioni
-            WHERE RevisioneID = @RevisioneID"
+SELECT ROW_NUMBER() OVER (PARTITION BY VideoID ORDER BY DataRevisione ASC) - 1 AS Numero
+FROM Mov_Revisioni
+WHERE RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
                 Return CInt(cmd.ExecuteScalar())
@@ -254,7 +579,6 @@ Public Class SceltaVideo
     End Function
 
     Private Sub dgvRevisioni_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvRevisioni.CellDoubleClick
-
         Cursor.Current = Cursors.WaitCursor
         Application.DoEvents()
 
@@ -263,9 +587,9 @@ Public Class SceltaVideo
         Dim row = dgvRevisioni.Rows(e.RowIndex)
         Dim videoID = CInt(row.Cells("VideoID").Value)
         Dim revisioneID = CInt(row.Cells("RevisioneID").Value)
-        Dim autore = row.Cells("Autore").Value.ToString()
-        Dim note = row.Cells("Note").Value.ToString()
-        Dim stato = row.Cells("Stato").Value.ToString()
+        Dim autore = If(row.Cells("Autore").Value IsNot Nothing, row.Cells("Autore").Value.ToString(), String.Empty)
+        Dim note = If(row.Cells("Note").Value IsNot Nothing, row.Cells("Note").Value.ToString(), String.Empty)
+        Dim stato = If(row.Cells("Stato").Value IsNot Nothing, row.Cells("Stato").Value.ToString(), String.Empty)
         Dim dataRevisione = Convert.ToDateTime(row.Cells("DataRevisione").Value)
         Dim approvato = If(Convert.IsDBNull(row.Cells("Approvato").Value), False, Convert.ToBoolean(row.Cells("Approvato").Value))
 
@@ -289,7 +613,7 @@ Public Class SceltaVideo
         videoForm.AggiornaRevisioneAttiva()
         videoForm.CaricaRevisione(videoID, revisioneID)
         videoForm.AggiornaNoteDaDatabase(revisioneID)
-        videoForm.AggiornaUtentiCondivisi(Int(videoForm.lblRevAttiva.Text))
+        videoForm.AggiornaUtentiCondivisi(CInt(videoForm.lblRevAttiva.Text))
         videoForm.AggiornaFrameCorrente(videoForm.TrackFrame.Value)
 
         Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
@@ -297,15 +621,12 @@ Public Class SceltaVideo
 
         Cursor.Current = Cursors.Default
         Application.DoEvents()
-
         Me.Close()
-
     End Sub
 
     Private Sub txtFiltro_TextChanged(sender As Object, e As EventArgs) Handles txtFiltro.TextChanged
         Dim filtro As String = txtFiltro.Text.Trim().ToLower()
-
-        Dim dv As DataView
+        Dim dv As DataView = Nothing
 
         If TypeOf dgvRevisioni.DataSource Is DataTable Then
             dv = New DataView(CType(dgvRevisioni.DataSource, DataTable))

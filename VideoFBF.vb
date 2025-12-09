@@ -68,6 +68,8 @@ Public Class VideoFBF
                 AddHandler LstNoteFrame.MouseLeave, AddressOf LstNoteFrame_MouseLeave_HideTooltip
                 AddHandler LstNoteFrame.DoubleClick, AddressOf LstNoteFrame_DoubleClick_OpenViewer
             End If
+            picFrame.SizeMode = PictureBoxSizeMode.AutoSize
+            picFrame.Enabled = True
         Catch
         End Try
 
@@ -660,7 +662,7 @@ Public Class VideoFBF
         Using conn As New SqlConnection(ConnString)
             Dim cmd As New SqlCommand("
                 SELECT NomeUtente, Generalità 
-                FROM Sys_Utenti 
+                FROM Tab_Utenti 
                 WHERE IsActive = 1 AND (Amministratore = 1 OR Supervisore = 1)
                 ORDER BY Generalità", conn)
             conn.Open()
@@ -2453,6 +2455,17 @@ WHEN NOT MATCHED THEN
         End Try
     End Sub
 
+    Private Sub ChkZoom_CheckedChanged(sender As Object, e As EventArgs) Handles ChkZoom.CheckedChanged
+        If ChkZoom.Checked Then
+            picFrame.Width = panelViewer.Width - 30
+            picFrame.Height = panelViewer.Height - 30
+            picFrame.SizeMode = PictureBoxSizeMode.Zoom
+            picFrame.Enabled = False
+        Else
+            picFrame.SizeMode = PictureBoxSizeMode.AutoSize
+            picFrame.Enabled = True
+        End If
+    End Sub
 
     ' --- DTO ListView Note ---
     Public Class NotaFrameInfo

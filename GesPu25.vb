@@ -146,7 +146,7 @@ Public Class GesPu25
             Using conn As New SqlConnection(ConnString)
                 conn.Open()
 
-                Dim query = "SELECT ISNULL(Amministratore, 0) FROM Sys_Utenti WHERE NomeUtente = @utente"
+                Dim query = "SELECT ISNULL(Amministratore, 0) FROM Tab_Utenti WHERE NomeUtente = @utente"
                 Using cmd As New SqlCommand(query, conn)
                     cmd.Parameters.AddWithValue("@utente", nomeUtente)
                     Return Convert.ToBoolean(cmd.ExecuteScalar())
@@ -191,7 +191,7 @@ Public Class GesPu25
         ApriModuloConPermessi("Sys_VisualizzainDbgrid", Me)
     End Sub
     Private Sub GestioneUtentiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles GestioneUtentiToolStripMenuItem.Click
-        ApriModuloConPermessi("Sys_Utenti", Me)
+        ApriModuloConPermessi("Tab_Utenti", Me)
     End Sub
 
     Private Sub FileTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles FileTemplateToolStripMenuItem.Click
