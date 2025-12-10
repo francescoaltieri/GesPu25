@@ -26,12 +26,7 @@ Public Class VideoEditor
 
         ' Carica i frame esistenti se presenti
         If Directory.Exists(frameDir) Then
-            Me.FrameList = Directory.GetFiles(frameDir, "frame_*.png").
-            OrderBy(Function(f)
-                        Dim nome = Path.GetFileNameWithoutExtension(f)
-                        Dim numero = Regex.Match(nome, "\d+").Value
-                        Return Integer.Parse(numero)
-                    End Function).ToList()
+            Me.FrameList = VideoFBF.GetFrameFiles(frameDir).ToList()
         Else
             Me.FrameList = New List(Of String)
         End If
@@ -212,68 +207,98 @@ Public Class VideoEditor
         HasUnsavedChanges = False
     End Sub
 
-    Public Function LoadFrame(index As Integer) As Bitmap
-        If index < 0 OrElse index >= FrameList.Count Then Return Nothing
+    Public Function LoadFrame(index As Integer) As Image
+        If FrameList Is Nothing OrElse index < 0 OrElse index >= FrameList.Count Then
+            Throw New ArgumentOutOfRangeException(NameOf(index))
+        End If
 
-        Dim basePath = FrameList(index)
-        Dim baseBmp As Bitmap = Nothing
+        Dim basePath As String = FrameList(index)
+        If String.IsNullOrWhiteSpace(basePath) Then
+            Throw New FileNotFoundException("Percorso frame non valido")
+        End If
 
         Try
+            ' Carica immagine base senza lock
+            Dim baseImg As Image = Nothing
             Using fs As New FileStream(basePath, FileMode.Open, FileAccess.Read, FileShare.Read)
                 Using ms As New MemoryStream()
                     fs.CopyTo(ms)
                     ms.Position = 0
-                    Using tmpImg As Image = Image.FromStream(ms)
-                        baseBmp = New Bitmap(tmpImg) ' copia indipendente
+                    Using tmp As Image = Image.FromStream(ms)
+                        baseImg = New Bitmap(tmp) ' copia indipendente
                     End Using
                 End Using
             End Using
-        Catch ex As Exception
-            Throw New IOException($"Impossibile caricare il frame: {basePath}", ex)
-        End Try
 
-        Try
-            Dim overlayPath = Path.Combine(Path.GetDirectoryName(basePath), Path.GetFileNameWithoutExtension(basePath) & "_overlay.png")
+            ' Determina percorso overlay (es. frame_0001_overlay.png)
+            Dim overlayPath = Path.Combine(Path.GetDirectoryName(basePath),
+                                      Path.GetFileNameWithoutExtension(basePath) & "_overlay.png")
+
+            Dim resultBmp As Bitmap = Nothing
+
             If File.Exists(overlayPath) Then
                 Try
-                    Using fsOv As New FileStream(overlayPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
-                        Using msOv As New MemoryStream()
-                            fsOv.CopyTo(msOv)
-                            msOv.Position = 0
-                            Using tmpOv As Image = Image.FromStream(msOv)
-                                Using ovBmp As New Bitmap(tmpOv)
-                                    Using g As Graphics = Graphics.FromImage(baseBmp)
-                                        g.DrawImage(ovBmp, 0, 0)
-                                    End Using
-                                End Using
+                    ' Carica overlay senza lock
+                    Dim overlayBmp As Bitmap = Nothing
+                    Using fs2 As New FileStream(overlayPath, FileMode.Open, FileAccess.Read, FileShare.Read)
+                        Using ms2 As New MemoryStream()
+                            fs2.CopyTo(ms2)
+                            ms2.Position = 0
+                            Using tmp2 As Image = Image.FromStream(ms2)
+                                overlayBmp = New Bitmap(tmp2)
                             End Using
                         End Using
                     End Using
-                Catch ex As FileNotFoundException
-                    ' overlay cancellato 
-                Catch ex As IOException
-                    ' lock o I/O temporaneo
-                Catch
-                    ' altri errori
+
+                    ' Componi immagine finale (base + overlay) in una nuova bitmap
+                    resultBmp = New Bitmap(baseImg.Width, baseImg.Height, Imaging.PixelFormat.Format32bppArgb)
+                    Using g As Graphics = Graphics.FromImage(resultBmp)
+                        g.Clear(System.Drawing.Color.Transparent)
+                        g.DrawImage(baseImg, 0, 0, baseImg.Width, baseImg.Height)
+                        g.DrawImage(overlayBmp, 0, 0, baseImg.Width, baseImg.Height)
+                    End Using
+
+                    ' libera temporanei
+                    overlayBmp.Dispose()
+                    baseImg.Dispose()
+
+                Catch exOverlay As Exception
+                    ' Log dell'errore overlay ma non bloccare il caricamento del frame base
+                    Try
+                        Dim logPath = Path.Combine(Path.GetTempPath(), "VideoEditor_overlay.log")
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - Overlay load error: {overlayPath} - {exOverlay.Message}{Environment.NewLine}")
+                    Catch
+                    End Try
+
+                    ' fallback: usa il base come risultato
+                    resultBmp = CType(baseImg, Bitmap)
                 End Try
+            Else
+                ' Nessun overlay: usa il base come risultato
+                resultBmp = CType(baseImg, Bitmap)
             End If
-        Catch
-            ' sicurezza
+
+            ' Imposta sempre DrawingBitmap come clone indipendente dell'immagine risultante
+            Try
+                If resultBmp IsNot Nothing Then
+                    Me.DrawingBitmap = CType(resultBmp.Clone(), Bitmap)
+                Else
+                    Me.DrawingBitmap = Nothing
+                End If
+            Catch
+                ' se il clone fallisce, non bloccare: lascia DrawingBitmap a Nothing
+                Me.DrawingBitmap = Nothing
+            End Try
+
+            ' Restituisci l'immagine da mostrare (resultBmp). La UI è responsabile del dispose precedente se necessario.
+            Return CType(resultBmp, Image)
+
+        Catch ex As Exception
+            'Throw New IOException($"Impossibile caricare il frame: {basePath}", ex)
         End Try
-
-        If DrawingBitmap IsNot Nothing Then
-            Try : DrawingBitmap.Dispose() : Catch : End Try
-            DrawingBitmap = Nothing
-        End If
-
-        DrawingBitmap = CType(baseBmp.Clone(), Bitmap)
-        baseBmp.Dispose()
-
-        HasUnsavedChanges = False
-        Try : stateStack.Clear() : Catch : End Try
-
-        Return CType(DrawingBitmap.Clone(), Bitmap)
     End Function
+
+
 
     Private Function GetFramerate() As Double
         Dim output As String = ""

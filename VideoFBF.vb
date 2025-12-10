@@ -2,6 +2,7 @@
 Imports Microsoft.Data.SqlClient
 Imports System.Threading.Tasks
 Imports System.Diagnostics
+Imports DocumentFormat.OpenXml.Vml.Office
 
 Public Class VideoFBF
     ' --- Campi di stato e UI ---
@@ -10,8 +11,8 @@ Public Class VideoFBF
     Dim lastPoint As Point
     Dim autoScrollActive As Boolean = False
     Dim autoScrollDirection As String = "" ' "forward" o "backward"
-    Dim testoAvantiOriginale As String = "Avanti Veloce"
-    Dim testoIndietroOriginale As String = "Indietro Veloce"
+    Dim testoAvantiOriginale As String = "Avanti Veloce ⟩⟩⟩"
+    Dim testoIndietroOriginale As String = "⟨⟨⟨ Indietro Veloce"
     Dim notaPosizione As Point = Point.Empty
     Dim colorePennino As Color = Color.Red
     Dim spessorePennino As Integer = 5
@@ -21,6 +22,29 @@ Public Class VideoFBF
     Private hasUnsavedChanges As Boolean = False
 
     Public Property Parametri As RevisioneParametri
+
+    ' Strumenti disponibili
+    Private Enum ToolType
+        None = 0
+        PointTool = 1
+        LineTool = 2
+        EllipseTool = 3
+        RectangleTool = 4
+    End Enum
+
+    Private currentTool As ToolType = ToolType.None
+
+    ' Per il disegno temporaneo (rubberband)
+    Private isDragging As Boolean = False
+    Private dragStart As Point = Point.Empty
+    Private dragCurrent As Point = Point.Empty
+
+    ' rubberband overlay
+    Private overlayRubber As OverlayPanel = Nothing
+    Private isRubberDragging As Boolean = False
+    Private rubberStart As Point = Point.Empty
+    Private rubberCurrent As Point = Point.Empty
+
 
     ' --- Costruttori e Load ---
     Public Sub New(parametri As RevisioneParametri)
@@ -45,6 +69,8 @@ Public Class VideoFBF
         btnAvantiVeloce.Enabled = False
         btnIndietroVeloce.Enabled = False
 
+        PenColor.BackColor = colorePennino
+
         ' COLLEGA l’evento Paint una sola volta
         Try
             RemoveHandler TrackFrame.Paint, AddressOf DisegnaSegnaliniNote
@@ -53,6 +79,8 @@ Public Class VideoFBF
         AddHandler TrackFrame.Paint, AddressOf DisegnaSegnaliniNote
 
         InitLstNoteFrameColumns()
+        InitStrumenti()
+        InitOverlayRubber()
         ' Inizializza tooltip e handler per la ListView
         Try
             If LstNoteFrame IsNot Nothing Then
@@ -68,8 +96,7 @@ Public Class VideoFBF
                 AddHandler LstNoteFrame.MouseLeave, AddressOf LstNoteFrame_MouseLeave_HideTooltip
                 AddHandler LstNoteFrame.DoubleClick, AddressOf LstNoteFrame_DoubleClick_OpenViewer
             End If
-            picFrame.SizeMode = PictureBoxSizeMode.AutoSize
-            picFrame.Enabled = True
+            SettaPicFrame("Zoom")
         Catch
         End Try
 
@@ -304,7 +331,7 @@ Public Class VideoFBF
             End Try
 
             ' 5) Verifica frame estratti
-            Dim filesEstratti = Directory.GetFiles(revisioneDir)
+            Dim filesEstratti = GetFrameFiles(revisioneDir)
             If filesEstratti Is Nothing OrElse filesEstratti.Length = 0 Then
                 MDIMessageBox.Show($"Estrazione completata ma nessun frame trovato in: {revisioneDir}", Me.MdiParent, MessageBoxButtons.OK)
                 Exit Sub
@@ -379,7 +406,7 @@ Public Class VideoFBF
         Directory.CreateDirectory(originalDir)
 
         ' Se è già popolata (almeno un file) non ricopiare
-        Dim existing = Directory.GetFiles(originalDir)
+        Dim existing = GetFrameFiles(originalDir)
         If existing IsNot Nothing AndAlso existing.Length > 0 Then
             Return
         End If
@@ -389,8 +416,8 @@ Public Class VideoFBF
             Throw New DirectoryNotFoundException($"Cartella revisione non trovata: {revisioneDir}")
         End If
 
-        Dim framesEstratti = Directory.GetFiles(revisioneDir, "frame_*.*", SearchOption.TopDirectoryOnly).
-                                OrderBy(Function(f) f).ToArray()
+        ' Prendi i frame estratti nella revisione corrente (escludi overlay)
+        Dim framesEstratti = GetFrameFiles(revisioneDir)
 
         If framesEstratti.Length = 0 Then
             ' niente da copiare
@@ -1032,7 +1059,7 @@ Public Class VideoFBF
             End Using
         End Using
 
-        If Not Directory.Exists(frameDir) OrElse Directory.GetFiles(frameDir).Length = 0 Then
+        If Not Directory.Exists(frameDir) OrElse GetFrameFiles(frameDir).Length = 0 Then
             MDIMessageBox.Show("Nessun Frame trovato per la revisione selezionata", Me.MdiParent, MessageBoxButtons.OK)
             Exit Sub
         End If
@@ -1240,35 +1267,6 @@ Public Class VideoFBF
         End While
     End Sub
 
-    ' --- Disegno note sul frame ---
-    Private Sub picFrame_MouseDown(sender As Object, e As MouseEventArgs) Handles picFrame.MouseDown
-        If picFrame.Image Is Nothing Then Return
-        isDrawing = True
-        lastPoint = e.Location
-        editor.SaveState() ' salva stato per undo
-    End Sub
-
-    Private Sub picFrame_MouseMove(sender As Object, e As MouseEventArgs) Handles picFrame.MouseMove
-        If picFrame.Image Is Nothing Then Return
-        If isDrawing Then
-            Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
-                Using penna As New Pen(colorePennino, spessorePennino)
-                    g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
-                    g.DrawLine(penna, lastPoint, e.Location)
-                End Using
-            End Using
-            picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
-            lastPoint = e.Location
-        End If
-    End Sub
-
-    Private Sub picFrame_MouseUp(sender As Object, e As MouseEventArgs) Handles picFrame.MouseUp
-        If picFrame.Image Is Nothing Then Return
-        isDrawing = False
-        hasUnsavedChanges = True
-        editor.HasUnsavedChanges = True
-    End Sub
-
     Private Sub picFrame_MouseClick(sender As Object, e As MouseEventArgs) Handles picFrame.MouseClick
         notaPosizione = e.Location
     End Sub
@@ -1276,7 +1274,7 @@ Public Class VideoFBF
     Private Sub btnColorePennino_Click(sender As Object, e As EventArgs) Handles btnColorePennino.Click
         If colorDialogPennino.ShowDialog = DialogResult.OK Then
             colorePennino = colorDialogPennino.Color
-            btnColorePennino.BackColor = colorePennino
+            PenColor.BackColor = colorePennino
         End If
     End Sub
 
@@ -1295,9 +1293,7 @@ Public Class VideoFBF
         editor.SaveFrame(editor.CurrentIndex, editor.DrawingBitmap)
         hasUnsavedChanges = False
         editor.HasUnsavedChanges = False
-
         RefreshLstNoteFrame()
-
     End Sub
 
     Private Sub btnSalvaVideo_Click(sender As Object, e As EventArgs) Handles btnSalvaVideo.Click
@@ -2234,7 +2230,7 @@ WHEN NOT MATCHED THEN
             If maxVal <= minVal Then Return
 
             ' larghezza utile: togli spazio per thumb e bordi (aggiusta se necessario)
-            Dim trackClientWidth = Math.Max(1, TrackFrame.Width - 22)
+            Dim trackClientWidth = Math.Max(1, TrackFrame.Width - 28)
             Dim totale = maxVal - minVal
 
             Dim g = e.Graphics
@@ -2306,6 +2302,60 @@ WHEN NOT MATCHED THEN
         Catch
         End Try
     End Sub
+
+    ' Restituisce solo i file "frame" escludendo overlay, tmp e file nascosti
+    Public Shared Function GetFrameFiles(dir As String) As String()
+        If String.IsNullOrWhiteSpace(dir) OrElse Not Directory.Exists(dir) Then
+            Return New String() {}
+        End If
+
+        Try
+            Dim all = Directory.GetFiles(dir, "*.png")
+            Dim list = New List(Of String)
+
+            For Each f In all
+                Dim name = Path.GetFileName(f)
+
+                ' Escludi overlay anywhere nel nome (case-insensitive)
+                If name.IndexOf("_overlay", StringComparison.OrdinalIgnoreCase) >= 0 Then
+                    Continue For
+                End If
+
+                ' Escludi file temporanei convenzionali
+                If name.StartsWith("_tmp", StringComparison.OrdinalIgnoreCase) OrElse name.StartsWith(".", StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+
+                ' Escludi file con attributo Hidden
+                Try
+                    Dim attr = File.GetAttributes(f)
+                    If (attr And FileAttributes.Hidden) = FileAttributes.Hidden Then
+                        Continue For
+                    End If
+                Catch
+                    ' ignore attribute errors
+                End Try
+
+                list.Add(f)
+            Next
+
+            ' Ordina in modo stabile: prova a estrarre l'ultimo numero nel nome, fallback alfabetico
+            Return list.OrderBy(Function(p)
+                                    Dim noExt = Path.GetFileNameWithoutExtension(p)
+                                    Dim m = System.Text.RegularExpressions.Regex.Match(noExt, "(\d+)(?!.*\d)")
+                                    If m.Success Then
+                                        Dim n As Integer
+                                        If Integer.TryParse(m.Value, n) Then Return n
+                                    End If
+                                    Return Integer.MaxValue
+                                End Function).
+                    ThenBy(Function(p) Path.GetFileName(p).ToLowerInvariant()).
+                    ToArray()
+        Catch
+            Return New String() {}
+        End Try
+    End Function
+
 
 
     ' ---------------------------
@@ -2457,14 +2507,431 @@ WHEN NOT MATCHED THEN
 
     Private Sub ChkZoom_CheckedChanged(sender As Object, e As EventArgs) Handles ChkZoom.CheckedChanged
         If ChkZoom.Checked Then
-            picFrame.Width = panelViewer.Width - 30
-            picFrame.Height = panelViewer.Height - 30
+            SettapicFrame("AutoSize")
+        Else
+            SettapicFrame("Zoom")
+        End If
+    End Sub
+
+    Private Sub SettaPicFrame(Settaggio As String)
+        picFrame.Width = panelViewer.Width - 30
+        picFrame.Height = panelViewer.Height - 30
+        If Settaggio = "Zoom" Then
             picFrame.SizeMode = PictureBoxSizeMode.Zoom
             picFrame.Enabled = False
+            picFrame.Cursor = Cursors.Default
+            numSpessorePennino.Enabled = False
+            CmbStrumento.Enabled = False
+            btnColorePennino.Enabled = False
         Else
             picFrame.SizeMode = PictureBoxSizeMode.AutoSize
             picFrame.Enabled = True
+            picFrame.Cursor = Cursors.Cross
+            numSpessorePennino.Enabled = True
+            CmbStrumento.Enabled = True
+            btnColorePennino.Enabled = True
         End If
+    End Sub
+
+    ' Popola cmbStrumento (chiamare una sola volta)
+    Private Sub InitStrumenti()
+        CmbStrumento.Items.Clear()
+        CmbStrumento.Items.Add("Nessuno")        ' index 0
+        CmbStrumento.Items.Add("Punto")          ' index 1
+        CmbStrumento.Items.Add("Linea")          ' index 2
+        CmbStrumento.Items.Add("Ellisse")        ' index 3
+        CmbStrumento.Items.Add("Rettangolo")     ' index 4
+        CmbStrumento.SelectedIndex = 0
+        AddHandler CmbStrumento.SelectedIndexChanged, AddressOf cmbStrumento_SelectedIndexChanged
+    End Sub
+
+    Private Sub cmbStrumento_SelectedIndexChanged(sender As Object, e As EventArgs)
+        Select Case CmbStrumento.SelectedIndex
+            Case 0 : currentTool = ToolType.None
+            Case 1 : currentTool = ToolType.PointTool
+            Case 2 : currentTool = ToolType.LineTool
+            Case 3 : currentTool = ToolType.EllipseTool
+            Case 4 : currentTool = ToolType.RectangleTool
+            Case Else : currentTool = ToolType.None
+        End Select
+        ' Aggiorna cursore e abilitazioni
+        If currentTool = ToolType.None Then
+            picFrame.Cursor = Cursors.Default
+        Else
+            picFrame.Cursor = Cursors.Cross
+        End If
+    End Sub
+
+    Private Sub picFrame_MouseDown(sender As Object, e As MouseEventArgs) Handles picFrame.MouseDown
+        Try
+            ' Protezioni base
+            If picFrame Is Nothing Then Return
+            If picFrame.Image Is Nothing Then Return
+            If editor Is Nothing Then
+                LogDebug("picFrame_MouseDown: editor = Nothing")
+                MDIMessageBox.Show("Editor non inizializzato.", Me.MdiParent, MessageBoxButtons.OK)
+                Return
+            End If
+
+            ' Linea/Ellisse/Rettangolo: inizia rubberband (coordinate immagine)
+            If currentTool = ToolType.LineTool OrElse currentTool = ToolType.EllipseTool OrElse currentTool = ToolType.RectangleTool Then
+                Dim imgPt As Point = ConvertMouseToImagePoint(e.Location)
+                isRubberDragging = True
+                rubberStart = imgPt
+                rubberCurrent = imgPt
+                If overlayRubber IsNot Nothing Then overlayRubber.Invalidate()
+                editor.SaveState()
+                Return
+            End If
+
+            ' Punto: disegna subito (coordinate immagine)
+            If currentTool = ToolType.PointTool Then
+                editor.SaveState()
+                Dim imgPt As Point = ConvertMouseToImagePoint(e.Location)
+                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
+                    Using pen As New Pen(colorePennino, spessorePennino)
+                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+                        g.DrawEllipse(pen, imgPt.X - spessorePennino, imgPt.Y - spessorePennino, spessorePennino * 2, spessorePennino * 2)
+                    End Using
+                End Using
+                If picFrame.Image IsNot Nothing Then
+                    Try : picFrame.Image.Dispose() : Catch : End Try
+                End If
+                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
+                hasUnsavedChanges = True
+                editor.HasUnsavedChanges = True
+                Return
+            End If
+
+            ' Fallback: pennino libero (comportamento esistente)
+            isDrawing = True
+            lastPoint = e.Location
+            editor.SaveState()
+        Catch ex As Exception
+            LogDebug("picFrame_MouseDown EX: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub picFrame_MouseMove(sender As Object, e As MouseEventArgs) Handles picFrame.MouseMove
+        Try
+            If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return
+
+            ' Pennino libero
+            If isDrawing Then
+                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
+                    Using penna As New Pen(colorePennino, spessorePennino)
+                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+                        g.DrawLine(penna, lastPoint, ConvertMouseToImagePoint(e.Location))
+                    End Using
+                End Using
+                lastPoint = ConvertMouseToImagePoint(e.Location)
+                If picFrame.Image IsNot Nothing Then
+                    Try : picFrame.Image.Dispose() : Catch : End Try
+                End If
+                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
+                Return
+            End If
+
+            ' Rubberband preview
+            If isRubberDragging Then
+                rubberCurrent = ConvertMouseToImagePoint(e.Location)
+                If overlayRubber IsNot Nothing Then overlayRubber.Invalidate()
+                Return
+            End If
+        Catch ex As Exception
+            LogDebug("picFrame_MouseMove EX: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub picFrame_MouseUp(sender As Object, e As MouseEventArgs) Handles picFrame.MouseUp
+        Try
+            If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return
+
+            If isDrawing Then
+                isDrawing = False
+                hasUnsavedChanges = True
+                editor.HasUnsavedChanges = True
+                Return
+            End If
+
+            If isRubberDragging Then
+                isRubberDragging = False
+                rubberCurrent = ConvertMouseToImagePoint(e.Location)
+
+                ' Commit su editor.DrawingBitmap (coordinate immagine)
+                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
+                    Using pen As New Pen(colorePennino, spessorePennino)
+                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+                        Dim rect = GetNormalizedRect(rubberStart, rubberCurrent)
+                        Select Case currentTool
+                            Case ToolType.LineTool
+                                g.DrawLine(pen, rubberStart, rubberCurrent)
+                            Case ToolType.EllipseTool
+                                g.DrawEllipse(pen, rect)
+                            Case ToolType.RectangleTool
+                                g.DrawRectangle(pen, rect)
+                        End Select
+                    End Using
+                End Using
+
+                If picFrame.Image IsNot Nothing Then
+                    Try : picFrame.Image.Dispose() : Catch : End Try
+                End If
+                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
+                hasUnsavedChanges = True
+                editor.HasUnsavedChanges = True
+                If overlayRubber IsNot Nothing Then overlayRubber.Invalidate()
+            End If
+        Catch ex As Exception
+            LogDebug("picFrame_MouseUp EX: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub OverlayRubber_MouseDown(sender As Object, e As MouseEventArgs)
+        Try
+            If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return
+            If editor Is Nothing Then Return
+
+            If currentTool = ToolType.LineTool OrElse currentTool = ToolType.EllipseTool OrElse currentTool = ToolType.RectangleTool Then
+                Dim imgPt = ConvertMouseToImagePoint(e.Location)
+                isRubberDragging = True
+                rubberStart = imgPt
+                rubberCurrent = imgPt
+                overlayRubber.Invalidate()
+                editor.SaveState()
+                Return
+            End If
+
+            If currentTool = ToolType.PointTool Then
+                editor.SaveState()
+                Dim imgPt = ConvertMouseToImagePoint(e.Location)
+                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
+                    Using pen As New Pen(colorePennino, spessorePennino)
+                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+                        g.DrawEllipse(pen, imgPt.X - spessorePennino, imgPt.Y - spessorePennino, spessorePennino * 2, spessorePennino * 2)
+                    End Using
+                End Using
+                If picFrame.Image IsNot Nothing Then Try : picFrame.Image.Dispose() : Catch : End Try
+                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
+                hasUnsavedChanges = True
+                editor.HasUnsavedChanges = True
+                Return
+            End If
+
+            ' fallback: pennino libero
+            isDrawing = True
+            lastPoint = ConvertMouseToImagePoint(e.Location)
+            editor.SaveState()
+        Catch ex As Exception
+            LogDebug("OverlayRubber_MouseDown EX: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub OverlayRubber_MouseMove(sender As Object, e As MouseEventArgs)
+        Try
+            If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return
+
+            If isDrawing Then
+                Dim imgPt = ConvertMouseToImagePoint(e.Location)
+                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
+                    Using penna As New Pen(colorePennino, spessorePennino)
+                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+                        g.DrawLine(penna, lastPoint, imgPt)
+                    End Using
+                End Using
+                lastPoint = imgPt
+                If picFrame.Image IsNot Nothing Then Try : picFrame.Image.Dispose() : Catch : End Try
+                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
+                Return
+            End If
+
+            If isRubberDragging Then
+                rubberCurrent = ConvertMouseToImagePoint(e.Location)
+                overlayRubber.Invalidate()
+                Return
+            End If
+        Catch ex As Exception
+            LogDebug("OverlayRubber_MouseMove EX: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub OverlayRubber_MouseUp(sender As Object, e As MouseEventArgs)
+        Try
+            If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return
+
+            If isDrawing Then
+                isDrawing = False
+                hasUnsavedChanges = True
+                editor.HasUnsavedChanges = True
+                Return
+            End If
+
+            If isRubberDragging Then
+                isRubberDragging = False
+                rubberCurrent = ConvertMouseToImagePoint(e.Location)
+
+                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
+                    Using pen As New Pen(colorePennino, spessorePennino)
+                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+                        Dim rect = GetNormalizedRect(rubberStart, rubberCurrent)
+                        Select Case currentTool
+                            Case ToolType.LineTool
+                                g.DrawLine(pen, rubberStart, rubberCurrent)
+                            Case ToolType.EllipseTool
+                                g.DrawEllipse(pen, rect)
+                            Case ToolType.RectangleTool
+                                g.DrawRectangle(pen, rect)
+                        End Select
+                    End Using
+                End Using
+
+                If picFrame.Image IsNot Nothing Then Try : picFrame.Image.Dispose() : Catch : End Try
+                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
+                hasUnsavedChanges = True
+                editor.HasUnsavedChanges = True
+                overlayRubber.Invalidate()
+            End If
+        Catch ex As Exception
+            LogDebug("OverlayRubber_MouseUp EX: " & ex.Message)
+        End Try
+    End Sub
+
+
+    Private Function PictureBoxToImage(point As Point, pb As PictureBox) As Point
+        If pb.Image Is Nothing Then Return point
+        Dim img = pb.Image
+        Dim imgRatio = img.Width / img.Height
+        Dim pbRatio = pb.Width / pb.Height
+        Dim scale As Double
+        Dim offsetX As Integer = 0
+        Dim offsetY As Integer = 0
+        If imgRatio > pbRatio Then
+            scale = pb.Width / img.Width
+            offsetY = CInt((pb.Height - img.Height * scale) / 2)
+        Else
+            scale = pb.Height / img.Height
+            offsetX = CInt((pb.Width - img.Width * scale) / 2)
+        End If
+        Dim ix = CInt((point.X - offsetX) / scale)
+        Dim iy = CInt((point.Y - offsetY) / scale)
+        Return New Point(Math.Max(0, ix), Math.Max(0, iy))
+    End Function
+
+    Private Sub InitOverlayRubber()
+        Try
+            If picFrame Is Nothing Then
+                LogDebug("InitOverlayRubber: picFrame = Nothing")
+                Return
+            End If
+            If overlayRubber IsNot Nothing Then Return
+
+            overlayRubber = New OverlayPanel() With {
+            .Name = "overlayRubber",
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Transparent,
+            .Visible = True,
+            .Enabled = True
+        }
+
+            picFrame.Controls.Add(overlayRubber)
+            overlayRubber.BringToFront()
+
+            AddHandler overlayRubber.Paint, AddressOf OverlayRubber_Paint
+
+            ' Gestori mouse sull'overlay (ora l'overlay riceve i mouse)
+            AddHandler overlayRubber.MouseDown, AddressOf OverlayRubber_MouseDown
+            AddHandler overlayRubber.MouseMove, AddressOf OverlayRubber_MouseMove
+            AddHandler overlayRubber.MouseUp, AddressOf OverlayRubber_MouseUp
+
+            AddHandler picFrame.Resize, Sub(s, e)
+                                            If overlayRubber IsNot Nothing Then overlayRubber.Invalidate()
+                                        End Sub
+        Catch ex As Exception
+            LogDebug("InitOverlayRubber ERROR: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub OverlayRubber_Paint(sender As Object, e As PaintEventArgs)
+        Try
+            If Not isRubberDragging Then Return
+            Dim g = e.Graphics
+            g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+            Using pen As New Pen(colorePennino, Math.Max(1, spessorePennino))
+                pen.DashStyle = Drawing2D.DashStyle.Dash
+                Dim p1 = ConvertImageToPictureBoxPoint(rubberStart)
+                Dim p2 = ConvertImageToPictureBoxPoint(rubberCurrent)
+                Dim rect = GetNormalizedRect(p1, p2)
+                Select Case currentTool
+                    Case ToolType.LineTool
+                        g.DrawLine(pen, p1, p2)
+                    Case ToolType.EllipseTool
+                        g.DrawEllipse(pen, rect)
+                    Case ToolType.RectangleTool
+                        g.DrawRectangle(pen, rect)
+                End Select
+            End Using
+        Catch ex As Exception
+            LogDebug("OverlayRubber_Paint ERROR: " & ex.Message)
+        End Try
+    End Sub
+
+
+    Private Function ConvertMouseToImagePoint(mousePt As Point) As Point
+        If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return mousePt
+        Dim img = picFrame.Image
+        Dim imgRatio = img.Width / img.Height
+        Dim pbRatio = picFrame.Width / picFrame.Height
+        Dim scale As Double
+        Dim offsetX As Integer = 0
+        Dim offsetY As Integer = 0
+        If imgRatio > pbRatio Then
+            scale = picFrame.Width / img.Width
+            offsetY = CInt((picFrame.Height - img.Height * scale) / 2)
+        Else
+            scale = picFrame.Height / img.Height
+            offsetX = CInt((picFrame.Width - img.Width * scale) / 2)
+        End If
+        Dim ix = CInt((mousePt.X - offsetX) / scale)
+        Dim iy = CInt((mousePt.Y - offsetY) / scale)
+        ix = Math.Max(0, Math.Min(img.Width - 1, ix))
+        iy = Math.Max(0, Math.Min(img.Height - 1, iy))
+        Return New Point(ix, iy)
+    End Function
+
+    Private Function ConvertImageToPictureBoxPoint(imgPt As Point) As Point
+        If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return imgPt
+        Dim img = picFrame.Image
+        Dim imgRatio = img.Width / img.Height
+        Dim pbRatio = picFrame.Width / picFrame.Height
+        Dim scale As Double
+        Dim offsetX As Integer = 0
+        Dim offsetY As Integer = 0
+        If imgRatio > pbRatio Then
+            scale = picFrame.Width / img.Width
+            offsetY = CInt((picFrame.Height - img.Height * scale) / 2)
+        Else
+            scale = picFrame.Height / img.Height
+            offsetX = CInt((picFrame.Width - img.Width * scale) / 2)
+        End If
+        Dim px = CInt(imgPt.X * scale + offsetX)
+        Dim py = CInt(imgPt.Y * scale + offsetY)
+        Return New Point(px, py)
+    End Function
+
+    Private Function GetNormalizedRect(p1 As Point, p2 As Point) As Rectangle
+        Dim x = Math.Min(p1.X, p2.X)
+        Dim y = Math.Min(p1.Y, p2.Y)
+        Dim w = Math.Abs(p1.X - p2.X)
+        Dim h = Math.Abs(p1.Y - p2.Y)
+        Return New Rectangle(x, y, w, h)
+    End Function
+
+
+    Private Sub LogDebug(msg As String)
+        Try
+            Dim logPath = IO.Path.Combine(IO.Path.GetTempPath(), "VideoFBF_debug.log")
+            IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {msg}{Environment.NewLine}")
+        Catch : End Try
     End Sub
 
     ' --- DTO ListView Note ---
@@ -2475,5 +2942,19 @@ WHEN NOT MATCHED THEN
         Public Property DataNota As DateTime
     End Class
 
+    Public Class OverlayPanel
+        Inherits Panel
+
+        Public Sub New()
+            MyBase.New()
+            ' Abilita double buffering e painting ottimizzato
+            Me.SetStyle(ControlStyles.OptimizedDoubleBuffer Or
+                        ControlStyles.AllPaintingInWmPaint Or
+                        ControlStyles.UserPaint Or
+                        ControlStyles.SupportsTransparentBackColor, True)
+            Me.UpdateStyles()
+            Me.BackColor = Color.Transparent
+        End Sub
+    End Class
 
 End Class
