@@ -41,10 +41,11 @@ Partial Class VideoFBF
         colorDialogPennino = New ColorDialog()
         Label1 = New Label()
         GroupBox2 = New GroupBox()
+        Label8 = New Label()
+        Label7 = New Label()
         PenColor = New PictureBox()
         CmbStrumento = New ComboBox()
         ChkZoom = New CheckBox()
-        btnColorePennino = New Button()
         btnCaricaRevisione = New Button()
         GroupBox3 = New GroupBox()
         Label4 = New Label()
@@ -89,9 +90,9 @@ Partial Class VideoFBF
         ' 
         ' btnSalvaVideo
         ' 
-        btnSalvaVideo.Location = New Point(1328, 842)
+        btnSalvaVideo.Location = New Point(1314, 828)
         btnSalvaVideo.Name = "btnSalvaVideo"
-        btnSalvaVideo.Size = New Size(240, 42)
+        btnSalvaVideo.Size = New Size(259, 42)
         btnSalvaVideo.TabIndex = 2
         btnSalvaVideo.Text = "Esporta Video"
         btnSalvaVideo.UseVisualStyleBackColor = True
@@ -101,13 +102,13 @@ Partial Class VideoFBF
         picFrame.BorderStyle = BorderStyle.Fixed3D
         picFrame.Location = New Point(3, 3)
         picFrame.Name = "picFrame"
-        picFrame.Size = New Size(1283, 723)
+        picFrame.Size = New Size(1283, 727)
         picFrame.TabIndex = 3
         picFrame.TabStop = False
         ' 
         ' btnPrecedente
         ' 
-        btnPrecedente.Location = New Point(138, 843)
+        btnPrecedente.Location = New Point(138, 827)
         btnPrecedente.Name = "btnPrecedente"
         btnPrecedente.Size = New Size(127, 41)
         btnPrecedente.TabIndex = 4
@@ -116,7 +117,7 @@ Partial Class VideoFBF
         ' 
         ' btnSuccessivo
         ' 
-        btnSuccessivo.Location = New Point(271, 843)
+        btnSuccessivo.Location = New Point(271, 827)
         btnSuccessivo.Name = "btnSuccessivo"
         btnSuccessivo.Size = New Size(127, 41)
         btnSuccessivo.TabIndex = 5
@@ -129,7 +130,7 @@ Partial Class VideoFBF
         ' 
         ' btnAnnulla
         ' 
-        btnAnnulla.Location = New Point(1045, 844)
+        btnAnnulla.Location = New Point(1045, 828)
         btnAnnulla.Name = "btnAnnulla"
         btnAnnulla.Size = New Size(120, 42)
         btnAnnulla.TabIndex = 10
@@ -138,7 +139,7 @@ Partial Class VideoFBF
         ' 
         ' btnPrimoFrame
         ' 
-        btnPrimoFrame.Location = New Point(12, 842)
+        btnPrimoFrame.Location = New Point(12, 826)
         btnPrimoFrame.Name = "btnPrimoFrame"
         btnPrimoFrame.Size = New Size(120, 41)
         btnPrimoFrame.TabIndex = 12
@@ -147,7 +148,7 @@ Partial Class VideoFBF
         ' 
         ' btnUltimoFrame
         ' 
-        btnUltimoFrame.Location = New Point(404, 842)
+        btnUltimoFrame.Location = New Point(404, 826)
         btnUltimoFrame.Name = "btnUltimoFrame"
         btnUltimoFrame.Size = New Size(120, 41)
         btnUltimoFrame.TabIndex = 13
@@ -156,7 +157,7 @@ Partial Class VideoFBF
         ' 
         ' btnAvantiVeloce
         ' 
-        btnAvantiVeloce.Location = New Point(706, 843)
+        btnAvantiVeloce.Location = New Point(706, 827)
         btnAvantiVeloce.Name = "btnAvantiVeloce"
         btnAvantiVeloce.Size = New Size(120, 41)
         btnAvantiVeloce.TabIndex = 14
@@ -165,7 +166,7 @@ Partial Class VideoFBF
         ' 
         ' btnIndietroVeloce
         ' 
-        btnIndietroVeloce.Location = New Point(580, 843)
+        btnIndietroVeloce.Location = New Point(580, 827)
         btnIndietroVeloce.Name = "btnIndietroVeloce"
         btnIndietroVeloce.Size = New Size(120, 41)
         btnIndietroVeloce.TabIndex = 15
@@ -174,7 +175,7 @@ Partial Class VideoFBF
         ' 
         ' TrackFrame
         ' 
-        TrackFrame.Location = New Point(12, 781)
+        TrackFrame.Location = New Point(12, 791)
         TrackFrame.Name = "TrackFrame"
         TrackFrame.Size = New Size(1299, 45)
         TrackFrame.TabIndex = 16
@@ -184,7 +185,7 @@ Partial Class VideoFBF
         txtNote.Location = New Point(8, 22)
         txtNote.Multiline = True
         txtNote.Name = "txtNote"
-        txtNote.Size = New Size(245, 166)
+        txtNote.Size = New Size(245, 180)
         txtNote.TabIndex = 17
         ' 
         ' GroupBox1
@@ -193,14 +194,14 @@ Partial Class VideoFBF
         GroupBox1.Controls.Add(txtNote)
         GroupBox1.Location = New Point(1317, 238)
         GroupBox1.Name = "GroupBox1"
-        GroupBox1.Size = New Size(259, 225)
+        GroupBox1.Size = New Size(259, 239)
         GroupBox1.TabIndex = 18
         GroupBox1.TabStop = False
         GroupBox1.Text = "Annotazione Frame"
         ' 
         ' btnSalvaNote
         ' 
-        btnSalvaNote.Location = New Point(8, 194)
+        btnSalvaNote.Location = New Point(6, 208)
         btnSalvaNote.Name = "btnSalvaNote"
         btnSalvaNote.Size = New Size(245, 25)
         btnSalvaNote.TabIndex = 19
@@ -210,44 +211,63 @@ Partial Class VideoFBF
         ' numSpessorePennino
         ' 
         numSpessorePennino.Enabled = False
-        numSpessorePennino.Location = New Point(131, 56)
+        numSpessorePennino.Location = New Point(143, 56)
         numSpessorePennino.Maximum = New Decimal(New Integer() {50, 0, 0, 0})
         numSpessorePennino.Minimum = New Decimal(New Integer() {1, 0, 0, 0})
         numSpessorePennino.Name = "numSpessorePennino"
-        numSpessorePennino.Size = New Size(120, 23)
+        numSpessorePennino.Size = New Size(108, 23)
         numSpessorePennino.TabIndex = 19
         numSpessorePennino.Value = New Decimal(New Integer() {5, 0, 0, 0})
         ' 
         ' Label1
         ' 
         Label1.AutoSize = True
-        Label1.Location = New Point(6, 58)
+        Label1.Location = New Point(8, 61)
         Label1.Name = "Label1"
-        Label1.Size = New Size(117, 15)
+        Label1.Size = New Size(73, 15)
         Label1.TabIndex = 21
-        Label1.Text = "Dimensione Pennino"
+        Label1.Text = "Dimensione:"
         ' 
         ' GroupBox2
         ' 
+        GroupBox2.Controls.Add(Label8)
+        GroupBox2.Controls.Add(Label7)
         GroupBox2.Controls.Add(PenColor)
         GroupBox2.Controls.Add(CmbStrumento)
         GroupBox2.Controls.Add(ChkZoom)
-        GroupBox2.Controls.Add(btnColorePennino)
         GroupBox2.Controls.Add(Label1)
         GroupBox2.Controls.Add(numSpessorePennino)
-        GroupBox2.Location = New Point(1317, 679)
+        GroupBox2.Location = New Point(1317, 704)
         GroupBox2.Name = "GroupBox2"
-        GroupBox2.Size = New Size(259, 147)
+        GroupBox2.Size = New Size(259, 118)
         GroupBox2.TabIndex = 22
         GroupBox2.TabStop = False
         GroupBox2.Text = "Pennino"
         ' 
+        ' Label8
+        ' 
+        Label8.AutoSize = True
+        Label8.Location = New Point(8, 86)
+        Label8.Name = "Label8"
+        Label8.Size = New Size(45, 15)
+        Label8.TabIndex = 39
+        Label8.Text = "Colore:"
+        ' 
+        ' Label7
+        ' 
+        Label7.AutoSize = True
+        Label7.Location = New Point(8, 30)
+        Label7.Name = "Label7"
+        Label7.Size = New Size(129, 15)
+        Label7.TabIndex = 38
+        Label7.Text = "Strumento Selezionato:"
+        ' 
         ' PenColor
         ' 
         PenColor.BorderStyle = BorderStyle.Fixed3D
-        PenColor.Location = New Point(11, 120)
+        PenColor.Location = New Point(143, 86)
         PenColor.Name = "PenColor"
-        PenColor.Size = New Size(36, 17)
+        PenColor.Size = New Size(108, 21)
         PenColor.TabIndex = 37
         PenColor.TabStop = False
         ' 
@@ -255,30 +275,20 @@ Partial Class VideoFBF
         ' 
         CmbStrumento.Enabled = False
         CmbStrumento.FormattingEnabled = True
-        CmbStrumento.Location = New Point(11, 85)
+        CmbStrumento.Location = New Point(143, 27)
         CmbStrumento.Name = "CmbStrumento"
-        CmbStrumento.Size = New Size(240, 23)
+        CmbStrumento.Size = New Size(108, 23)
         CmbStrumento.TabIndex = 22
         ' 
         ' ChkZoom
         ' 
         ChkZoom.AutoSize = True
-        ChkZoom.Location = New Point(11, 27)
+        ChkZoom.Location = New Point(153, 0)
         ChkZoom.Name = "ChkZoom"
         ChkZoom.Size = New Size(106, 19)
         ChkZoom.TabIndex = 36
         ChkZoom.Text = "Abilita Disegno"
         ChkZoom.UseVisualStyleBackColor = True
-        ' 
-        ' btnColorePennino
-        ' 
-        btnColorePennino.Enabled = False
-        btnColorePennino.Location = New Point(53, 114)
-        btnColorePennino.Name = "btnColorePennino"
-        btnColorePennino.Size = New Size(198, 27)
-        btnColorePennino.TabIndex = 21
-        btnColorePennino.Text = "Scegli Colore"
-        btnColorePennino.UseVisualStyleBackColor = True
         ' 
         ' btnCaricaRevisione
         ' 
@@ -297,9 +307,9 @@ Partial Class VideoFBF
         GroupBox3.Controls.Add(lstUtentiCondivisi)
         GroupBox3.Controls.Add(lblDataNota)
         GroupBox3.Controls.Add(lblAutore)
-        GroupBox3.Location = New Point(1317, 469)
+        GroupBox3.Location = New Point(1317, 483)
         GroupBox3.Name = "GroupBox3"
-        GroupBox3.Size = New Size(259, 204)
+        GroupBox3.Size = New Size(259, 215)
         GroupBox3.TabIndex = 25
         GroupBox3.TabStop = False
         GroupBox3.Text = "Autore e Condivisioni"
@@ -307,7 +317,7 @@ Partial Class VideoFBF
         ' Label4
         ' 
         Label4.AutoSize = True
-        Label4.Location = New Point(11, 50)
+        Label4.Location = New Point(8, 39)
         Label4.Name = "Label4"
         Label4.Size = New Size(34, 15)
         Label4.TabIndex = 4
@@ -316,7 +326,7 @@ Partial Class VideoFBF
         ' Label3
         ' 
         Label3.AutoSize = True
-        Label3.Location = New Point(11, 30)
+        Label3.Location = New Point(8, 19)
         Label3.Name = "Label3"
         Label3.Size = New Size(46, 15)
         Label3.TabIndex = 3
@@ -325,15 +335,15 @@ Partial Class VideoFBF
         ' lstUtentiCondivisi
         ' 
         lstUtentiCondivisi.FormattingEnabled = True
-        lstUtentiCondivisi.Location = New Point(11, 68)
+        lstUtentiCondivisi.Location = New Point(6, 57)
         lstUtentiCondivisi.Name = "lstUtentiCondivisi"
-        lstUtentiCondivisi.Size = New Size(242, 112)
+        lstUtentiCondivisi.Size = New Size(247, 148)
         lstUtentiCondivisi.TabIndex = 2
         ' 
         ' lblDataNota
         ' 
         lblDataNota.AutoSize = True
-        lblDataNota.Location = New Point(63, 50)
+        lblDataNota.Location = New Point(63, 39)
         lblDataNota.Name = "lblDataNota"
         lblDataNota.Size = New Size(31, 15)
         lblDataNota.TabIndex = 1
@@ -342,7 +352,7 @@ Partial Class VideoFBF
         ' lblAutore
         ' 
         lblAutore.AutoSize = True
-        lblAutore.Location = New Point(63, 30)
+        lblAutore.Location = New Point(63, 19)
         lblAutore.Name = "lblAutore"
         lblAutore.Size = New Size(43, 15)
         lblAutore.TabIndex = 0
@@ -403,15 +413,15 @@ Partial Class VideoFBF
         ' LstNoteFrame
         ' 
         LstNoteFrame.Columns.AddRange(New ColumnHeader() {Frame, Nota, Utente})
-        LstNoteFrame.Location = New Point(11, 22)
+        LstNoteFrame.Location = New Point(6, 22)
         LstNoteFrame.Name = "LstNoteFrame"
-        LstNoteFrame.Size = New Size(242, 159)
+        LstNoteFrame.Size = New Size(247, 159)
         LstNoteFrame.TabIndex = 26
         LstNoteFrame.UseCompatibleStateImageBehavior = False
         ' 
         ' BtnRipristinaFrame
         ' 
-        BtnRipristinaFrame.Location = New Point(1171, 844)
+        BtnRipristinaFrame.Location = New Point(1171, 828)
         BtnRipristinaFrame.Name = "BtnRipristinaFrame"
         BtnRipristinaFrame.Size = New Size(120, 42)
         BtnRipristinaFrame.TabIndex = 31
@@ -468,7 +478,7 @@ Partial Class VideoFBF
         panelViewer.Controls.Add(picFrame)
         panelViewer.Location = New Point(12, 40)
         panelViewer.Name = "panelViewer"
-        panelViewer.Size = New Size(1289, 729)
+        panelViewer.Size = New Size(1289, 733)
         panelViewer.TabIndex = 37
         ' 
         ' VideoFBF
@@ -477,7 +487,7 @@ Partial Class VideoFBF
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         AutoScroll = True
-        ClientSize = New Size(1585, 894)
+        ClientSize = New Size(1585, 879)
         Controls.Add(panelViewer)
         Controls.Add(lblTotFrames)
         Controls.Add(Label6)
@@ -541,7 +551,6 @@ Partial Class VideoFBF
     Friend WithEvents colorDialogPennino As ColorDialog
     Friend WithEvents Label1 As Label
     Friend WithEvents GroupBox2 As GroupBox
-    Friend WithEvents btnColorePennino As Button
     Friend WithEvents btnSalvaNote As Button
     Friend WithEvents btnCaricaRevisione As Button
     Friend WithEvents GroupBox3 As GroupBox
@@ -568,5 +577,7 @@ Partial Class VideoFBF
     Friend WithEvents panelViewer As Panel
     Friend WithEvents CmbStrumento As ComboBox
     Friend WithEvents PenColor As PictureBox
+    Friend WithEvents Label7 As Label
+    Friend WithEvents Label8 As Label
 
 End Class

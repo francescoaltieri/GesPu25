@@ -133,7 +133,7 @@ Public Class CreaLettAssegnazione
             If Not String.IsNullOrWhiteSpace(studioAssegnatario) Then
                 Using conn As New SqlConnection(ConnString)
                     conn.Open()
-                    Using cmd As New SqlCommand("SELECT TOP 1 Descrizione, IndirizzoFornitore, CAPFornitore, CittàFornitore, EmailFornitore, NumeroTelefonoFornitore FROM Tab_Fornitori WHERE IdFornitore = @id", conn)
+                    Using cmd As New SqlCommand("SELECT TOP 1 Descrizione, Indirizzo, CAP, Città, Email, NumeroTelefono FROM Tab_Fornitori WHERE IdFornitore = @id", conn)
                         cmd.Parameters.AddWithValue("@id", studioAssegnatario)
                         Using rd = cmd.ExecuteReader()
                             If rd.Read() Then

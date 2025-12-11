@@ -43,6 +43,8 @@ Public Class Login
                 GesPu25.toolStripDataOra.Text = "Connesso dalle " & SessioneUtente.DataConnessione.ToString("HH:mm - dd/MM/yyyy")
 
                 AttivaTuttiIMenu(GesPu25.MenuStrip1)
+                GesPu25.CaricaNotificheUtente(SessioneUtente.NomeUtenteCorrente)
+
                 Me.Close()
             Else
                 Dim risposta = MDIMessageBox.Show("Nome utente o password errati.", Me.MdiParent, MessageBoxButtons.OK)

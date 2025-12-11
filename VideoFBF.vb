@@ -295,7 +295,7 @@ Public Class VideoFBF
 
             Dim videoPath = OpenFileDialog1.FileName
             Dim nomeVideo = Path.GetFileNameWithoutExtension(videoPath)
-            Dim baseDir = Path.Combine(OttieniPercorsoFrames(), nomeVideo)
+            Dim baseDir = Path.Combine(OttieniPercorso("PercorsoFrames"), nomeVideo)
             Directory.CreateDirectory(baseDir)
 
             Dim approvato As Boolean = False
@@ -399,7 +399,7 @@ Public Class VideoFBF
 
     ' Crea/Popola la cartella di backup fissa Revisione_0000 con i frame originali
     Private Sub EnsureOriginalBackupFolder(nomeVideo As String, revisioneDir As String)
-        Dim baseDir = Path.Combine(OttieniPercorsoFrames(), nomeVideo)
+        Dim baseDir = Path.Combine(OttieniPercorso("PercorsoFrames"), nomeVideo)
         Dim originalDir = Path.Combine(baseDir, "Revisione_0000")
 
         ' Crea la cartella se non esiste
@@ -821,12 +821,12 @@ Public Class VideoFBF
     End Sub
 
     ' --- Parametri e DB helpers ---
-    Private Function OttieniPercorsoFrames() As String
+    Private Function OttieniPercorso(DescPercorso As String) As String
         Using conn As New SqlConnection(ConnString)
             conn.Open()
             Dim query As String = "SELECT Valore FROM Sys_Parametri WHERE Descrizione = @DescPar"
             Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.Add("@DescPar", SqlDbType.NVarChar, 200).Value = "PercorsoFrames"
+                cmd.Parameters.Add("@DescPar", SqlDbType.NVarChar, 200).Value = DescPercorso
                 Dim result = cmd.ExecuteScalar()
                 If result IsNot Nothing Then
                     Return result.ToString()
@@ -1041,7 +1041,7 @@ Public Class VideoFBF
     Public Sub CaricaRevisione(videoID As Integer, revisioneID As Integer)
         Dim videoPath As String = ""
         Dim nomeVideo = OttieniNomeVideo(videoID)
-        Dim basePath = OttieniPercorsoFrames()
+        Dim basePath = OttieniPercorso("PercorsoFrames")
         Dim frameDir = Path.Combine(basePath, nomeVideo, $"Revisione_{revisioneID:0000}")
 
         Using conn As New SqlConnection(ConnString)
@@ -1271,13 +1271,6 @@ Public Class VideoFBF
         notaPosizione = e.Location
     End Sub
 
-    Private Sub btnColorePennino_Click(sender As Object, e As EventArgs) Handles btnColorePennino.Click
-        If colorDialogPennino.ShowDialog = DialogResult.OK Then
-            colorePennino = colorDialogPennino.Color
-            PenColor.BackColor = colorePennino
-        End If
-    End Sub
-
     Private Sub numSpessorePennino_ValueChanged(sender As Object, e As EventArgs) Handles numSpessorePennino.ValueChanged
         spessorePennino = CInt(numSpessorePennino.Value)
     End Sub
@@ -1297,12 +1290,16 @@ Public Class VideoFBF
     End Sub
 
     Private Sub btnSalvaVideo_Click(sender As Object, e As EventArgs) Handles btnSalvaVideo.Click
+        Cursor.Current = Cursors.WaitCursor
+        Application.DoEvents()
         If picFrame.Image Is Nothing Then
             MDIMessageBox.Show("Caricare prima i Frame", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
-        Dim outputPath = "C:\VideoEditor\output.mp4"
+        Dim outputPath = OttieniPercorso("PercorsoVideodaFrames") & "\" & "Video_Salvato_" & DateTime.Now.ToString("yyyyMMdd_HHmmss") & ".mp4"
         editor.RebuildVideo(outputPath)
+        Cursor.Current = Cursors.Default
+        Application.DoEvents()
         MDIMessageBox.Show("Video salvato in: " & outputPath, Me.MdiParent, MessageBoxButtons.OK)
     End Sub
 
@@ -1806,7 +1803,7 @@ Public Class VideoFBF
 
         ' Verifica che esista la cartella di backup Revisione_0000
         Dim nomeVideo = Path.GetFileNameWithoutExtension(editor.VideoPath)
-        Dim baseDir = Path.Combine(OttieniPercorsoFrames(), nomeVideo)
+        Dim baseDir = Path.Combine(OttieniPercorso("PercorsoFrames"), nomeVideo)
         Dim originalDir = Path.Combine(baseDir, "Revisione_0000")
         If Not Directory.Exists(originalDir) Then
             MDIMessageBox.Show("Cartella di backup Revisione_0000 non trovato", Me.MdiParent, MessageBoxButtons.OK)
@@ -1880,7 +1877,7 @@ Public Class VideoFBF
                 Return
             End If
             Dim nomeVideo = Path.GetFileNameWithoutExtension(editor.VideoPath)
-            Dim baseDir = Path.Combine(OttieniPercorsoFrames(), nomeVideo)
+            Dim baseDir = Path.Combine(OttieniPercorso("PercorsoFrames"), nomeVideo)
             Dim originalDir = Path.Combine(baseDir, "Revisione_0000")
             BtnRipristinaFrame.Enabled = Directory.Exists(originalDir)
         Catch
@@ -2522,14 +2519,14 @@ WHEN NOT MATCHED THEN
             picFrame.Cursor = Cursors.Default
             numSpessorePennino.Enabled = False
             CmbStrumento.Enabled = False
-            btnColorePennino.Enabled = False
+            PenColor.Enabled = False
         Else
             picFrame.SizeMode = PictureBoxSizeMode.AutoSize
             picFrame.Enabled = True
             picFrame.Cursor = Cursors.Cross
             numSpessorePennino.Enabled = True
             CmbStrumento.Enabled = True
-            btnColorePennino.Enabled = True
+            PenColor.Enabled = True
         End If
     End Sub
 
@@ -2796,6 +2793,12 @@ WHEN NOT MATCHED THEN
         End Try
     End Sub
 
+    Private Sub PenColor_Click(sender As Object, e As EventArgs) Handles PenColor.Click
+        If colorDialogPennino.ShowDialog = DialogResult.OK Then
+            colorePennino = colorDialogPennino.Color
+            PenColor.BackColor = colorePennino
+        End If
+    End Sub
 
     Private Function PictureBoxToImage(point As Point, pb As PictureBox) As Point
         If pb.Image Is Nothing Then Return point

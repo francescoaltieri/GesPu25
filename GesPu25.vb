@@ -18,10 +18,90 @@ Public Class GesPu25
 
     End Sub
 
+    Public Sub CaricaNotificheUtente(nomeUtente As String)
+        ' Configura la ListView
+        ListNotifiche.Clear()
+        ListNotifiche.View = View.Details
+        ListNotifiche.FullRowSelect = True
+
+        ' Definisci le colonne
+        ListNotifiche.Columns.Add("Id Notifica", 80)
+        ListNotifiche.Columns.Add("Data", 150)
+        ListNotifiche.Columns.Add("Messaggio", 300)
+        ListNotifiche.Columns.Add("Letto", 60)
+
+        ListNotifiche.Visible = False
+
+        Try
+            Dim query As String = "SELECT IdNotifica, Data, Messaggio, Letto 
+                                   FROM Tab_Notifiche 
+                                   WHERE Destinatario = @utente and Letto = @letto
+                                   ORDER BY Data DESC"
+
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@utente", nomeUtente)
+                    cmd.Parameters.AddWithValue("@letto", False)
+
+                    conn.Open()
+                    Using reader As SqlDataReader = cmd.ExecuteReader()
+                        While reader.Read()
+                            Dim item As New ListViewItem(reader("IdNotifica").ToString())
+                            item.SubItems.Add(Convert.ToDateTime(reader("Data")).ToString("dd/MM/yyyy HH:mm"))
+                            item.SubItems.Add(reader("Messaggio").ToString())
+                            item.SubItems.Add(If(Convert.ToBoolean(reader("Letto")), "Sì", "No"))
+                            ListNotifiche.Items.Add(item)
+                        End While
+                    End Using
+                End Using
+            End Using
+            If ListNotifiche.Items.Count = 0 Then
+                ListNotifiche.Visible = False
+            Else
+                ListNotifiche.Visible = True
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show("Errore nel caricamento notifiche: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub ListNotifiche_DoubleClick(sender As Object, e As EventArgs) Handles ListNotifiche.DoubleClick
+        If ListNotifiche.SelectedItems.Count > 0 Then
+            Dim idNotifica As Integer = Convert.ToInt32(ListNotifiche.SelectedItems(0).Text)
+
+            ' Aggiorna lo stato nel DB
+            AggiornaNotificaComeLetta(idNotifica)
+
+            ' Ricarica la lista notifiche per l’utente corrente
+            CaricaNotificheUtente(SessioneUtente.NomeUtenteCorrente)
+        End If
+    End Sub
+
+    Private Sub AggiornaNotificaComeLetta(idNotifica As Integer)
+        Try
+            Dim query As String = "UPDATE Tab_Notifiche SET Letto = 1 WHERE IdNotifica = @id"
+
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@id", idNotifica)
+                    conn.Open()
+                    cmd.ExecuteNonQuery()
+                End Using
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Errore durante l'aggiornamento della notifica: " & ex.Message)
+        End Try
+    End Sub
+
+
     Private Sub LogoutToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles LogoutToolStripMenuItem.Click
         ' Cancella la sessione utente
         SessioneUtente.NomeUtenteCorrente = Nothing
         SessioneUtente.Autorizzazioni = Nothing
+
+        ListNotifiche.Visible = False
 
         Me.toolStripUser.Text = "Nessun utente connesso"
         Me.toolStripDataOra.Text = "                                       "
@@ -101,7 +181,6 @@ Public Class GesPu25
 
             End If
         Next
-
 
         Dim campi = RecuperaCampiDa(nomeTabella)
         Dim nuovoForm As New DynamicDataForm(campi, nomeTabella)
@@ -201,8 +280,8 @@ Public Class GesPu25
         ApriModuloConPermessi("Tab_Fornitori", Me)
     End Sub
 
-    Private Sub EMailToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles EMailToolStripMenuItem.Click
-        ApriModuloConPermessi("Tab_EMail", Me)
+    Private Sub EMailToolStripMenuItem_Click(sender As Object, e As EventArgs)
+        ApriModuloConPermessi("Tab_Comunicazioni", Me)
     End Sub
 
     Private Sub ConvalidaCampiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConvalidaCampiToolStripMenuItem.Click
@@ -323,6 +402,10 @@ Public Class GesPu25
     Private Sub AcquisisciDaPDFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AcquisisciDaPDFToolStripMenuItem.Click
         Dim modulo As New PDF2Storyboard()
         ApriModulo2ConPermessi("Acquisici da PDF", modulo)
+    End Sub
+
+    Private Sub GestioneNotificheToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles GestioneNotificheToolStripMenuItem.Click
+        ApriModuloConPermessi("Tab_Notifiche", Me)
     End Sub
 
 End Class
