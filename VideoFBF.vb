@@ -1,8 +1,9 @@
-﻿Imports System.IO
-Imports Microsoft.Data.SqlClient
+﻿Imports System.Diagnostics
+Imports System.IO
 Imports System.Threading.Tasks
-Imports System.Diagnostics
 Imports DocumentFormat.OpenXml.Vml.Office
+Imports Microsoft.Data.SqlClient
+Imports UglyToad.PdfPig.Graphics.Operations.PathPainting
 
 Public Class VideoFBF
     ' --- Campi di stato e UI ---
@@ -23,15 +24,6 @@ Public Class VideoFBF
 
     Public Property Parametri As RevisioneParametri
 
-    ' Strumenti disponibili
-    Private Enum ToolType
-        None = 0
-        PointTool = 1
-        LineTool = 2
-        EllipseTool = 3
-        RectangleTool = 4
-    End Enum
-
     Private currentTool As ToolType = ToolType.None
 
     ' Per il disegno temporaneo (rubberband)
@@ -45,8 +37,17 @@ Public Class VideoFBF
     Private rubberStart As Point = Point.Empty
     Private rubberCurrent As Point = Point.Empty
 
+    ' Strumenti disponibili
+    Private Enum ToolType
+        None = 0
+        PointTool = 1
+        LineTool = 2
+        EllipseTool = 3
+        RectangleTool = 4
+        ArrowTool = 5
+        FillTool = 6
+    End Enum
 
-    ' --- Costruttori e Load ---
     Public Sub New(parametri As RevisioneParametri)
         InitializeComponent()
         Me.Parametri = parametri
@@ -81,6 +82,7 @@ Public Class VideoFBF
         InitLstNoteFrameColumns()
         InitStrumenti()
         InitOverlayRubber()
+
         ' Inizializza tooltip e handler per la ListView
         Try
             If LstNoteFrame IsNot Nothing Then
@@ -141,7 +143,6 @@ Public Class VideoFBF
         End Try
     End Sub
 
-    ' Aggiorna il double-click per passare anche il numero revisione al viewer
     Private Sub LstNoteFrame_DoubleClick_OpenViewer(sender As Object, e As EventArgs)
         Try
             Dim lv = TryCast(sender, ListView)
@@ -180,69 +181,6 @@ Public Class VideoFBF
         End Try
     End Sub
 
-
-    ' NoteViewerForm esteso per mostrare anche il numero revisione
-    Public Class NoteViewerForm
-        Inherits Form
-
-        Private txtFullNote As TextBox
-        Private lblInfo As Label
-        Private lblRevisione As Label
-        Private btnClose As Button
-
-        ' Nuovo costruttore: revisioneNumber può essere -1 se non disponibile
-        Public Sub New(revisioneNumber As Integer, frameIndex As Integer, testo As String, autore As String, dataNota As DateTime)
-            Me.Text = If(frameIndex >= 0, $"Nota Frame {frameIndex + 1}", "Nota")
-            Me.FormBorderStyle = FormBorderStyle.FixedDialog
-            Me.MaximizeBox = False
-            Me.MinimizeBox = False
-            Me.ClientSize = New Size(760, 380)
-
-            ' Label revisione in alto a sinistra
-            lblRevisione = New Label() With {
-            .AutoSize = False,
-            .Location = New Point(10, 8),
-            .Size = New Size(300, 20),
-            .Font = New Font("Segoe UI", 9, FontStyle.Bold),
-            .Text = If(revisioneNumber >= 0, $"Revisione: {revisioneNumber}", "Revisione: -")
-        }
-            Me.Controls.Add(lblRevisione)
-
-            ' Info autore/data a destra
-            lblInfo = New Label() With {
-            .AutoSize = False,
-            .Location = New Point(320, 8),
-            .Size = New Size(420, 20),
-            .TextAlign = ContentAlignment.MiddleRight,
-            .Text = $"Autore: {If(String.IsNullOrEmpty(autore), "-", autore)}    Data: {If(dataNota = DateTime.MinValue, "-", dataNota.ToString("dd/MM/yyyy HH:mm"))}"
-        }
-            Me.Controls.Add(lblInfo)
-
-            txtFullNote = New TextBox() With {
-            .Multiline = True,
-            .ReadOnly = True,
-            .ScrollBars = ScrollBars.Vertical,
-            .Location = New Point(10, 36),
-            .Size = New Size(740, 290),
-            .Font = New Font("Segoe UI", 10),
-            .Text = If(String.IsNullOrEmpty(testo), "(nota vuota)", testo)
-        }
-            Me.Controls.Add(txtFullNote)
-
-            btnClose = New Button() With {
-            .Text = "Chiudi",
-            .DialogResult = DialogResult.OK,
-            .Size = New Size(100, 30),
-            .Location = New Point(Me.ClientSize.Width - 110, Me.ClientSize.Height - 40)
-        }
-            Me.Controls.Add(btnClose)
-
-            Me.AcceptButton = btnClose
-        End Sub
-    End Class
-
-
-
     Private Sub LstNoteFrame_MouseLeave_HideTooltip(sender As Object, e As EventArgs)
         Try
             Dim lv = TryCast(sender, ListView)
@@ -253,7 +191,6 @@ Public Class VideoFBF
         End Try
     End Sub
 
-    ' --- Utility TrackBar sicura ---
     Private Sub SafeSetTrackFrameValue(desired As Integer)
         If TrackFrame Is Nothing Then Return
         If TrackFrame.Minimum > TrackFrame.Maximum Then
@@ -276,7 +213,6 @@ Public Class VideoFBF
 
     End Sub
 
-    ' --- Caricamento NUOVO VIDEO: con ID revisione reale e backup NomeVideo_0000 ---
     Private Async Sub btnCaricaVideo_Click(sender As Object, e As EventArgs) Handles btnCaricaVideo.Click
         Dim previousUseWait As Boolean = Application.UseWaitCursor
         Dim previousCursor As Cursor = Me.Cursor
@@ -397,7 +333,6 @@ Public Class VideoFBF
         End Try
     End Sub
 
-    ' Crea/Popola la cartella di backup fissa Revisione_0000 con i frame originali
     Private Sub EnsureOriginalBackupFolder(nomeVideo As String, revisioneDir As String)
         Dim baseDir = Path.Combine(OttieniPercorso("PercorsoFrames"), nomeVideo)
         Dim originalDir = Path.Combine(baseDir, "Revisione_0000")
@@ -437,7 +372,6 @@ Public Class VideoFBF
         Next
     End Sub
 
-    ' Ripristina il frame corrente dall’originale cancellando il file overlay
     Private Sub RestoreCurrentFrameFromOriginal()
         If editor Is Nothing Then Return
 
@@ -453,7 +387,7 @@ Public Class VideoFBF
 
         Dim logPath = Path.Combine(Path.GetTempPath(), "VideoFBF_restore.log")
         Try
-            ' 1) Rilascia riferimenti UI/editor che potrebbero lockare il file overlay
+            ' 1) Rilascia riferimenti UI/editor che potrebbero bloccare il file overlay
             Try
                 If picFrame.Image IsNot Nothing Then
                     Try : picFrame.Image.Dispose() : Catch : End Try
@@ -484,7 +418,7 @@ Public Class VideoFBF
             GC.WaitForPendingFinalizers()
             GC.Collect()
 
-            ' 2) Elimina il file overlay se esiste (retry semplice)
+            ' 2) Elimina il file overlay se esiste
             If File.Exists(overlayPath) Then
                 Dim attempts As Integer = 0
                 Dim deleted As Boolean = False
@@ -528,7 +462,7 @@ Public Class VideoFBF
                 Try : FrameConNote.Remove(idx) : Catch : End Try
             End If
 
-            ' 4) Aggiorna UI delle note (se la revisione è gestita dal DB, ricarica; altrimenti refresh in memoria)
+            ' 4) Aggiorna UI delle note
             Try
                 Dim revID As Integer
                 If TryParseRevisioneID(lblRevAttiva.Text, revID) Then
@@ -540,7 +474,7 @@ Public Class VideoFBF
             Catch
             End Try
 
-            ' 5) Ricarica il frame (ora il file base è il frame "originale" della revisione attiva)
+            ' 5) Ricarica il frame 
             Try
                 If editor IsNot Nothing Then
                     If picFrame.Image IsNot Nothing Then
@@ -589,7 +523,21 @@ Public Class VideoFBF
         End Try
     End Sub
 
-    ' Aggiorna lblFrameAttivo e lblTotFrames in modo thread-safe
+    Private Sub ChkZoom_CheckedChanged(sender As Object, e As EventArgs) Handles ChkZoom.CheckedChanged
+        If ChkZoom.Checked Then
+            SettaPicFrame("AutoSize")
+        Else
+            SettaPicFrame("Zoom")
+        End If
+    End Sub
+
+    Private Sub PenColor_Click(sender As Object, e As EventArgs) Handles PenColor.Click
+        If colorDialogPennino.ShowDialog = DialogResult.OK Then
+            colorePennino = colorDialogPennino.Color
+            PenColor.BackColor = colorePennino
+        End If
+    End Sub
+
     Private Sub UpdateFrameLabels(Optional currentIndex As Integer = -1)
         Try
             If Me.InvokeRequired Then
@@ -635,7 +583,6 @@ Public Class VideoFBF
         End Try
     End Sub
 
-    ' Carica un'immagine da file senza tenere il file lockato (usa MemoryStream)
     Private Function LoadImageWithoutLock(path As String) As Image
         ' Carica l'immagine in memoria e restituisce una copia indipendente
         Using fs As New FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)
@@ -650,7 +597,6 @@ Public Class VideoFBF
         End Using
     End Function
 
-    ' --- Inserire revisione ritornando ID reale (OUTPUT INSERTED) ---
     Private Function InserisciRevisione_RitornaID(videoId As Integer, nomeUtente As String, stato As String) As Integer
         Dim nomeRevisione = $"Revisione - {DateTime.Now:dd/MM/yyyy}"
         Dim NumRetake = CalcolaRetake(videoId)
@@ -683,7 +629,6 @@ Public Class VideoFBF
         End Using
     End Function
 
-    ' --- UTENTI condivisi: cambi di tabella (Mov_RevisioniUtente) ---
     Private Sub CaricaUtentiDisponibili()
         lstUtentiCondivisi.Items.Clear()
         Using conn As New SqlConnection(ConnString)
@@ -782,7 +727,7 @@ Public Class VideoFBF
             cmd.ExecuteNonQuery()
         End Using
     End Sub
-    ' --- FormClosing e salvataggio posizione ---
+
     Private Sub VideoFBF_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
         If hasUnsavedChanges Then
             Dim proceed = ConfirmSaveChanges()
@@ -794,33 +739,6 @@ Public Class VideoFBF
         SalvaPosizioneForm(Me)
     End Sub
 
-    Private Sub SalvaPosizioneForm2()
-        Dim stato = If(Me.WindowState = FormWindowState.Maximized, "Maximized", "Normal")
-        Dim x = If(Me.WindowState = FormWindowState.Normal, Me.Location.X, RestoreBounds.X)
-        Dim y = If(Me.WindowState = FormWindowState.Normal, Me.Location.Y, RestoreBounds.Y)
-        Dim w = If(Me.WindowState = FormWindowState.Normal, Me.Size.Width, RestoreBounds.Width)
-        Dim h = If(Me.WindowState = FormWindowState.Normal, Me.Size.Height, RestoreBounds.Height)
-
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query = "
-                IF EXISTS (SELECT 1 FROM Sys_Form WHERE FormName = @FormName)
-                    UPDATE Sys_Form SET X = @X, Y = @Y, Width = @Width, Height = @Height, WindowsState = @WindowsState WHERE FormName = @FormName
-                ELSE
-                    INSERT INTO Sys_Form (FormName, X, Y, Width, Height, WindowsState) VALUES (@FormName, @X, @Y, @Width, @Height, @WindowsState)"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.Add("@FormName", SqlDbType.NVarChar, 200).Value = Me.Name
-                cmd.Parameters.Add("@X", SqlDbType.Int).Value = x
-                cmd.Parameters.Add("@Y", SqlDbType.Int).Value = y
-                cmd.Parameters.Add("@Width", SqlDbType.Int).Value = w
-                cmd.Parameters.Add("@Height", SqlDbType.Int).Value = h
-                cmd.Parameters.Add("@WindowsState", SqlDbType.NVarChar, 50).Value = stato
-                cmd.ExecuteNonQuery()
-            End Using
-        End Using
-    End Sub
-
-    ' --- Parametri e DB helpers ---
     Private Function OttieniPercorso(DescPercorso As String) As String
         Using conn As New SqlConnection(ConnString)
             conn.Open()
@@ -931,68 +849,6 @@ Public Class VideoFBF
         End Using
     End Function
 
-    Private Function OttieniProssimoRevisioneIDPerVideo(videoID As Integer) As Integer
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query = "SELECT ISNULL(MAX(RevisioneID), 0) + 1 FROM Mov_Revisioni WHERE VideoID = @VideoID"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.Add("@VideoID", SqlDbType.Int).Value = videoID
-                Return CInt(cmd.ExecuteScalar())
-            End Using
-        End Using
-    End Function
-
-    Private Function OttieniProssimoRevisioneID() As Integer
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query = "SELECT ISNULL(MAX(RevisioneID), 0) + 1 FROM Mov_Revisioni"
-            Using cmd As New SqlCommand(query, conn)
-                Return CInt(cmd.ExecuteScalar())
-            End Using
-        End Using
-    End Function
-
-    Public Function OttieniNumeroRevisione() As Integer
-        Dim numero As Integer = 0
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query As String = "SELECT ISNULL(MAX(RevisioneID), -1) FROM Mov_Revisioni"
-            Using cmd As New SqlCommand(query, conn)
-                numero = CInt(cmd.ExecuteScalar())
-            End Using
-        End Using
-        Return numero
-    End Function
-
-    Public Function IsRevisioneModificabile(revisioneID As Integer) As Boolean
-        Dim modificabile As Boolean = False
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query As String = "SELECT Stato FROM Mov_Revisioni WHERE RevisioneID = @ID"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.Add("@ID", SqlDbType.Int).Value = revisioneID
-                Dim statoObj = cmd.ExecuteScalar()
-                If statoObj IsNot Nothing Then
-                    Dim stato = CStr(statoObj)
-                    modificabile = (stato = "bozza" OrElse stato = "modifica")
-                End If
-            End Using
-        End Using
-        Return modificabile
-    End Function
-
-    Private Function EsistonoRevisioniAttive(videoID As Integer) As Boolean
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query As String = "SELECT COUNT(*) FROM Mov_Revisioni WHERE VideoID = @VideoID"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.Add("@VideoID", SqlDbType.Int).Value = videoID
-                Dim count As Integer = CInt(cmd.ExecuteScalar())
-                Return count > 0
-            End Using
-        End Using
-    End Function
-
     Public Sub AggiornaRevisioneAttiva()
         If Parametri Is Nothing Then
             lblRevAttiva.Text = "Nessuna revisione attiva"
@@ -1000,34 +856,6 @@ Public Class VideoFBF
         End If
         lblRevAttiva.Text = Parametri.RevisioneID.ToString()
     End Sub
-
-    Private Function VerificaCreazioneRevisione(videoID As Integer, revisioneCorrente As Integer) As Boolean
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim revisioniEsistenti As New List(Of Integer)
-            Dim query As String = "SELECT RevisioneID FROM Mov_Revisioni WHERE VideoID = @VideoID ORDER BY RevisioneID ASC"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.Add("@VideoID", SqlDbType.Int).Value = videoID
-                Using reader = cmd.ExecuteReader()
-                    While reader.Read()
-                        revisioniEsistenti.Add(CInt(reader("RevisioneID")))
-                    End While
-                End Using
-            End Using
-            Dim revisioneSuccessiva = revisioneCorrente + 1
-            If revisioniEsistenti.Contains(revisioneSuccessiva) Then
-                MDIMessageBox.Show($"La Revisione {revisioneSuccessiva} esiste già. Per ricrearla, devi prima cancellarla.", Me.MdiParent, MessageBoxButtons.OK, "Revisione già presente")
-                Return False
-            End If
-            Dim revisioniSuperiori = revisioniEsistenti.Where(Function(r) r > revisioneSuccessiva).ToList()
-            If revisioniSuperiori.Any() Then
-                Dim elenco = String.Join(", ", revisioniSuperiori)
-                MDIMessageBox.Show($"Non è possibile ricreare la Revisione {revisioneSuccessiva} perché esistono revisioni successive ({elenco})." & vbCrLf & "Elimina prima tutte le revisioni superiori.", Me.MdiParent, MessageBoxButtons.OK, "Catena incoerente")
-                Return False
-            End If
-            Return True
-        End Using
-    End Function
 
     Private Function TryParseRevisioneID(text As String, ByRef id As Integer) As Boolean
         If String.IsNullOrWhiteSpace(text) Then
@@ -1037,7 +865,6 @@ Public Class VideoFBF
         Return Integer.TryParse(text, id)
     End Function
 
-    ' --- Caricamento revisione esistente ---
     Public Sub CaricaRevisione(videoID As Integer, revisioneID As Integer)
         Dim videoPath As String = ""
         Dim nomeVideo = OttieniNomeVideo(videoID)
@@ -1110,7 +937,6 @@ Public Class VideoFBF
         End Using
     End Function
 
-    ' --- Trackbar e pulsanti navigazione ---
     Private Sub trackFrame_Scroll(sender As Object, e As EventArgs) Handles TrackFrame.Scroll
         If editor Is Nothing Then Return
         If Not ConfirmSaveChanges() Then
@@ -1225,6 +1051,27 @@ Public Class VideoFBF
         End If
     End Sub
 
+    Private Sub btnAnnulla_Click(sender As Object, e As EventArgs) Handles btnAnnulla.Click
+        If picFrame.Image Is Nothing Then Return
+        Dim ancoraModifiche = editor.Undo()
+        picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
+        hasUnsavedChanges = editor.HasUnsavedChanges
+    End Sub
+
+    Private Sub btnSalvaVideo_Click(sender As Object, e As EventArgs) Handles btnSalvaVideo.Click
+        Cursor.Current = Cursors.WaitCursor
+        Application.DoEvents()
+        If picFrame.Image Is Nothing Then
+            MDIMessageBox.Show("Caricare prima i Frame", Me.MdiParent, MessageBoxButtons.OK)
+            Return
+        End If
+        Dim outputPath = OttieniPercorso("PercorsoVideodaFrames") & "\" & "Video_Salvato_" & DateTime.Now.ToString("yyyyMMdd_HHmmss") & ".mp4"
+        editor.RebuildVideo(outputPath)
+        Cursor.Current = Cursors.Default
+        Application.DoEvents()
+        MDIMessageBox.Show("Video salvato in: " & outputPath, Me.MdiParent, MessageBoxButtons.OK)
+    End Sub
+
     Private Async Sub StartAutoScroll()
         While autoScrollActive
             If hasUnsavedChanges Then
@@ -1275,35 +1122,6 @@ Public Class VideoFBF
         spessorePennino = CInt(numSpessorePennino.Value)
     End Sub
 
-    Private Sub btnAnnulla_Click(sender As Object, e As EventArgs) Handles btnAnnulla.Click
-        If picFrame.Image Is Nothing Then Return
-        Dim ancoraModifiche = editor.Undo()
-        picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
-        hasUnsavedChanges = editor.HasUnsavedChanges
-    End Sub
-
-    Private Sub SalvaFrame()
-        editor.SaveFrame(editor.CurrentIndex, editor.DrawingBitmap)
-        hasUnsavedChanges = False
-        editor.HasUnsavedChanges = False
-        RefreshLstNoteFrame()
-    End Sub
-
-    Private Sub btnSalvaVideo_Click(sender As Object, e As EventArgs) Handles btnSalvaVideo.Click
-        Cursor.Current = Cursors.WaitCursor
-        Application.DoEvents()
-        If picFrame.Image Is Nothing Then
-            MDIMessageBox.Show("Caricare prima i Frame", Me.MdiParent, MessageBoxButtons.OK)
-            Return
-        End If
-        Dim outputPath = OttieniPercorso("PercorsoVideodaFrames") & "\" & "Video_Salvato_" & DateTime.Now.ToString("yyyyMMdd_HHmmss") & ".mp4"
-        editor.RebuildVideo(outputPath)
-        Cursor.Current = Cursors.Default
-        Application.DoEvents()
-        MDIMessageBox.Show("Video salvato in: " & outputPath, Me.MdiParent, MessageBoxButtons.OK)
-    End Sub
-
-    ' --- Lista annotazioni ---
     Private Function RecuperaNotaDaDatabase(revisioneID As Integer, frameIndex As Integer) As String
         Using conn As New SqlConnection(ConnString)
             Dim cmd As New SqlCommand("
@@ -1429,7 +1247,6 @@ Public Class VideoFBF
         End Try
     End Sub
 
-    ' Chiamare una volta in Load per impostare la ListView in Details e creare le colonne
     Private Sub InitLstNoteFrameColumns()
         If LstNoteFrame Is Nothing Then Return
         LstNoteFrame.View = View.Details
@@ -1441,7 +1258,6 @@ Public Class VideoFBF
         LstNoteFrame.Columns.Add("Utente", 150, HorizontalAlignment.Left)
     End Sub
 
-    ' Aggiorna la ListBox lstNoteFrame per il frame corrente in modo thread-safe
     Private Sub RefreshLstNoteFrame()
         If Me.IsDisposed Then Return
 
@@ -1688,9 +1504,6 @@ Public Class VideoFBF
         lblDataNota.Text = ""
     End Sub
 
-    ' ----------------------------
-    ' SafeDeleteFile (cancellazione con retry, restituisce True se cancellato)
-    ' ----------------------------
     Private Function SafeDeleteFile(path As String, Optional maxAttempts As Integer = 6) As Boolean
         If String.IsNullOrWhiteSpace(path) Then Return False
         If Not File.Exists(path) Then Return True
@@ -1722,7 +1535,6 @@ Public Class VideoFBF
         Return False
     End Function
 
-    ' --- Conferma salvataggio modifiche ---
     Private Function ConfirmSaveChanges() As Boolean
         If Not hasUnsavedChanges Then Return True
         Dim result = MessageBox.Show("Ci sono modifiche non salvate sul frame corrente. Vuoi salvare prima di procedere?", "Salvare modifiche?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question)
@@ -1781,7 +1593,6 @@ Public Class VideoFBF
         End If
     End Function
 
-    ' --- Attivazione form: ricarica revisione se presente ---
     Private Sub VideoFBF_Activated(sender As Object, e As EventArgs) Handles Me.Activated
         If Me.Tag IsNot Nothing Then
             Dim param = CType(Me.Tag, Object)
@@ -1794,7 +1605,6 @@ Public Class VideoFBF
         End If
     End Sub
 
-    ' --- Gestione click per il pulsante Ripristina Frame ---
     Private Sub BtnRipristinaFrame_Click(sender As Object, e As EventArgs) Handles BtnRipristinaFrame.Click
         If editor Is Nothing Then
             MDIMessageBox.Show("Nessun video caricato", Me.MdiParent, MessageBoxButtons.OK)
@@ -1830,7 +1640,7 @@ Public Class VideoFBF
             End If
         End If
 
-        ' Esegui il ripristino (metodo già presente nella classe)
+        ' Esegui il ripristino 
         Try
             RestoreCurrentFrameFromOriginal()
             ' Aggiorna stato UI e flag
@@ -1842,7 +1652,7 @@ Public Class VideoFBF
                     ' se la proprietà non esiste o fallisce, ignoriamo
                 End Try
             End If
-            AggiornaOverlayEStato() ' chiamata opzionale per aggiornare overlay/segnalini
+            AggiornaOverlayEStato()
         Catch ex As Exception
             MDIMessageBox.Show("Errore durante il ripristino: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
         End Try
@@ -1857,7 +1667,7 @@ Public Class VideoFBF
         End Try
     End Function
 
-    ' Metodo opzionale per aggiornare overlay o stato UI dopo il ripristino
+    ' Metodo per aggiornare overlay o stato UI dopo il ripristino
     Private Sub AggiornaOverlayEStato()
         ' Aggiorna overlay se presente
         Dim overlay = Me.Controls.Find("OverlayNotePanel", True).FirstOrDefault()
@@ -1869,7 +1679,6 @@ Public Class VideoFBF
         'UpdateRipristinaButton()
     End Sub
 
-    ' Abilita/disabilita BtnRipristinaFrame in base alla presenza della cartella Revisione_0000 e dello stato editor
     Private Sub UpdateRipristinaButton()
         Try
             If editor Is Nothing OrElse String.IsNullOrEmpty(editor.VideoPath) Then
@@ -1885,7 +1694,6 @@ Public Class VideoFBF
         End Try
     End Sub
 
-    ' Nuovo handler integrato per aprire la form di scelta revisione
     Private Sub btnCaricaRevisione_Click(sender As Object, e As EventArgs) Handles btnCaricaRevisione.Click
         Cursor.Current = Cursors.WaitCursor
         Application.DoEvents()
@@ -1909,27 +1717,6 @@ Public Class VideoFBF
         Cursor.Current = Cursors.Default
         Application.DoEvents()
     End Sub
-
-    Private Function ComputeBitmapChecksum(bmp As System.Drawing.Bitmap) As String
-        Using ms As New System.IO.MemoryStream()
-            bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png)
-            ms.Position = 0
-            Using md5 As System.Security.Cryptography.MD5 = System.Security.Cryptography.MD5.Create()
-                Dim hash = md5.ComputeHash(ms)
-                Return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant()
-            End Using
-        End Using
-    End Function
-
-    Private Function ComputeFileChecksum(path As String) As String
-        If Not System.IO.File.Exists(path) Then Return String.Empty
-        Using fs As New System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read)
-            Using md5 As System.Security.Cryptography.MD5 = System.Security.Cryptography.MD5.Create()
-                Dim hash = md5.ComputeHash(fs)
-                Return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant()
-            End Using
-        End Using
-    End Function
 
     Private Function IsBitmapFullyTransparent(bmp As System.Drawing.Bitmap) As Boolean
         If bmp Is Nothing Then Return True
@@ -2086,7 +1873,7 @@ Public Class VideoFBF
         Using conn As New SqlConnection(ConnString)
             conn.Open()
             Dim query As String = "
-            UPDATE Mov_Revisione
+            UPDATE Mov_Revisioni
             SET Stato = 'Non Conforme', Approvato = 0
             WHERE RevisioneID = @RevisioneID"
 
@@ -2173,14 +1960,14 @@ Public Class VideoFBF
                 Using conn As New SqlConnection(ConnString)
                     conn.Open()
                     Using cmd As New SqlCommand("
-MERGE INTO Mov_FrameNote AS target
-USING (SELECT @RevID AS RevisioneID, @FrameIndex AS FrameIndex) AS source
-ON target.RevisioneID = source.RevisioneID AND target.FrameIndex = source.FrameIndex
-WHEN MATCHED THEN
-    UPDATE SET TestoNota = @TestoNota, NomeUtente = @NomeUtente, DataNota = @DataNota
-WHEN NOT MATCHED THEN
-    INSERT (RevisioneID, FrameIndex, TestoNota, NomeUtente, DataNota)
-    VALUES (@RevID, @FrameIndex, @TestoNota, @NomeUtente, @DataNota);", conn)
+                                                MERGE INTO Mov_FrameNote AS target
+                                                USING (SELECT @RevID AS RevisioneID, @FrameIndex AS FrameIndex) AS source
+                                                ON target.RevisioneID = source.RevisioneID AND target.FrameIndex = source.FrameIndex
+                                                WHEN MATCHED THEN
+                                                    UPDATE SET TestoNota = @TestoNota, NomeUtente = @NomeUtente, DataNota = @DataNota
+                                                WHEN NOT MATCHED THEN
+                                                    INSERT (RevisioneID, FrameIndex, TestoNota, NomeUtente, DataNota)
+                                                    VALUES (@RevID, @FrameIndex, @TestoNota, @NomeUtente, @DataNota);", conn)
                         cmd.Parameters.Add("@RevID", SqlDbType.Int).Value = revisioneID
                         cmd.Parameters.Add("@FrameIndex", SqlDbType.Int).Value = frameIndex
                         cmd.Parameters.Add("@TestoNota", SqlDbType.NVarChar, 2000).Value = If(String.IsNullOrEmpty(nota), String.Empty, nota)
@@ -2214,8 +2001,6 @@ WHEN NOT MATCHED THEN
         End Try
     End Sub
 
-
-    ' Disegna i segnalini rossi sopra la TrackBar
     Private Sub DisegnaSegnaliniNote(sender As Object, e As PaintEventArgs)
         Try
             If FrameConNote Is Nothing OrElse FrameConNote.Count = 0 Then Return
@@ -2237,14 +2022,13 @@ WHEN NOT MATCHED THEN
                 If index < minVal OrElse index > maxVal Then Continue For
                 Dim percentuale As Double = (index - minVal) / CDbl(totale)
                 Dim x = CInt(percentuale * trackClientWidth)
-                Dim rectX = x + 11 ' offset per allineare con il centro della thumb
+                Dim rectX = x + 11
                 Dim rect = New System.Drawing.Rectangle(rectX, 0, 6, 10)
                 Using b As New System.Drawing.SolidBrush(System.Drawing.Color.Red)
                     g.FillRectangle(b, rect)
                 End Using
             Next
         Catch ex As Exception
-            ' non bloccare UI: loggare se serve
             Try
                 Dim logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "VideoFBF_draw.log")
                 System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - DisegnaSegnaliniNote error: {ex.Message}{Environment.NewLine}")
@@ -2252,7 +2036,6 @@ WHEN NOT MATCHED THEN
         End Try
     End Sub
 
-    ' Aggiorna i segnalini: ricarica note e forza ridisegno overlay e trackbar
     Private Sub UpdateSegnaliniNote(Optional revisioneID As Integer = -1)
         Try
             Dim revID As Integer = revisioneID
@@ -2300,7 +2083,6 @@ WHEN NOT MATCHED THEN
         End Try
     End Sub
 
-    ' Restituisce solo i file "frame" escludendo overlay, tmp e file nascosti
     Public Shared Function GetFrameFiles(dir As String) As String()
         If String.IsNullOrWhiteSpace(dir) OrElse Not Directory.Exists(dir) Then
             Return New String() {}
@@ -2353,163 +2135,6 @@ WHEN NOT MATCHED THEN
         End Try
     End Function
 
-
-
-    ' ---------------------------
-    ' SaveOverlayAnchored helper (fallback)
-    ' ---------------------------
-    Private Sub SaveOverlayAnchored(drawingBmp As Bitmap, baseFramePath As String, overlayPath As String)
-        If drawingBmp Is Nothing Then Return
-        If String.IsNullOrWhiteSpace(baseFramePath) Then Return
-
-        Dim baseWidth As Integer = 1, baseHeight As Integer = 1
-        Try
-            Using fs As New FileStream(baseFramePath, FileMode.Open, FileAccess.Read, FileShare.Read)
-                Using ms As New MemoryStream()
-                    fs.CopyTo(ms)
-                    ms.Position = 0
-                    Using tmpImg As Image = Image.FromStream(ms)
-                        baseWidth = Math.Max(1, tmpImg.Width)
-                        baseHeight = Math.Max(1, tmpImg.Height)
-                    End Using
-                End Using
-            End Using
-        Catch
-            baseWidth = Math.Max(1, drawingBmp.Width)
-            baseHeight = Math.Max(1, drawingBmp.Height)
-        End Try
-
-        Using bmpToSave As New Bitmap(baseWidth, baseHeight, Imaging.PixelFormat.Format32bppArgb)
-            Using g As Graphics = Graphics.FromImage(bmpToSave)
-                g.Clear(Color.Transparent)
-                Dim drawW = Math.Min(drawingBmp.Width, baseWidth)
-                Dim drawH = Math.Min(drawingBmp.Height, baseHeight)
-                g.DrawImage(drawingBmp, 0, 0, drawW, drawH)
-            End Using
-            SafeWriteBitmapAtomic(bmpToSave, overlayPath)
-        End Using
-    End Sub
-
-    ' ---------------------------
-    ' SafeDeleteFileEnhanced (VideoFBF)
-    ' ---------------------------
-    Private Function SafeDeleteFileEnhanced(path As String, Optional maxAttempts As Integer = 6) As Boolean
-        If String.IsNullOrWhiteSpace(path) Then Return False
-        If Not System.IO.File.Exists(path) Then Return True
-
-        Dim attempts As Integer = 0
-        Dim lastEx As Exception = Nothing
-
-        While attempts < maxAttempts
-            attempts += 1
-            Try
-                System.IO.File.Delete(path)
-                Return True
-            Catch ex As System.IO.IOException
-                lastEx = ex
-                Threading.Thread.Sleep(100 * attempts)
-            Catch ex As UnauthorizedAccessException
-                lastEx = ex
-                Threading.Thread.Sleep(100 * attempts)
-            Catch ex As Exception
-                lastEx = ex
-                Exit While
-            End Try
-        End While
-
-        ' Prova a sovrascrivere con 1x1 PNG trasparente e poi cancellare
-        Try
-            Dim dir = System.IO.Path.GetDirectoryName(path)
-            If String.IsNullOrWhiteSpace(dir) Then dir = System.IO.Path.GetTempPath()
-            If Not System.IO.Directory.Exists(dir) Then System.IO.Directory.CreateDirectory(dir)
-
-            Dim tmp = System.IO.Path.Combine(dir, System.IO.Path.GetFileNameWithoutExtension(path) & "_tmp" & System.IO.Path.GetExtension(path))
-            Try
-                Using emptyBmp As New System.Drawing.Bitmap(1, 1, System.Drawing.Imaging.PixelFormat.Format32bppArgb)
-                    Using g As System.Drawing.Graphics = System.Drawing.Graphics.FromImage(emptyBmp)
-                        g.Clear(System.Drawing.Color.Transparent)
-                    End Using
-                    emptyBmp.Save(tmp, System.Drawing.Imaging.ImageFormat.Png)
-                End Using
-
-                If System.IO.File.Exists(path) Then
-                    Try
-                        System.IO.File.Replace(tmp, path, Nothing)
-                    Catch ex As PlatformNotSupportedException
-                        Try : System.IO.File.Delete(path) : Catch : End Try
-                        System.IO.File.Move(tmp, path)
-                    End Try
-                Else
-                    System.IO.File.Move(tmp, path)
-                End If
-
-                Try
-                    System.IO.File.Delete(path)
-                    Return True
-                Catch
-                    ' fallthrough: tenteremo altre strategie/logging
-                End Try
-            Finally
-                If System.IO.File.Exists(tmp) Then
-                    Try : System.IO.File.Delete(tmp) : Catch : End Try
-                End If
-            End Try
-        Catch ex As Exception
-            lastEx = ex
-        End Try
-
-        Try
-            Dim logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "VideoFBF_delete.log")
-            Dim msg = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - SafeDeleteFileEnhanced failed for {path} : {If(lastEx IsNot Nothing, lastEx.Message, "unknown")}{Environment.NewLine}"
-            System.IO.File.AppendAllText(logPath, msg)
-        Catch
-            ' ignore logging errors
-        End Try
-
-        Return False
-    End Function
-
-
-    ' ---------------------------
-    ' SafeWriteBitmapAtomic (VideoFBF)
-    ' ---------------------------
-    Private Sub SafeWriteBitmapAtomic(bmp As System.Drawing.Bitmap, dstPath As String)
-        If bmp Is Nothing OrElse String.IsNullOrWhiteSpace(dstPath) Then Return
-        Dim dir = Path.GetDirectoryName(dstPath)
-        If Not Directory.Exists(dir) Then Directory.CreateDirectory(dir)
-        Dim tmp = Path.Combine(dir, Path.GetFileNameWithoutExtension(dstPath) & "_tmp" & Path.GetExtension(dstPath))
-        Try
-            If File.Exists(tmp) Then
-                Try : File.Delete(tmp) : Catch : End Try
-            End If
-            bmp.Save(tmp, Imaging.ImageFormat.Png)
-            If File.Exists(dstPath) Then
-                Try
-                    File.Replace(tmp, dstPath, Nothing)
-                Catch ex As PlatformNotSupportedException
-                    If File.Exists(dstPath) Then
-                        Try : File.Delete(dstPath) : Catch : End Try
-                    End If
-                    File.Move(tmp, dstPath)
-                End Try
-            Else
-                File.Move(tmp, dstPath)
-            End If
-        Finally
-            If File.Exists(tmp) Then
-                Try : File.Delete(tmp) : Catch : End Try
-            End If
-        End Try
-    End Sub
-
-    Private Sub ChkZoom_CheckedChanged(sender As Object, e As EventArgs) Handles ChkZoom.CheckedChanged
-        If ChkZoom.Checked Then
-            SettapicFrame("AutoSize")
-        Else
-            SettapicFrame("Zoom")
-        End If
-    End Sub
-
     Private Sub SettaPicFrame(Settaggio As String)
         picFrame.Width = panelViewer.Width - 30
         picFrame.Height = panelViewer.Height - 30
@@ -2530,7 +2155,6 @@ WHEN NOT MATCHED THEN
         End If
     End Sub
 
-    ' Popola cmbStrumento (chiamare una sola volta)
     Private Sub InitStrumenti()
         CmbStrumento.Items.Clear()
         CmbStrumento.Items.Add("Nessuno")        ' index 0
@@ -2538,6 +2162,9 @@ WHEN NOT MATCHED THEN
         CmbStrumento.Items.Add("Linea")          ' index 2
         CmbStrumento.Items.Add("Ellisse")        ' index 3
         CmbStrumento.Items.Add("Rettangolo")     ' index 4
+        CmbStrumento.Items.Add("Freccia")        ' index 5
+        CmbStrumento.Items.Add("Paint")          ' index 6
+
         CmbStrumento.SelectedIndex = 0
         AddHandler CmbStrumento.SelectedIndexChanged, AddressOf cmbStrumento_SelectedIndexChanged
     End Sub
@@ -2549,6 +2176,8 @@ WHEN NOT MATCHED THEN
             Case 2 : currentTool = ToolType.LineTool
             Case 3 : currentTool = ToolType.EllipseTool
             Case 4 : currentTool = ToolType.RectangleTool
+            Case 5 : currentTool = ToolType.ArrowTool
+            Case 6 : currentTool = ToolType.FillTool
             Case Else : currentTool = ToolType.None
         End Select
         ' Aggiorna cursore e abilitazioni
@@ -2559,143 +2188,32 @@ WHEN NOT MATCHED THEN
         End If
     End Sub
 
-    Private Sub picFrame_MouseDown(sender As Object, e As MouseEventArgs) Handles picFrame.MouseDown
-        Try
-            ' Protezioni base
-            If picFrame Is Nothing Then Return
-            If picFrame.Image Is Nothing Then Return
-            If editor Is Nothing Then
-                LogDebug("picFrame_MouseDown: editor = Nothing")
-                MDIMessageBox.Show("Editor non inizializzato.", Me.MdiParent, MessageBoxButtons.OK)
-                Return
-            End If
-
-            ' Linea/Ellisse/Rettangolo: inizia rubberband (coordinate immagine)
-            If currentTool = ToolType.LineTool OrElse currentTool = ToolType.EllipseTool OrElse currentTool = ToolType.RectangleTool Then
-                Dim imgPt As Point = ConvertMouseToImagePoint(e.Location)
-                isRubberDragging = True
-                rubberStart = imgPt
-                rubberCurrent = imgPt
-                If overlayRubber IsNot Nothing Then overlayRubber.Invalidate()
-                editor.SaveState()
-                Return
-            End If
-
-            ' Punto: disegna subito (coordinate immagine)
-            If currentTool = ToolType.PointTool Then
-                editor.SaveState()
-                Dim imgPt As Point = ConvertMouseToImagePoint(e.Location)
-                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
-                    Using pen As New Pen(colorePennino, spessorePennino)
-                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
-                        g.DrawEllipse(pen, imgPt.X - spessorePennino, imgPt.Y - spessorePennino, spessorePennino * 2, spessorePennino * 2)
-                    End Using
-                End Using
-                If picFrame.Image IsNot Nothing Then
-                    Try : picFrame.Image.Dispose() : Catch : End Try
-                End If
-                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
-                hasUnsavedChanges = True
-                editor.HasUnsavedChanges = True
-                Return
-            End If
-
-            ' Fallback: pennino libero (comportamento esistente)
-            isDrawing = True
-            lastPoint = e.Location
-            editor.SaveState()
-        Catch ex As Exception
-            LogDebug("picFrame_MouseDown EX: " & ex.Message)
-        End Try
-    End Sub
-
-    Private Sub picFrame_MouseMove(sender As Object, e As MouseEventArgs) Handles picFrame.MouseMove
-        Try
-            If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return
-
-            ' Pennino libero
-            If isDrawing Then
-                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
-                    Using penna As New Pen(colorePennino, spessorePennino)
-                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
-                        g.DrawLine(penna, lastPoint, ConvertMouseToImagePoint(e.Location))
-                    End Using
-                End Using
-                lastPoint = ConvertMouseToImagePoint(e.Location)
-                If picFrame.Image IsNot Nothing Then
-                    Try : picFrame.Image.Dispose() : Catch : End Try
-                End If
-                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
-                Return
-            End If
-
-            ' Rubberband preview
-            If isRubberDragging Then
-                rubberCurrent = ConvertMouseToImagePoint(e.Location)
-                If overlayRubber IsNot Nothing Then overlayRubber.Invalidate()
-                Return
-            End If
-        Catch ex As Exception
-            LogDebug("picFrame_MouseMove EX: " & ex.Message)
-        End Try
-    End Sub
-
-    Private Sub picFrame_MouseUp(sender As Object, e As MouseEventArgs) Handles picFrame.MouseUp
-        Try
-            If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return
-
-            If isDrawing Then
-                isDrawing = False
-                hasUnsavedChanges = True
-                editor.HasUnsavedChanges = True
-                Return
-            End If
-
-            If isRubberDragging Then
-                isRubberDragging = False
-                rubberCurrent = ConvertMouseToImagePoint(e.Location)
-
-                ' Commit su editor.DrawingBitmap (coordinate immagine)
-                Using g As Graphics = Graphics.FromImage(editor.DrawingBitmap)
-                    Using pen As New Pen(colorePennino, spessorePennino)
-                        g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
-                        Dim rect = GetNormalizedRect(rubberStart, rubberCurrent)
-                        Select Case currentTool
-                            Case ToolType.LineTool
-                                g.DrawLine(pen, rubberStart, rubberCurrent)
-                            Case ToolType.EllipseTool
-                                g.DrawEllipse(pen, rect)
-                            Case ToolType.RectangleTool
-                                g.DrawRectangle(pen, rect)
-                        End Select
-                    End Using
-                End Using
-
-                If picFrame.Image IsNot Nothing Then
-                    Try : picFrame.Image.Dispose() : Catch : End Try
-                End If
-                picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
-                hasUnsavedChanges = True
-                editor.HasUnsavedChanges = True
-                If overlayRubber IsNot Nothing Then overlayRubber.Invalidate()
-            End If
-        Catch ex As Exception
-            LogDebug("picFrame_MouseUp EX: " & ex.Message)
-        End Try
-    End Sub
-
     Private Sub OverlayRubber_MouseDown(sender As Object, e As MouseEventArgs)
         Try
             If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return
             If editor Is Nothing Then Return
 
-            If currentTool = ToolType.LineTool OrElse currentTool = ToolType.EllipseTool OrElse currentTool = ToolType.RectangleTool Then
+            If currentTool = ToolType.LineTool OrElse currentTool = ToolType.EllipseTool OrElse currentTool = ToolType.RectangleTool OrElse currentTool = ToolType.ArrowTool Then
                 Dim imgPt = ConvertMouseToImagePoint(e.Location)
                 isRubberDragging = True
                 rubberStart = imgPt
                 rubberCurrent = imgPt
                 overlayRubber.Invalidate()
                 editor.SaveState()
+                Return
+            End If
+
+            If currentTool = ToolType.FillTool Then
+                editor.SaveState()
+                Dim imgPt = ConvertMouseToImagePoint(e.Location)
+                Dim targetBmp As Bitmap = editor.DrawingBitmap
+                If targetBmp IsNot Nothing Then
+                    FloodFill(targetBmp, imgPt.X, imgPt.Y, colorePennino)
+                    If picFrame.Image IsNot Nothing Then Try : picFrame.Image.Dispose() : Catch : End Try
+                    picFrame.Image = CType(targetBmp.Clone(), Bitmap)
+                    hasUnsavedChanges = True
+                    editor.HasUnsavedChanges = True
+                End If
                 Return
             End If
 
@@ -2778,6 +2296,8 @@ WHEN NOT MATCHED THEN
                                 g.DrawEllipse(pen, rect)
                             Case ToolType.RectangleTool
                                 g.DrawRectangle(pen, rect)
+                            Case ToolType.ArrowTool
+                                DrawArrow(g, rubberStart, rubberCurrent, pen)
                         End Select
                     End Using
                 End Using
@@ -2793,32 +2313,58 @@ WHEN NOT MATCHED THEN
         End Try
     End Sub
 
-    Private Sub PenColor_Click(sender As Object, e As EventArgs) Handles PenColor.Click
-        If colorDialogPennino.ShowDialog = DialogResult.OK Then
-            colorePennino = colorDialogPennino.Color
-            PenColor.BackColor = colorePennino
-        End If
-    End Sub
+    Private Sub FloodFill(bmp As Bitmap, x As Integer, y As Integer, fillColor As Color)
+        ' Flood fill non ricorsivo (stack) con controllo per bordi e tolleranza colore esatto.
+        If x < 0 OrElse x >= bmp.Width OrElse y < 0 OrElse y >= bmp.Height Then Return
 
-    Private Function PictureBoxToImage(point As Point, pb As PictureBox) As Point
-        If pb.Image Is Nothing Then Return point
-        Dim img = pb.Image
-        Dim imgRatio = img.Width / img.Height
-        Dim pbRatio = pb.Width / pb.Height
-        Dim scale As Double
-        Dim offsetX As Integer = 0
-        Dim offsetY As Integer = 0
-        If imgRatio > pbRatio Then
-            scale = pb.Width / img.Width
-            offsetY = CInt((pb.Height - img.Height * scale) / 2)
-        Else
-            scale = pb.Height / img.Height
-            offsetX = CInt((pb.Width - img.Width * scale) / 2)
-        End If
-        Dim ix = CInt((point.X - offsetX) / scale)
-        Dim iy = CInt((point.Y - offsetY) / scale)
-        Return New Point(Math.Max(0, ix), Math.Max(0, iy))
-    End Function
+        Dim targetColor As Color = bmp.GetPixel(x, y)
+        If targetColor.ToArgb() = fillColor.ToArgb() Then Return
+
+        Dim width As Integer = bmp.Width
+        Dim height As Integer = bmp.Height
+        Dim visited(width - 1, height - 1) As Boolean
+
+        Dim stack As New Collections.Generic.Stack(Of Point)
+        stack.Push(New Point(x, y))
+
+        While stack.Count > 0
+            Dim p As Point = stack.Pop()
+            Dim px As Integer = p.X
+            Dim py As Integer = p.Y
+
+            If px < 0 OrElse px >= width OrElse py < 0 OrElse py >= height Then Continue While
+            If visited(px, py) Then Continue While
+
+            Dim c As Color = bmp.GetPixel(px, py)
+            If c.ToArgb() <> targetColor.ToArgb() Then Continue While
+
+            ' Scansiona orizzontalmente per efficienza (scanline fill)
+            Dim left As Integer = px
+            Dim right As Integer = px
+
+            ' estendi a sinistra
+            While left - 1 >= 0 AndAlso Not visited(left - 1, py) AndAlso bmp.GetPixel(left - 1, py).ToArgb() = targetColor.ToArgb()
+                left -= 1
+            End While
+            ' estendi a destra
+            While right + 1 < width AndAlso Not visited(right + 1, py) AndAlso bmp.GetPixel(right + 1, py).ToArgb() = targetColor.ToArgb()
+                right += 1
+            End While
+
+            ' riempi la scanline
+            For ix As Integer = left To right
+                bmp.SetPixel(ix, py, fillColor)
+                visited(ix, py) = True
+                ' aggiungi pixel sopra e sotto
+                If py - 1 >= 0 AndAlso Not visited(ix, py - 1) AndAlso bmp.GetPixel(ix, py - 1).ToArgb() = targetColor.ToArgb() Then
+                    stack.Push(New Point(ix, py - 1))
+                End If
+                If py + 1 < height AndAlso Not visited(ix, py + 1) AndAlso bmp.GetPixel(ix, py + 1).ToArgb() = targetColor.ToArgb() Then
+                    stack.Push(New Point(ix, py + 1))
+                End If
+            Next
+        End While
+    End Sub
 
     Private Sub InitOverlayRubber()
         Try
@@ -2860,7 +2406,7 @@ WHEN NOT MATCHED THEN
             Dim g = e.Graphics
             g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
             Using pen As New Pen(colorePennino, Math.Max(1, spessorePennino))
-                pen.DashStyle = Drawing2D.DashStyle.Dash
+                pen.DashStyle = Drawing2D.DashStyle.DashDot
                 Dim p1 = ConvertImageToPictureBoxPoint(rubberStart)
                 Dim p2 = ConvertImageToPictureBoxPoint(rubberCurrent)
                 Dim rect = GetNormalizedRect(p1, p2)
@@ -2871,11 +2417,117 @@ WHEN NOT MATCHED THEN
                         g.DrawEllipse(pen, rect)
                     Case ToolType.RectangleTool
                         g.DrawRectangle(pen, rect)
+                    Case ToolType.ArrowTool
+                        DrawArrowPreview(g, p1, p2, pen)
                 End Select
             End Using
         Catch ex As Exception
             LogDebug("OverlayRubber_Paint ERROR: " & ex.Message)
         End Try
+    End Sub
+
+    ' Disegna freccia: linea termina alla base della punta; punta spostata in avanti
+    Private Sub DrawArrow(g As Graphics, startPt As PointF, endPt As PointF, pen As Pen, Optional SoloPunta As Boolean = False, Optional tipOffset As Single = -1.0F)
+        If startPt = endPt Then
+            g.DrawLine(pen, startPt, endPt)
+            Return
+        End If
+
+        ' vettore direzione
+        Dim dx As Double = endPt.X - startPt.X
+        Dim dy As Double = endPt.Y - startPt.Y
+        Dim dist As Double = Math.Sqrt(dx * dx + dy * dy)
+        If dist < 1 Then Return
+        Dim ux As Double = dx / dist
+        Dim uy As Double = dy / dist
+
+        ' parametri scalabili in funzione dello spessore
+        Dim penW As Single = Math.Max(1.0F, pen.Width)
+        Dim arrowLength As Single = CSng(Math.Max(12.0, penW * 8.0))   ' lunghezza triangolo punta
+        Dim arrowWidth As Single = CSng(Math.Max(8.0, penW * 4.0))     ' larghezza base punta
+        If tipOffset < 0 Then tipOffset = CSng(Math.Max(6.0, penW * 4.0)) ' quanto spostare la punta oltre endPt
+
+        ' calcola tipPoint (oltre endPt) e basePoint (indietro di arrowLength da tipPoint)
+        Dim tipX As Double = endPt.X + ux * tipOffset
+        Dim tipY As Double = endPt.Y + uy * tipOffset
+        Dim baseX As Double = tipX - ux * arrowLength
+        Dim baseY As Double = tipY - uy * arrowLength
+
+        Dim tipPoint As New PointF(CSng(tipX), CSng(tipY))
+        Dim basePoint As New PointF(CSng(baseX), CSng(baseY))
+
+        ' disegna la linea principale fino alla base (se non SoloPunta)
+        If Not SoloPunta Then
+            Using linePen As Pen = CType(pen.Clone(), Pen)
+                linePen.LineJoin = Drawing2D.LineJoin.Round
+                linePen.StartCap = Drawing2D.LineCap.Round
+                linePen.EndCap = Drawing2D.LineCap.Round
+                g.DrawLine(linePen, startPt, basePoint)
+            End Using
+        End If
+
+        ' calcola i due vertici della base del triangolo (perpendicolare alla direzione)
+        Dim perpX As Double = -uy
+        Dim perpY As Double = ux
+        Dim leftX As Double = baseX + perpX * (arrowWidth / 2.0)
+        Dim leftY As Double = baseY + perpY * (arrowWidth / 2.0)
+        Dim rightX As Double = baseX - perpX * (arrowWidth / 2.0)
+        Dim rightY As Double = baseY - perpY * (arrowWidth / 2.0)
+
+        Dim pts() As PointF = {
+        tipPoint,
+        New PointF(CSng(leftX), CSng(leftY)),
+        New PointF(CSng(rightX), CSng(rightY))
+    }
+
+        ' riempi la punta 
+        Using brush As New SolidBrush(pen.Color)
+            g.FillPolygon(brush, pts)
+        End Using
+
+        ' Disegna un contorno
+        'Using outline As New Pen(Color.FromArgb(180, Color.Black), Math.Max(1, penW / 2))
+        'outline.LineJoin = Drawing2D.LineJoin.Round
+        'g.DrawPolygon(outline, pts)
+        'End Using
+    End Sub
+
+    ' Anteprima freccia in overlay (pStart/pEnd in coordinate picturebox)
+    Private Sub DrawArrowPreview(g As Graphics, pStart As PointF, pEnd As PointF, pen As Pen)
+        ' pen per tratteggio (clonata)
+        Using dashedPen As Pen = CType(pen.Clone(), Pen)
+            dashedPen.DashStyle = Drawing2D.DashStyle.DashDot
+            dashedPen.DashPattern = New Single() {4.0F, 4.0F}
+            dashedPen.LineJoin = Drawing2D.LineJoin.Round
+
+            ' calcola base come in DrawArrow per non far sovrapporre la punta
+            Dim dx As Double = pEnd.X - pStart.X
+            Dim dy As Double = pEnd.Y - pStart.Y
+            Dim dist As Double = Math.Sqrt(dx * dx + dy * dy)
+            If dist < 1 Then
+                g.DrawLine(dashedPen, pStart, pEnd)
+            Else
+                Dim ux As Double = dx / dist
+                Dim uy As Double = dy / dist
+                Dim penW As Single = Math.Max(1.0F, pen.Width)
+                Dim arrowLength As Single = CSng(Math.Max(12.0, penW * 8.0))
+                Dim tipOffset As Single = CSng(Math.Max(6.0, penW * 4.0))
+                Dim tipX As Double = pEnd.X + ux * tipOffset
+                Dim tipY As Double = pEnd.Y + uy * tipOffset
+                Dim baseX As Double = tipX - ux * arrowLength
+                Dim baseY As Double = tipY - uy * arrowLength
+                Dim basePoint As New PointF(CSng(baseX), CSng(baseY))
+
+                ' linea tratteggiata fino alla base
+                g.DrawLine(dashedPen, pStart, basePoint)
+            End If
+        End Using
+
+        ' punta piena (usa pen colore, SoloPunta True e tipOffset coerente)
+        Using solidPen As New Pen(pen.Color, Math.Max(1, pen.Width))
+            ' DrawArrow calcola internamente tipOffset se non passato; passiamo un valore coerente
+            DrawArrow(g, pStart, pEnd, solidPen, SoloPunta:=True, tipOffset:=CSng(Math.Max(6.0, pen.Width * 4.0)))
+        End Using
     End Sub
 
 
@@ -2929,7 +2581,6 @@ WHEN NOT MATCHED THEN
         Return New Rectangle(x, y, w, h)
     End Function
 
-
     Private Sub LogDebug(msg As String)
         Try
             Dim logPath = IO.Path.Combine(IO.Path.GetTempPath(), "VideoFBF_debug.log")
@@ -2947,7 +2598,6 @@ WHEN NOT MATCHED THEN
 
     Public Class OverlayPanel
         Inherits Panel
-
         Public Sub New()
             MyBase.New()
             ' Abilita double buffering e painting ottimizzato
@@ -2957,6 +2607,65 @@ WHEN NOT MATCHED THEN
                         ControlStyles.SupportsTransparentBackColor, True)
             Me.UpdateStyles()
             Me.BackColor = Color.Transparent
+        End Sub
+    End Class
+
+    Public Class NoteViewerForm
+        Inherits Form
+
+        Private txtFullNote As TextBox
+        Private lblInfo As Label
+        Private lblRevisione As Label
+        Private btnClose As Button
+
+        ' Nuovo costruttore: revisioneNumber può essere -1 se non disponibile
+        Public Sub New(revisioneNumber As Integer, frameIndex As Integer, testo As String, autore As String, dataNota As DateTime)
+            Me.Text = If(frameIndex >= 0, $"Nota Frame {frameIndex + 1}", "Nota")
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MaximizeBox = False
+            Me.MinimizeBox = False
+            Me.ClientSize = New Size(760, 380)
+
+            ' Label revisione in alto a sinistra
+            lblRevisione = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 8),
+            .Size = New Size(300, 20),
+            .Font = New Font("Segoe UI", 9, FontStyle.Bold),
+            .Text = If(revisioneNumber >= 0, $"Revisione: {revisioneNumber}", "Revisione: -")
+        }
+            Me.Controls.Add(lblRevisione)
+
+            ' Info autore/data a destra
+            lblInfo = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(320, 8),
+            .Size = New Size(420, 20),
+            .TextAlign = ContentAlignment.MiddleRight,
+            .Text = $"Autore: {If(String.IsNullOrEmpty(autore), "-", autore)}    Data: {If(dataNota = DateTime.MinValue, "-", dataNota.ToString("dd/MM/yyyy HH:mm"))}"
+        }
+            Me.Controls.Add(lblInfo)
+
+            txtFullNote = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .ScrollBars = ScrollBars.Vertical,
+            .Location = New Point(10, 36),
+            .Size = New Size(740, 290),
+            .Font = New Font("Segoe UI", 10),
+            .Text = If(String.IsNullOrEmpty(testo), "(nota vuota)", testo)
+        }
+            Me.Controls.Add(txtFullNote)
+
+            btnClose = New Button() With {
+            .Text = "Chiudi",
+            .DialogResult = DialogResult.OK,
+            .Size = New Size(100, 30),
+            .Location = New Point(Me.ClientSize.Width - 110, Me.ClientSize.Height - 40)
+        }
+            Me.Controls.Add(btnClose)
+
+            Me.AcceptButton = btnClose
         End Sub
     End Class
 

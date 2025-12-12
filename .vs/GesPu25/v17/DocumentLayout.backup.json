@@ -3,20 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\login.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:login.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\login.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:login.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
-      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:videofbf.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
     }
   ],
   "DocumentGroupContainers": [
@@ -26,7 +18,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
@@ -34,52 +26,27 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "Login.vb",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\Login.vb",
-              "RelativeDocumentMoniker": "Login.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\Login.vb",
-              "RelativeToolTip": "Login.vb",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAC0AAAAYAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-12-11T16:32:47.847Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "Login.vb [Progettazione]",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\Login.vb",
-              "RelativeDocumentMoniker": "Login.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\Login.vb [Progettazione]",
-              "RelativeToolTip": "Login.vb [Progettazione]",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-12-11T16:32:45.622Z",
-              "EditorCaption": " [Progettazione]"
-            },
-            {
-              "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "GesPu25.vb",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
-              "RelativeDocumentMoniker": "GesPu25.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb*",
-              "RelativeToolTip": "GesPu25.vb*",
-              "ViewState": "AgIAAIEAAAAAAAAAAAAmwL4AAAAAAAAAAAAAAA==",
+              "Title": "VideoFBF.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoFBF.vb",
+              "RelativeDocumentMoniker": "VideoFBF.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoFBF.vb",
+              "RelativeToolTip": "VideoFBF.vb",
+              "ViewState": "AgIAAA4JAAAAAAAAAAAlwJYIAAAjAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-12-11T16:25:01.682Z",
+              "WhenOpened": "2025-12-12T13:49:54.373Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "GesPu25.vb [Progettazione]",
-              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
-              "RelativeDocumentMoniker": "GesPu25.vb",
-              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb [Progettazione]*",
-              "RelativeToolTip": "GesPu25.vb [Progettazione]*",
+              "DocumentIndex": 1,
+              "Title": "VideoFBF.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoFBF.vb",
+              "RelativeDocumentMoniker": "VideoFBF.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\VideoFBF.vb [Progettazione]",
+              "RelativeToolTip": "VideoFBF.vb [Progettazione]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
-              "WhenOpened": "2025-12-11T16:24:58.709Z",
+              "WhenOpened": "2025-12-12T13:49:44.678Z",
               "EditorCaption": " [Progettazione]"
             }
           ]
