@@ -405,6 +405,11 @@ Public Class CreaLettAssegnazione
                     End If
 
                     mainPart.Document.Save()
+
+                    If MsgBox("Vuoi salvare una notifica di invio?", MsgBoxStyle.Question + MsgBoxStyle.YesNo, "Comunicazione") = MsgBoxResult.Yes Then
+                        SalvaNotifica()
+                    End If
+
                 End Using
             Catch exDoc As Exception
                 MessageBox.Show("Errore creazione documento: " & exDoc.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -1433,5 +1438,94 @@ EndProcess:
             Return txtLog.Text
         End Function
     End Class
+
+    Private Sub SalvaNotifica()
+        If _idAssegnazione <= 0 Then
+            If _recordCorrente IsNot Nothing AndAlso _recordCorrente.ContainsKey("IdAssegnazione") Then
+                Integer.TryParse(Convert.ToString(_recordCorrente("IdAssegnazione")), _idAssegnazione)
+            End If
+        End If
+
+        If _idAssegnazione <= 0 Then
+            MDIMessageBox.Show("IdAssegnazione non valido. Seleziona una riga corretta e riprova.", Me.MdiParent, MessageBoxButtons.OK)
+            Return
+        End If
+
+        Try
+            Using conn As New Microsoft.Data.SqlClient.SqlConnection(ConnString)
+                conn.Open()
+
+                ' Leggi operatore assegnatario e data
+                Dim operatoreRaw As Object = Nothing
+                Dim dataAssegnazioneObj As Object = Nothing
+                Using cmd As New Microsoft.Data.SqlClient.SqlCommand(
+                    "SELECT OperatoreAssegnatario, DataAssegnazione FROM Mov_Assegnazioni WHERE IdAssegnazione = @Id", conn)
+                    cmd.Parameters.Add("@Id", SqlDbType.Int).Value = _idAssegnazione
+                    Using rdr = cmd.ExecuteReader()
+                        If rdr.Read() Then
+                            operatoreRaw = If(rdr.IsDBNull(0), Nothing, rdr.GetValue(0))
+                            dataAssegnazioneObj = If(rdr.IsDBNull(1), Nothing, rdr.GetValue(1))
+                        End If
+                    End Using
+                End Using
+
+                Dim operatoreKey As String = If(operatoreRaw Is Nothing OrElse Convert.IsDBNull(operatoreRaw), String.Empty, Convert.ToString(operatoreRaw)).Trim()
+                If String.IsNullOrWhiteSpace(operatoreKey) Then
+                    MDIMessageBox.Show("Destinatario non disponibile per questa assegnazione.", Me.MdiParent, MessageBoxButtons.OK)
+                    Return
+                End If
+
+                Dim nomeUtente As String = String.Empty
+                Using cmdLookup As New Microsoft.Data.SqlClient.SqlCommand(
+                    "SELECT TOP 1 NomeUtente FROM dbo.Tab_Utenti WHERE NomeUtente = @Key OR IdFornitore = @Key", conn)
+                    cmdLookup.Parameters.Add("@Key", SqlDbType.NVarChar, 100).Value = operatoreKey
+                    Dim o = cmdLookup.ExecuteScalar()
+                    If o IsNot Nothing AndAlso Not Convert.IsDBNull(o) Then
+                        nomeUtente = Convert.ToString(o).Trim()
+                    End If
+                End Using
+
+                If String.IsNullOrWhiteSpace(nomeUtente) Then
+                    MDIMessageBox.Show($"Destinatario '{operatoreKey}' non trovato in Tab_Utenti (né come NomeUtente né come IdFornitore).", Me.MdiParent, MessageBoxButtons.OK)
+                    Return
+                End If
+
+                If nomeUtente.Length > 10 Then
+                    MDIMessageBox.Show("Il NomeUtente risolto supera i 10 caratteri. Controlla i dati in Tab_Utenti.", Me.MdiParent, MessageBoxButtons.OK)
+                    Return
+                End If
+
+                ' Prepara messaggio (opzionale: includi data assegnazione)
+                Dim messaggio As String = $"Ti sono state affidate le lavorazioni relative all'assegnazione n. {_idAssegnazione}"
+
+                ' Inserimento con recupero IdNotifica
+                Dim insertSql As String = "INSERT INTO dbo.Mov_Notifiche (Destinatario, Data, Messaggio, Letto) " & "OUTPUT INSERTED.IdNotifica " & "VALUES (@Destinatario, @Data, @Messaggio, @Letto);"
+
+                Using cmdIns As New Microsoft.Data.SqlClient.SqlCommand(insertSql, conn)
+                    cmdIns.Parameters.Add("@Destinatario", SqlDbType.NVarChar, 10).Value = nomeUtente
+                    cmdIns.Parameters.Add("@Data", SqlDbType.DateTime).Value = DateTime.Now
+                    Dim pMsg = cmdIns.Parameters.Add("@Messaggio", SqlDbType.NVarChar, -1)
+                    If String.IsNullOrEmpty(messaggio) Then
+                        pMsg.Value = DBNull.Value
+                    Else
+                        pMsg.Value = messaggio
+                    End If
+                    cmdIns.Parameters.Add("@Letto", SqlDbType.Bit).Value = False
+
+                    Dim newIdObj = cmdIns.ExecuteScalar()
+                    If newIdObj IsNot Nothing AndAlso Not Convert.IsDBNull(newIdObj) Then
+                        Dim newId As Integer = Convert.ToInt32(newIdObj)
+                        MDIMessageBox.Show("Notifica inviata con successo. Id Notifica: " & newId.ToString(), Me.MdiParent, MessageBoxButtons.OK)
+                    Else
+                        MDIMessageBox.Show("Inserimento notifica non riuscito.", Me.MdiParent, MessageBoxButtons.OK)
+                    End If
+                End Using
+            End Using
+        Catch sqlEx As Microsoft.Data.SqlClient.SqlException
+            MDIMessageBox.Show("Errore database durante l'invio della notifica: " & sqlEx.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Catch ex As Exception
+            MDIMessageBox.Show("Errore durante l'invio della notifica: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
 
 End Class

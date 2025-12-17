@@ -18,7 +18,7 @@ Public Class Login
 
     Private Sub BtnLogin_Click(sender As Object, e As EventArgs) Handles BtnLogin.Click
         Try
-            Dim query As String = "SELECT NomeUtente FROM Tab_Utenti WHERE NomeUtente = @nome AND Password = @password"
+            Dim query As String = "SELECT NomeUtente FROM Tab_Utenti WHERE NomeUtente = @nome AND Password = @password AND IsActive = @Active"
             Dim Cripta As New CriptaHash
             Dim hashedPassword = Cripta.HashPassword(txtPassword.Text)
             Dim utenteAutenticato As Object = Nothing
@@ -27,33 +27,59 @@ Public Class Login
                 Using cmd As New SqlCommand(query, conn)
                     cmd.Parameters.AddWithValue("@nome", txtNomeUtente.Text)
                     cmd.Parameters.AddWithValue("@password", hashedPassword)
+                    cmd.Parameters.AddWithValue("@Active", True)
 
                     conn.Open()
-                    utenteAutenticato = cmd.ExecuteScalar() ' 🔹 Recupera il NomeUtente se esiste
+                    utenteAutenticato = cmd.ExecuteScalar()
                 End Using
             End Using
 
             If utenteAutenticato IsNot Nothing Then
+                ' Imposta la sessione utente
                 SessioneUtente.NomeUtenteCorrente = txtNomeUtente.Text
                 SessioneUtente.Autorizzazioni = New AutorizzazioniUtente()
                 SessioneUtente.Autorizzazioni.Carica(txtNomeUtente.Text)
                 SessioneUtente.DataConnessione = Now
 
-                GesPu25.toolStripUser.Text = "Utente: " & SessioneUtente.NomeUtenteCorrente
-                GesPu25.toolStripDataOra.Text = "Connesso dalle " & SessioneUtente.DataConnessione.ToString("HH:mm - dd/MM/yyyy")
+                ' Aggiorna l'interfaccia del MDI parent se disponibile
+                If Me.MdiParent IsNot Nothing AndAlso TypeOf Me.MdiParent Is GesPu25 Then
+                    Dim parentForm = CType(Me.MdiParent, GesPu25)
 
-                AttivaTuttiIMenu(GesPu25.MenuStrip1)
-                GesPu25.CaricaNotificheUtente(SessioneUtente.NomeUtenteCorrente)
+                    ' Aggiorna i toolstrip in modo sicuro (Invoke se necessario)
+                    If parentForm.InvokeRequired Then
+                        parentForm.Invoke(Sub()
+                                              parentForm.toolStripUser.Text = "Utente: " & SessioneUtente.NomeUtenteCorrente
+                                              parentForm.toolStripDataOra.Text = "Connesso dalle " & SessioneUtente.DataConnessione.ToString("HH:mm - dd/MM/yyyy")
+                                              AttivaTuttiIMenu(parentForm.MenuStrip1)
+                                          End Sub)
+                    Else
+                        parentForm.toolStripUser.Text = "Utente: " & SessioneUtente.NomeUtenteCorrente
+                        parentForm.toolStripDataOra.Text = "Connesso dalle " & SessioneUtente.DataConnessione.ToString("HH:mm - dd/MM/yyyy")
+                        AttivaTuttiIMenu(parentForm.MenuStrip1)
+                    End If
 
+                    ' Apri le notifiche
+                    Try
+                        parentForm.ApriNotifiche(False)
+                    Catch ex As Exception
+                        MDIMessageBox.Show($"Errore apertura notifiche: {ex.Message}", parentForm, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    End Try
+                Else
+                    GesPu25.toolStripUser.Text = "Utente: " & SessioneUtente.NomeUtenteCorrente
+                    GesPu25.toolStripDataOra.Text = "Connesso dalle " & SessioneUtente.DataConnessione.ToString("HH:mm - dd/MM/yyyy")
+                    AttivaTuttiIMenu(GesPu25.MenuStrip1)
+                End If
+
+                ' Chiudi il form di login
                 Me.Close()
             Else
-                Dim risposta = MDIMessageBox.Show("Nome utente o password errati.", Me.MdiParent, MessageBoxButtons.OK)
+                MDIMessageBox.Show("Nome utente o password errati.", Me.MdiParent, MessageBoxButtons.OK)
             End If
         Catch ex As Exception
             MDIMessageBox.Show("Errore durante l'autenticazione: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
         End Try
-
     End Sub
+
 
     Public Sub AttivaTuttiIMenu(menuBar As MenuStrip)
         For Each voce As ToolStripMenuItem In menuBar.Items

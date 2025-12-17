@@ -65,9 +65,9 @@ Partial Class VideoFBF
         BtnRipristinaFrame = New Button()
         Label5 = New Label()
         lblFrameAttivo = New Label()
-        Label6 = New Label()
         lblTotFrames = New Label()
         panelViewer = New Panel()
+        Label6 = New Label()
         CType(picFrame, ComponentModel.ISupportInitialize).BeginInit()
         CType(TrackFrame, ComponentModel.ISupportInitialize).BeginInit()
         GroupBox1.SuspendLayout()
@@ -435,42 +435,32 @@ Partial Class VideoFBF
         Label5.ForeColor = SystemColors.HotTrack
         Label5.Location = New Point(629, 13)
         Label5.Name = "Label5"
-        Label5.Size = New Size(86, 17)
+        Label5.Size = New Size(68, 17)
         Label5.TabIndex = 32
-        Label5.Text = "Frame n/tot:"
+        Label5.Text = "N. Frame:"
         ' 
         ' lblFrameAttivo
         ' 
         lblFrameAttivo.AutoSize = True
+        lblFrameAttivo.BackColor = SystemColors.Control
         lblFrameAttivo.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblFrameAttivo.ForeColor = SystemColors.HotTrack
-        lblFrameAttivo.Location = New Point(721, 13)
+        lblFrameAttivo.Location = New Point(703, 13)
         lblFrameAttivo.Name = "lblFrameAttivo"
-        lblFrameAttivo.Size = New Size(60, 17)
+        lblFrameAttivo.Size = New Size(0, 17)
         lblFrameAttivo.TabIndex = 33
-        lblFrameAttivo.Text = "N.Frame"
-        ' 
-        ' Label6
-        ' 
-        Label6.AutoSize = True
-        Label6.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        Label6.ForeColor = SystemColors.HotTrack
-        Label6.Location = New Point(787, 13)
-        Label6.Name = "Label6"
-        Label6.Size = New Size(14, 17)
-        Label6.TabIndex = 34
-        Label6.Text = "/"
+        lblFrameAttivo.TextAlign = ContentAlignment.MiddleRight
         ' 
         ' lblTotFrames
         ' 
         lblTotFrames.AutoSize = True
         lblTotFrames.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblTotFrames.ForeColor = SystemColors.HotTrack
-        lblTotFrames.Location = New Point(807, 13)
+        lblTotFrames.Location = New Point(854, 13)
         lblTotFrames.Name = "lblTotFrames"
-        lblTotFrames.Size = New Size(70, 17)
+        lblTotFrames.Size = New Size(0, 17)
         lblTotFrames.TabIndex = 35
-        lblTotFrames.Text = "Tot Frame"
+        lblTotFrames.TextAlign = ContentAlignment.MiddleLeft
         ' 
         ' panelViewer
         ' 
@@ -481,6 +471,17 @@ Partial Class VideoFBF
         panelViewer.Size = New Size(1289, 733)
         panelViewer.TabIndex = 37
         ' 
+        ' Label6
+        ' 
+        Label6.AutoSize = True
+        Label6.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label6.ForeColor = SystemColors.HotTrack
+        Label6.Location = New Point(770, 13)
+        Label6.Name = "Label6"
+        Label6.Size = New Size(78, 17)
+        Label6.TabIndex = 38
+        Label6.Text = "Tot. Frame:"
+        ' 
         ' VideoFBF
         ' 
         AllowDrop = True
@@ -488,9 +489,9 @@ Partial Class VideoFBF
         AutoScaleMode = AutoScaleMode.Font
         AutoScroll = True
         ClientSize = New Size(1585, 879)
+        Controls.Add(Label6)
         Controls.Add(panelViewer)
         Controls.Add(lblTotFrames)
-        Controls.Add(Label6)
         Controls.Add(lblFrameAttivo)
         Controls.Add(Label5)
         Controls.Add(BtnRipristinaFrame)
@@ -568,7 +569,6 @@ Partial Class VideoFBF
     Friend WithEvents LstNoteFrame As ListView
     Friend WithEvents Label5 As Label
     Friend WithEvents lblFrameAttivo As Label
-    Friend WithEvents Label6 As Label
     Friend WithEvents lblTotFrames As Label
     Friend WithEvents Frame As ColumnHeader
     Friend WithEvents Nota As ColumnHeader
@@ -579,5 +579,6 @@ Partial Class VideoFBF
     Friend WithEvents PenColor As PictureBox
     Friend WithEvents Label7 As Label
     Friend WithEvents Label8 As Label
+    Friend WithEvents Label6 As Label
 
 End Class

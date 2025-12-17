@@ -222,6 +222,13 @@ Public Class VideoFBF
             If OpenFileDialog1.ShowDialog() <> DialogResult.OK Then Exit Sub
 
             btnCaricaVideo.Enabled = False
+            btnApprovazione.Enabled = False
+            btnRetake.Enabled = False
+            btnCaricaRevisione.Enabled = False
+            btnAnnulla.Enabled = False
+            BtnRipristinaFrame.Enabled = False
+            btnSalvaVideo.Enabled = False
+
             lblRevAttiva.Text = "Caricamento in corso..."
             Application.DoEvents()
 
@@ -274,13 +281,13 @@ Public Class VideoFBF
             End If
 
             ' 6) CREA/POPOLA Revisione_0000 in background (non blocca UI)
-            Try
-                Await Task.Run(Sub()
-                                   EnsureOriginalBackupFolder(nomeVideo, revisioneDir)
-                               End Sub)
-            Catch ex As Exception
-                MDIMessageBox.Show("Attenzione: impossibile creare backup Revisione_0000: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
-            End Try
+            'Try
+            'Await Task.Run(Sub()
+            '                      EnsureOriginalBackupFolder(nomeVideo, revisioneDir)
+            '                 End Sub)
+            'Catch ex As Exception
+            'MDIMessageBox.Show("Attenzione: impossibile creare backup Revisione_0000: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
+            'End Try
 
             ' 7) Inserisci permesso utente con FK coerente
             Await Task.Run(Sub() InserisciPermessoUtente(newRevisioneID, SessioneUtente.NomeUtenteCorrente))
@@ -317,6 +324,14 @@ Public Class VideoFBF
             btnUltimoFrame.Enabled = True
             btnAvantiVeloce.Enabled = True
             btnIndietroVeloce.Enabled = True
+
+            btnCaricaVideo.Enabled = False
+            btnApprovazione.Enabled = False
+            btnRetake.Enabled = False
+            btnCaricaRevisione.Enabled = False
+            btnAnnulla.Enabled = False
+            BtnRipristinaFrame.Enabled = False
+            btnSalvaVideo.Enabled = False
 
             Me.Parametri = parametri
             Me.AggiornaRevisioneAttiva()
@@ -809,10 +824,9 @@ Public Class VideoFBF
         Using conn As New SqlConnection(ConnString)
             conn.Open()
             Dim query = "
-                INSERT INTO Mov_Revisioni (RevisioneID, VideoID, Autore, DataRevisione, Note, Stato)
+                INSERT INTO Mov_Revisioni (VideoID, Autore, DataRevisione, Note, Stato)
                 VALUES (@RevisioneID, @VideoID, @Autore, @Data, @Note, @Stato)"
             Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.Add("@RevisioneID", SqlDbType.Int).Value = 0
                 cmd.Parameters.Add("@VideoID", SqlDbType.Int).Value = videoID
                 cmd.Parameters.Add("@Autore", SqlDbType.NVarChar, 100).Value = SessioneUtente.NomeUtenteCorrente
                 cmd.Parameters.Add("@Data", SqlDbType.DateTime).Value = DateTime.Now

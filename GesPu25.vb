@@ -18,90 +18,10 @@ Public Class GesPu25
 
     End Sub
 
-    Public Sub CaricaNotificheUtente(nomeUtente As String)
-        ' Configura la ListView
-        ListNotifiche.Clear()
-        ListNotifiche.View = View.Details
-        ListNotifiche.FullRowSelect = True
-
-        ' Definisci le colonne
-        ListNotifiche.Columns.Add("Id Notifica", 80)
-        ListNotifiche.Columns.Add("Data", 150)
-        ListNotifiche.Columns.Add("Messaggio", 300)
-        ListNotifiche.Columns.Add("Letto", 60)
-
-        ListNotifiche.Visible = False
-
-        Try
-            Dim query As String = "SELECT IdNotifica, Data, Messaggio, Letto 
-                                   FROM Tab_Notifiche 
-                                   WHERE Destinatario = @utente and Letto = @letto
-                                   ORDER BY Data DESC"
-
-            Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand(query, conn)
-                    cmd.Parameters.AddWithValue("@utente", nomeUtente)
-                    cmd.Parameters.AddWithValue("@letto", False)
-
-                    conn.Open()
-                    Using reader As SqlDataReader = cmd.ExecuteReader()
-                        While reader.Read()
-                            Dim item As New ListViewItem(reader("IdNotifica").ToString())
-                            item.SubItems.Add(Convert.ToDateTime(reader("Data")).ToString("dd/MM/yyyy HH:mm"))
-                            item.SubItems.Add(reader("Messaggio").ToString())
-                            item.SubItems.Add(If(Convert.ToBoolean(reader("Letto")), "Sì", "No"))
-                            ListNotifiche.Items.Add(item)
-                        End While
-                    End Using
-                End Using
-            End Using
-            If ListNotifiche.Items.Count = 0 Then
-                ListNotifiche.Visible = False
-            Else
-                ListNotifiche.Visible = True
-            End If
-
-        Catch ex As Exception
-            MessageBox.Show("Errore nel caricamento notifiche: " & ex.Message)
-        End Try
-    End Sub
-
-    Private Sub ListNotifiche_DoubleClick(sender As Object, e As EventArgs) Handles ListNotifiche.DoubleClick
-        If ListNotifiche.SelectedItems.Count > 0 Then
-            Dim idNotifica As Integer = Convert.ToInt32(ListNotifiche.SelectedItems(0).Text)
-
-            ' Aggiorna lo stato nel DB
-            AggiornaNotificaComeLetta(idNotifica)
-
-            ' Ricarica la lista notifiche per l’utente corrente
-            CaricaNotificheUtente(SessioneUtente.NomeUtenteCorrente)
-        End If
-    End Sub
-
-    Private Sub AggiornaNotificaComeLetta(idNotifica As Integer)
-        Try
-            Dim query As String = "UPDATE Tab_Notifiche SET Letto = 1 WHERE IdNotifica = @id"
-
-            Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand(query, conn)
-                    cmd.Parameters.AddWithValue("@id", idNotifica)
-                    conn.Open()
-                    cmd.ExecuteNonQuery()
-                End Using
-            End Using
-
-        Catch ex As Exception
-            MessageBox.Show("Errore durante l'aggiornamento della notifica: " & ex.Message)
-        End Try
-    End Sub
-
-
     Private Sub LogoutToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles LogoutToolStripMenuItem.Click
         ' Cancella la sessione utente
         SessioneUtente.NomeUtenteCorrente = Nothing
         SessioneUtente.Autorizzazioni = Nothing
-
-        ListNotifiche.Visible = False
 
         Me.toolStripUser.Text = "Nessun utente connesso"
         Me.toolStripDataOra.Text = "                                       "
@@ -119,7 +39,6 @@ Public Class GesPu25
         Dim loginForm As New Login()
         loginForm.MdiParent = Me
         loginForm.Show()
-
     End Sub
 
     Private Sub DisattivaVociMenu()
@@ -145,8 +64,7 @@ Public Class GesPu25
         ImportForm.Show()
     End Sub
 
-    Public Sub ApriModuloConPermessi(nomeTabella As String, mdiParent As Form)
-
+    Public Sub ApriModuloConPermessi(nomeTabella As String, mdiParent As Form, Optional pFiltroIniziale As String = "")
         Cursor.Current = Cursors.WaitCursor
         Application.DoEvents()
 
@@ -158,40 +76,90 @@ Public Class GesPu25
             Return
         End If
 
+        ' Cerca form già aperto e, se trovato, applica il filtro e ricarica
         For Each f As Form In mdiParent.MdiChildren
             If TypeOf f Is DynamicDataForm Then
                 Dim ft As String = If(f.Text, "").Trim()
                 Dim target As String = If(nomeTabella, "").Trim()
 
-                ' esatto 
+                Dim matchesTarget As Boolean = False
                 If String.Equals(ft, target, StringComparison.OrdinalIgnoreCase) Then
-                    f.Activate()
-                    Return
-                End If
-
-                ' formato "Modulo: Nomeform" (o simili "Chiave: Valore") -> prendi la parte dopo i due punti
-                Dim parts = ft.Split(New Char() {":"c}, 2)
-                If parts.Length = 2 Then
-                    Dim right = parts(1).Trim()
-                    If String.Equals(right, target, StringComparison.OrdinalIgnoreCase) Then
-                        f.Activate()
-                        Return
+                    matchesTarget = True
+                Else
+                    Dim parts = ft.Split(New Char() {":"c}, 2)
+                    If parts.Length = 2 Then
+                        Dim right = parts(1).Trim()
+                        If String.Equals(right, target, StringComparison.OrdinalIgnoreCase) Then
+                            matchesTarget = True
+                        End If
                     End If
                 End If
 
+                If matchesTarget Then
+                    ' Applica filtro se fornito
+                    If Not String.IsNullOrEmpty(pFiltroIniziale) Then
+                        Try
+                            Dim prop = f.GetType().GetProperty("FiltroIniziale")
+                            If prop IsNot Nothing AndAlso prop.CanWrite Then
+                                prop.SetValue(f, pFiltroIniziale)
+                            Else
+                                f.Tag = pFiltroIniziale
+                            End If
+
+                            ' Prova a invocare un metodo di ricarica dati esposto dal DynamicDataForm
+                            Dim reloadNames = New String() {"RicaricaDati", "CaricaDati", "ApplicaFiltroIniziale", "RefreshData", "RefreshGrid"}
+                            For Each NN In reloadNames
+                                Dim mi = f.GetType().GetMethod(NN, Reflection.BindingFlags.Instance Or Reflection.BindingFlags.Public Or Reflection.BindingFlags.NonPublic)
+                                If mi IsNot Nothing Then
+                                    mi.Invoke(f, Nothing)
+                                    Exit For
+                                End If
+                            Next
+                        Catch ex As Exception
+                            MDIMessageBox.Show($"Impossibile applicare filtro al modulo aperto: {ex.Message}", mdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                        End Try
+                    End If
+
+                    f.Activate()
+                    Cursor.Current = Cursors.Default
+                    Return
+                End If
             End If
         Next
 
+        ' Non è aperto: crealo, imposta il filtro e mostra
         Dim campi = RecuperaCampiDa(nomeTabella)
         Dim nuovoForm As New DynamicDataForm(campi, nomeTabella)
         nuovoForm.Text = $"Modulo: {nomeTabella}"
+
+        If Not String.IsNullOrEmpty(pFiltroIniziale) Then
+            Try
+                Dim prop = nuovoForm.GetType().GetProperty("FiltroIniziale")
+                If prop IsNot Nothing AndAlso prop.CanWrite Then
+                    prop.SetValue(nuovoForm, pFiltroIniziale)
+                Else
+                    nuovoForm.Tag = pFiltroIniziale
+                End If
+            Catch
+                ' fallback silenzioso
+            End Try
+        End If
+
         nuovoForm.MdiParent = mdiParent
         nuovoForm.Show()
 
+        ' opzionale: forzare la ricarica immediata se il form espone il metodo
+        Try
+            Dim mi = nuovoForm.GetType().GetMethod("RicaricaDati", Reflection.BindingFlags.Instance Or Reflection.BindingFlags.Public Or Reflection.BindingFlags.NonPublic)
+            If mi IsNot Nothing Then mi.Invoke(nuovoForm, Nothing)
+        Catch
+            ' ignorare errori non critici
+        End Try
+
         Cursor.Current = Cursors.Default
         Application.DoEvents()
-
     End Sub
+
 
     Public Sub ApriModulo2ConPermessi(nomeTabella As String, pForm As Form)
 
@@ -224,7 +192,6 @@ Public Class GesPu25
         Try
             Using conn As New SqlConnection(ConnString)
                 conn.Open()
-
                 Dim query = "SELECT ISNULL(Amministratore, 0) FROM Tab_Utenti WHERE NomeUtente = @utente"
                 Using cmd As New SqlCommand(query, conn)
                     cmd.Parameters.AddWithValue("@utente", nomeUtente)
@@ -232,10 +199,54 @@ Public Class GesPu25
                 End Using
             End Using
         Catch ex As Exception
-            MDIMessageBox.Show("Errore nel controllo amministratore: " & ex.Message, Nothing, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MDIMessageBox.Show($"Errore nel controllo amministratore: {ex.Message}", Nothing, MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return False
         End Try
     End Function
+
+    Private Function HasNotificheDaVisualizzare(nomeUtente As String) As Boolean
+        Try
+            Dim query As String = "
+            SELECT COUNT(1)
+            FROM Mov_Notifiche
+            WHERE Destinatario = @utente AND Letto = 0"
+
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@utente", nomeUtente)
+                    conn.Open()
+                    Dim countObj = cmd.ExecuteScalar()
+                    Dim count As Integer = If(IsDBNull(countObj), 0, Convert.ToInt32(countObj))
+                    Return count > 0
+                End Using
+            End Using
+        Catch ex As Exception
+            MDIMessageBox.Show($"Errore nel controllo notifiche: {ex.Message}", Me, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        End Try
+    End Function
+
+    ' helper chiamato dopo autenticazione
+    Public Sub ApriNotifiche(Optional TuttiIRecord As Boolean = True)
+        If String.IsNullOrEmpty(SessioneUtente.NomeUtenteCorrente) Then Return
+        If TuttiIRecord <> True Then
+            If Not HasNotificheDaVisualizzare(SessioneUtente.NomeUtenteCorrente) Then
+                Return
+            End If
+        End If
+        Dim ParteFiltro As String = ""
+
+        If TuttiIRecord = False Then
+            ParteFiltro = " AND Letto = 0"
+        Else
+            ParteFiltro = ""
+        End If
+        Dim utenteEscaped = SessioneUtente.NomeUtenteCorrente.Replace("'", "''")
+        Dim filtro As String = $"Destinatario = '{utenteEscaped}'{ParteFiltro}"
+
+        ApriModuloConPermessi("Mov_Notifiche", Me, filtro)
+    End Sub
+
     Private Sub GesPu25_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
         GestioneStatoForm.SalvaStato(Me)
     End Sub
@@ -405,8 +416,7 @@ Public Class GesPu25
     End Sub
 
     Private Sub GestioneNotificheToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles GestioneNotificheToolStripMenuItem.Click
-        ApriModuloConPermessi("Tab_Notifiche", Me)
+        ApriNotifiche(True)
     End Sub
 
 End Class
-

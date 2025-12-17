@@ -39,7 +39,7 @@ Partial Class CreaLettAssegnazione
         ' 
         ' btnChiudi
         ' 
-        btnChiudi.Location = New Point(91, 94)
+        btnChiudi.Location = New Point(92, 96)
         btnChiudi.Name = "btnChiudi"
         btnChiudi.Size = New Size(75, 23)
         btnChiudi.TabIndex = 3
@@ -50,11 +50,11 @@ Partial Class CreaLettAssegnazione
         ' 
         lblCreaPDF.AutoSize = True
         lblCreaPDF.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblCreaPDF.Location = New Point(28, 20)
+        lblCreaPDF.Location = New Point(51, 20)
         lblCreaPDF.Name = "lblCreaPDF"
-        lblCreaPDF.Size = New Size(211, 17)
+        lblCreaPDF.Size = New Size(167, 17)
         lblCreaPDF.TabIndex = 0
-        lblCreaPDF.Text = "CREAZIONE Lettera Assegnazioni"
+        lblCreaPDF.Text = "Assegnazione Lavorazioni"
         ' 
         ' btnCaricaAllegati
         ' 
@@ -69,7 +69,7 @@ Partial Class CreaLettAssegnazione
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(272, 129)
+        ClientSize = New Size(272, 130)
         Controls.Add(btnCaricaAllegati)
         Controls.Add(lblCreaPDF)
         Controls.Add(btnChiudi)
