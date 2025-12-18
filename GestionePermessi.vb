@@ -14,7 +14,7 @@ Module ModuloAutorizzazioni
                 Case Else : Return False
             End Select
 
-            Dim query As String = $"SELECT {campoPermesso} FROM Sys_Autorizzazioni WHERE NomeUtente = @NomeUtente AND Form = @Form"
+            Dim query As String = $"SELECT {campoPermesso} FROM Tab_UtentiAutorizzazioni WHERE NomeUtente = @NomeUtente AND Form = @Form"
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
                 cmd.Parameters.AddWithValue("@Form", formName)

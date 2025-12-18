@@ -1,5 +1,4 @@
-﻿
-Imports Microsoft.Data.SqlClient
+﻿Imports Microsoft.Data.SqlClient
 
 Public Class PermessiUtenteForm
 
@@ -78,7 +77,7 @@ Public Class PermessiUtenteForm
         Using conn As New SqlConnection(connectionString)
             conn.Open()
 
-            Dim cmdAut As New SqlCommand("SELECT Form, CanView, CanInsert, CanUpdate, CanDelete FROM Sys_Autorizzazioni WHERE NomeUtente = @nome", conn)
+            Dim cmdAut As New SqlCommand("SELECT Form, CanView, CanInsert, CanUpdate, CanDelete FROM Tab_UtentiAutorizzazioni WHERE NomeUtente = @nome", conn)
             cmdAut.Parameters.AddWithValue("@nome", nomeUtente)
 
             Dim permessi As New Dictionary(Of String, PermessiForm)
@@ -126,7 +125,7 @@ Public Class PermessiUtenteForm
                 Dim canDelete = Convert.ToBoolean(row.Cells("CanDelete").Value)
 
                 ' Verifica se già esiste
-                Dim queryCheck = "SELECT COUNT(*) FROM Sys_Autorizzazioni WHERE NomeUtente = @nome AND Form = @form"
+                Dim queryCheck = "SELECT COUNT(*) FROM Tab_UtentiAutorizzazioni WHERE NomeUtente = @nome AND Form = @form"
                 Dim esiste As Boolean
                 Using cmdCheck As New SqlCommand(queryCheck, conn)
                     cmdCheck.Parameters.AddWithValue("@nome", nomeUtente)
@@ -136,7 +135,7 @@ Public Class PermessiUtenteForm
 
                 If esiste Then
                     ' UPDATE
-                    Dim queryUpdate = "UPDATE Sys_Autorizzazioni SET CanView = @v, CanInsert = @i, CanUpdate = @u, CanDelete = @d " &
+                    Dim queryUpdate = "UPDATE Tab_UtentiAutorizzazioni SET CanView = @v, CanInsert = @i, CanUpdate = @u, CanDelete = @d " &
                           "WHERE NomeUtente = @nome AND Form = @form"
                     Using cmd As New SqlCommand(queryUpdate, conn)
                         cmd.Parameters.AddWithValue("@v", canView)
@@ -149,7 +148,7 @@ Public Class PermessiUtenteForm
                     End Using
                 Else
                     ' INSERT
-                    Dim queryInsert = "INSERT INTO Sys_Autorizzazioni (NomeUtente, Form, CanView, CanInsert, CanUpdate, CanDelete) " &
+                    Dim queryInsert = "INSERT INTO Tab_UtentiAutorizzazioni (NomeUtente, Form, CanView, CanInsert, CanUpdate, CanDelete) " &
                           "VALUES (@nome, @form, @v, @i, @u, @d)"
                     Using cmd As New SqlCommand(queryInsert, conn)
                         cmd.Parameters.AddWithValue("@nome", nomeUtente)

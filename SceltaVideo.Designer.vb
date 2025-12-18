@@ -23,7 +23,7 @@ Partial Class SceltaVideo
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
         dgvRevisioni = New DataGridView()
-        txtFiltro = New TextBox()
+        txtFiltroLavorazione = New TextBox()
         Label1 = New Label()
         CType(dgvRevisioni, ComponentModel.ISupportInitialize).BeginInit()
         SuspendLayout()
@@ -36,43 +36,44 @@ Partial Class SceltaVideo
         dgvRevisioni.AllowUserToResizeRows = False
         dgvRevisioni.Anchor = AnchorStyles.None
         dgvRevisioni.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgvRevisioni.Location = New Point(12, 44)
+        dgvRevisioni.Location = New Point(13, 44)
         dgvRevisioni.Name = "dgvRevisioni"
-        dgvRevisioni.Size = New Size(821, 424)
+        dgvRevisioni.Size = New Size(914, 424)
         dgvRevisioni.TabIndex = 0
         ' 
-        ' txtFiltro
+        ' txtFiltroLavorazione
         ' 
-        txtFiltro.Location = New Point(55, 10)
-        txtFiltro.Name = "txtFiltro"
-        txtFiltro.Size = New Size(300, 23)
-        txtFiltro.TabIndex = 1
+        txtFiltroLavorazione.Location = New Point(59, 10)
+        txtFiltroLavorazione.Name = "txtFiltroLavorazione"
+        txtFiltroLavorazione.Size = New Size(394, 23)
+        txtFiltroLavorazione.TabIndex = 1
         ' 
         ' Label1
         ' 
         Label1.AutoSize = True
         Label1.Location = New Point(13, 13)
         Label1.Name = "Label1"
-        Label1.Size = New Size(37, 15)
+        Label1.Size = New Size(40, 15)
         Label1.TabIndex = 2
-        Label1.Text = "Video"
+        Label1.Text = "Cerca:"
         ' 
         ' SceltaVideo
         ' 
-        AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(845, 480)
+        ClientSize = New Size(939, 480)
         Controls.Add(Label1)
-        Controls.Add(txtFiltro)
+        Controls.Add(txtFiltroLavorazione)
         Controls.Add(dgvRevisioni)
+        FormBorderStyle = FormBorderStyle.FixedToolWindow
         Name = "SceltaVideo"
-        Text = "Scelta Video da elaborare"
+        Text = "Scelta Lavorazione"
         CType(dgvRevisioni, ComponentModel.ISupportInitialize).EndInit()
         ResumeLayout(False)
         PerformLayout()
     End Sub
 
     Friend WithEvents dgvRevisioni As DataGridView
-    Friend WithEvents txtFiltro As TextBox
+    Friend WithEvents txtFiltroLavorazione As TextBox
     Friend WithEvents Label1 As Label
 End Class

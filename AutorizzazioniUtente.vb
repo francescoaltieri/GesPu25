@@ -5,7 +5,7 @@ Public Class AutorizzazioniUtente
     Public Sub Carica(nomeUtente As String)
         autorizzazioni.Clear()
 
-        Dim query = "SELECT Form, CanView, CanInsert, CanUpdate, CanDelete FROM Sys_Autorizzazioni WHERE NomeUtente = @nome"
+        Dim query = "SELECT Form, CanView, CanInsert, CanUpdate, CanDelete FROM Tab_UtentiAutorizzazioni WHERE NomeUtente = @nome"
 
         Using conn As New SqlConnection(ConnString)
             Using cmd As New SqlCommand(query, conn)

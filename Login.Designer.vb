@@ -92,6 +92,7 @@ Partial Class Login
         Controls.Add(Label2)
         Controls.Add(txtNomeUtente)
         Controls.Add(Label1)
+        FormBorderStyle = FormBorderStyle.None
         Name = "Login"
         StartPosition = FormStartPosition.CenterParent
         Text = "Login"

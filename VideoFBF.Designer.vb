@@ -68,6 +68,7 @@ Partial Class VideoFBF
         lblTotFrames = New Label()
         panelViewer = New Panel()
         Label6 = New Label()
+        BtnApriEditorEsterno = New Button()
         CType(picFrame, ComponentModel.ISupportInitialize).BeginInit()
         CType(TrackFrame, ComponentModel.ISupportInitialize).BeginInit()
         GroupBox1.SuspendLayout()
@@ -373,7 +374,7 @@ Partial Class VideoFBF
         lblRevAttiva.AutoSize = True
         lblRevAttiva.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblRevAttiva.ForeColor = SystemColors.HotTrack
-        lblRevAttiva.Location = New Point(89, 13)
+        lblRevAttiva.Location = New Point(101, 13)
         lblRevAttiva.Name = "lblRevAttiva"
         lblRevAttiva.Size = New Size(74, 17)
         lblRevAttiva.TabIndex = 27
@@ -396,9 +397,9 @@ Partial Class VideoFBF
         Label2.ForeColor = SystemColors.HotTrack
         Label2.Location = New Point(12, 13)
         Label2.Name = "Label2"
-        Label2.Size = New Size(71, 17)
+        Label2.Size = New Size(86, 17)
         Label2.TabIndex = 29
-        Label2.Text = "Revisione:"
+        Label2.Text = "Lavorazione:"
         ' 
         ' GroupBox4
         ' 
@@ -482,6 +483,16 @@ Partial Class VideoFBF
         Label6.TabIndex = 38
         Label6.Text = "Tot. Frame:"
         ' 
+        ' BtnApriEditorEsterno
+        ' 
+        BtnApriEditorEsterno.Location = New Point(877, 828)
+        BtnApriEditorEsterno.Name = "BtnApriEditorEsterno"
+        BtnApriEditorEsterno.Size = New Size(120, 42)
+        BtnApriEditorEsterno.TabIndex = 39
+        BtnApriEditorEsterno.Text = "Editor Esterno"
+        BtnApriEditorEsterno.UseVisualStyleBackColor = True
+        BtnApriEditorEsterno.Visible = False
+        ' 
         ' VideoFBF
         ' 
         AllowDrop = True
@@ -489,6 +500,7 @@ Partial Class VideoFBF
         AutoScaleMode = AutoScaleMode.Font
         AutoScroll = True
         ClientSize = New Size(1585, 879)
+        Controls.Add(BtnApriEditorEsterno)
         Controls.Add(Label6)
         Controls.Add(panelViewer)
         Controls.Add(lblTotFrames)
@@ -517,7 +529,7 @@ Partial Class VideoFBF
         Name = "VideoFBF"
         SizeGripStyle = SizeGripStyle.Hide
         StartPosition = FormStartPosition.CenterParent
-        Text = "Modifica Frame"
+        Text = "Video Frame By Frame"
         CType(picFrame, ComponentModel.ISupportInitialize).EndInit()
         CType(TrackFrame, ComponentModel.ISupportInitialize).EndInit()
         GroupBox1.ResumeLayout(False)
@@ -580,5 +592,6 @@ Partial Class VideoFBF
     Friend WithEvents Label7 As Label
     Friend WithEvents Label8 As Label
     Friend WithEvents Label6 As Label
+    Friend WithEvents BtnApriEditorEsterno As Button
 
 End Class

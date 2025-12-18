@@ -102,6 +102,9 @@ Public Class VideoFBF
         Catch
         End Try
 
+        Dim isAdmin = GesPu25.IsUtenteAdmin(SessioneUtente.NomeUtenteCorrente)
+        lstUtentiCondivisi.Enabled = isAdmin
+
     End Sub
 
     Private Sub LstNoteFrame_MouseMove_ShowTooltip(sender As Object, e As MouseEventArgs)
@@ -280,32 +283,15 @@ Public Class VideoFBF
                 Exit Sub
             End If
 
-            ' 6) CREA/POPOLA Revisione_0000 in background (non blocca UI)
-            'Try
-            'Await Task.Run(Sub()
-            '                      EnsureOriginalBackupFolder(nomeVideo, revisioneDir)
-            '                 End Sub)
-            'Catch ex As Exception
-            'MDIMessageBox.Show("Attenzione: impossibile creare backup Revisione_0000: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK)
-            'End Try
-
-            ' 7) Inserisci permesso utente con FK coerente
+            ' 6) Inserisci permesso utente con FK coerente
             Await Task.Run(Sub() InserisciPermessoUtente(newRevisioneID, SessioneUtente.NomeUtenteCorrente))
 
             MDIMessageBox.Show($"Video caricato, frame estratti, Revisione_{newRevisioneID:D4} registrata e backup {nomeVideo}_0000 creato.", Me.MdiParent, MessageBoxButtons.OK)
 
-            ' 8) Aggiorna UI
+            ' 7) Aggiorna UI
             lblRevAttiva.Text = newRevisioneID.ToString()
 
-            Dim parametri = New RevisioneParametri(
-                videoID,
-                newRevisioneID,
-                SessioneUtente.NomeUtenteCorrente,
-                $"Revisione {newRevisioneID}",
-                "visualizza",
-                DateTime.Now,
-                approvato
-            )
+            Dim parametri = New RevisioneParametri(videoID, newRevisioneID, SessioneUtente.NomeUtenteCorrente, $"Revisione {newRevisioneID}", "visualizza", DateTime.Now, approvato)
 
             editor = tempEditor
             editor.CurrentIndex = 0
@@ -650,7 +636,7 @@ Public Class VideoFBF
             Dim cmd As New SqlCommand("
                 SELECT NomeUtente, Generalità 
                 FROM Tab_Utenti 
-                WHERE IsActive = 1 AND (Amministratore = 1 OR Supervisore = 1)
+                WHERE IsActive = 1 AND (Amministratore = 1 OR Supervisore = 1 OR Animatore = 1)
                 ORDER BY Generalità", conn)
             conn.Open()
             Using reader = cmd.ExecuteReader()
@@ -667,12 +653,13 @@ Public Class VideoFBF
 
     Private Sub lstUtentiCondivisi_ItemCheck(sender As Object, e As ItemCheckEventArgs) Handles lstUtentiCondivisi.ItemCheck
         If aggiornamentoInCorso Then Exit Sub
+
         Me.BeginInvoke(Sub()
                            Dim item = CType(lstUtentiCondivisi.Items(e.Index), KeyValuePair(Of String, String))
                            Dim nomeUtente = item.Key
                            Dim revisioneID As Integer
                            If Not TryParseRevisioneID(lblRevAttiva.Text, revisioneID) Then
-                               MDIMessageBox.Show("Revisione non valida", Me.MdiParent, MessageBoxButtons.OK)
+                               MDIMessageBox.Show("Lavorazione non valida", Me.MdiParent, MessageBoxButtons.OK)
                                Return
                            End If
                            If e.NewValue = CheckState.Checked Then
@@ -865,7 +852,7 @@ Public Class VideoFBF
 
     Public Sub AggiornaRevisioneAttiva()
         If Parametri Is Nothing Then
-            lblRevAttiva.Text = "Nessuna revisione attiva"
+            lblRevAttiva.Text = "Nessuna lavorazione attiva"
             Return
         End If
         lblRevAttiva.Text = Parametri.RevisioneID.ToString()
@@ -901,7 +888,7 @@ Public Class VideoFBF
         End Using
 
         If Not Directory.Exists(frameDir) OrElse GetFrameFiles(frameDir).Length = 0 Then
-            MDIMessageBox.Show("Nessun Frame trovato per la revisione selezionata", Me.MdiParent, MessageBoxButtons.OK)
+            MDIMessageBox.Show("Nessun Frame trovato per la lavorazione selezionata", Me.MdiParent, MessageBoxButtons.OK)
             Exit Sub
         End If
 
@@ -1067,8 +1054,8 @@ Public Class VideoFBF
 
     Private Sub btnAnnulla_Click(sender As Object, e As EventArgs) Handles btnAnnulla.Click
         If picFrame.Image Is Nothing Then Return
-        Dim ancoraModifiche = editor.Undo()
-        picFrame.Image = CType(editor.DrawingBitmap.Clone(), Bitmap)
+        Dim ancoraModifiche = editor.Undo
+        picFrame.Image = CType(editor.DrawingBitmap.Clone, Bitmap)
         hasUnsavedChanges = editor.HasUnsavedChanges
     End Sub
 
@@ -1211,10 +1198,10 @@ Public Class VideoFBF
 
                 Using conn As New SqlConnection(ConnString)
                     Dim query As String = "
-                    SELECT FrameIndex, TestoNota, NomeUtente, DataNota
-                    FROM Mov_FrameNote
-                    WHERE RevisioneID = @RevID
-                    ORDER BY FrameIndex"
+                                            SELECT FrameIndex, TestoNota, NomeUtente, DataNota
+                                            FROM Mov_FrameNote
+                                            WHERE RevisioneID = @RevID
+                                            ORDER BY FrameIndex"
                     Using cmd As New SqlCommand(query, conn)
                         cmd.Parameters.Add("@RevID", SqlDbType.Int).Value = revisioneID
                         conn.Open()
@@ -1386,7 +1373,7 @@ Public Class VideoFBF
         ' Parse revisione
         Dim revisioneID As Integer
         If Not TryParseRevisioneID(lblRevAttiva.Text, revisioneID) Then
-            MDIMessageBox.Show("Revisione non valida", Me.MdiParent, MessageBoxButtons.OK)
+            MDIMessageBox.Show("Lavorazione non valida", Me.MdiParent, MessageBoxButtons.OK)
             Return
         End If
 
@@ -1556,7 +1543,7 @@ Public Class VideoFBF
             Try
                 Dim revisioneID As Integer
                 If Not TryParseRevisioneID(lblRevAttiva.Text, revisioneID) Then
-                    MDIMessageBox.Show("Revisione non valida", Me.MdiParent, MessageBoxButtons.OK)
+                    MDIMessageBox.Show("Lavorazione non valida", Me.MdiParent, MessageBoxButtons.OK)
                     Return False
                 End If
                 editor.SaveFrame(editor.CurrentIndex, editor.DrawingBitmap)
@@ -1626,13 +1613,13 @@ Public Class VideoFBF
         End If
 
         ' Verifica che esista la cartella di backup Revisione_0000
-        Dim nomeVideo = Path.GetFileNameWithoutExtension(editor.VideoPath)
-        Dim baseDir = Path.Combine(OttieniPercorso("PercorsoFrames"), nomeVideo)
-        Dim originalDir = Path.Combine(baseDir, "Revisione_0000")
-        If Not Directory.Exists(originalDir) Then
-            MDIMessageBox.Show("Cartella di backup Revisione_0000 non trovato", Me.MdiParent, MessageBoxButtons.OK)
-            Return
-        End If
+        'Dim nomeVideo = Path.GetFileNameWithoutExtension(editor.VideoPath)
+        'Dim baseDir = Path.Combine(OttieniPercorso("PercorsoFrames"), nomeVideo)
+        'Dim originalDir = Path.Combine(baseDir, "Revisione_0000")
+        'If Not Directory.Exists(originalDir) Then
+        'MDIMessageBox.Show("Cartella di backup Revisione_0000 non trovato", Me.MdiParent, MessageBoxButtons.OK)
+        'Return
+        'End If
 
         ' Controllo indice valido
         Dim idx = editor.CurrentIndex
@@ -1704,7 +1691,7 @@ Public Class VideoFBF
             Dim originalDir = Path.Combine(baseDir, "Revisione_0000")
             BtnRipristinaFrame.Enabled = Directory.Exists(originalDir)
         Catch
-            BtnRipristinaFrame.Enabled = False
+            'BtnRipristinaFrame.Enabled = False
         End Try
     End Sub
 
@@ -2601,6 +2588,82 @@ Public Class VideoFBF
             IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {msg}{Environment.NewLine}")
         Catch : End Try
     End Sub
+
+    Private Sub BtnApriEditorEsterno_Click(sender As Object, e As EventArgs) Handles BtnApriEditorEsterno.Click
+        Try
+            ' Ottieni la bitmap dell'overlay (sostituisci con la tua sorgente)
+            Dim overlayBmp As Bitmap = GetOverlayBitmap()
+            If overlayBmp Is Nothing Then
+                LogDebug("Nessuna overlay disponibile da aprire.")
+                Return
+            End If
+
+            ' Salva su file temporaneo e apri con l'app predefinita
+            Dim tempPath As String = SaveBitmapToTempPng(overlayBmp)
+            If String.IsNullOrEmpty(tempPath) Then
+                LogDebug("Errore nel salvataggio del file temporaneo.")
+                Return
+            End If
+
+            OpenFileWithDefaultApp(tempPath)
+        Catch ex As Exception
+            LogDebug(ex.Message)
+        End Try
+    End Sub
+
+    ' Recupera la bitmap dell'overlay: adatta questa funzione alla tua struttura
+    Private Function GetOverlayBitmap() As Bitmap
+        ' Esempio: se hai editor.OverlayBitmap o editor.DrawingBitmap
+        ' Return CType(editor.OverlayBitmap?.Clone(), Bitmap)
+        If editor Is Nothing OrElse editor.DrawingBitmap Is Nothing Then Return Nothing
+        ' Se hai una bitmap separata per l'overlay, restituiscila; altrimenti usa una copia del drawing
+        Return CType(editor.DrawingBitmap.Clone(), Bitmap)
+    End Function
+
+    ' Salva la bitmap in un file PNG temporaneo e restituisce il percorso
+    Private Function SaveBitmapToTempPng(bmp As Bitmap) As String
+        Try
+            Dim tempFile As String = IO.Path.Combine(IO.Path.GetTempPath(), "overlay_" & Guid.NewGuid().ToString("N") & ".png")
+            bmp.Save(tempFile, Imaging.ImageFormat.Png)
+            Return tempFile
+        Catch ex As Exception
+            LogDebug("SaveBitmapToTempPng EX: " & ex.Message)
+            Return String.Empty
+        End Try
+    End Function
+
+    ' Apre il file con l'applicazione predefinita del sistema (UseShellExecute = True)
+    Private Sub OpenFileWithDefaultApp(filePath As String)
+        Try
+            Dim psi As New ProcessStartInfo()
+            psi.FileName = filePath
+            psi.UseShellExecute = True
+            Process.Start(psi)
+        Catch ex As Exception
+            LogDebug("OpenFileWithDefaultApp EX: " & ex.Message)
+        End Try
+    End Sub
+
+    ' Opzionale: prova ad aprire con un'app specifica (es. mspaint o gimp) se presente
+    Private Sub OpenFileWithSpecificApp(filePath As String, appPath As String)
+        Try
+            If String.IsNullOrEmpty(appPath) OrElse Not IO.File.Exists(appPath) Then
+                ' fallback: apri con app predefinita
+                OpenFileWithDefaultApp(filePath)
+                Return
+            End If
+
+            Dim psi As New ProcessStartInfo()
+            psi.FileName = appPath
+            psi.Arguments = """" & filePath & """"
+            psi.UseShellExecute = True
+            Process.Start(psi)
+        Catch ex As Exception
+            LogDebug("OpenFileWithSpecificApp EX: " & ex.Message)
+        End Try
+    End Sub
+
+
 
     ' --- DTO ListView Note ---
     Public Class NotaFrameInfo

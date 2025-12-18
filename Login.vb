@@ -1,4 +1,5 @@
-﻿Imports Microsoft.Data.SqlClient
+﻿Imports System.ComponentModel
+Imports Microsoft.Data.SqlClient
 
 Public Class Login
     Private Sub Login_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -96,4 +97,7 @@ Public Class Login
         Next
     End Sub
 
+    Private Sub Login_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
+
+    End Sub
 End Class

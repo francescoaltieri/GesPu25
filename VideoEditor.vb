@@ -175,7 +175,6 @@ Public Class VideoEditor
         End SyncLock
     End Sub
 
-
     Public Sub ClearFrameAnnotations(index As Integer)
         If index < 0 OrElse index >= FrameList.Count Then Return
 

@@ -2976,7 +2976,7 @@ Public Class DynamicDataForm
 
                 Dim queryAut = "
                 SELECT CanInsert, CanUpdate, CanDelete 
-                FROM Sys_Autorizzazioni 
+                FROM Tab_UtentiAutorizzazioni 
                 WHERE NomeUtente = @utente AND Form = @form
             "
 

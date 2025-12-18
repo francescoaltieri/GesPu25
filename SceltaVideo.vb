@@ -6,7 +6,7 @@ Imports Microsoft.Data.SqlClient
 
 Public Class SceltaVideo
 
-    Public Property RevisioneSelezionata As RevisioneParametri
+    'Public Property RevisioneSelezionata As RevisioneParametri
     Private videoFormDestinazione As VideoFBF
 
     ' Cache per PercorsoFrames e PercrsoTempFolder
@@ -33,25 +33,25 @@ Public Class SceltaVideo
         Dim dt As New DataTable()
 
         Using conn As New SqlConnection(ConnString)
-            Dim query As String = "
-SELECT
-    R.RevisioneID,
-    R.DataRevisione,
-    V.VideoID,
-    V.Titolo AS TitoloVideo,
-    R.Autore,
-    R.NumRetake,
-    R.Stato,
-    R.Approvato,
-    R.Note
-FROM Mov_Revisioni R
-INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
-INNER JOIN Mov_RevisioniUtente UR ON R.RevisioneID = UR.RevisioneID
-WHERE UR.NomeUtente = @NomeUtente
-ORDER BY V.Titolo, R.DataRevisione ASC;"
+            Dim query As String =
+                                    "SELECT " &
+                                    "    R.RevisioneID, " &
+                                    "    R.DataRevisione, " &
+                                    "    V.VideoID, " &
+                                    "    V.Titolo AS TitoloVideo, " &
+                                    "    R.Autore, " &
+                                    "    R.NumRetake, " &
+                                    "    R.Stato, " &
+                                    "    R.Approvato, " &
+                                    "    R.Note " &
+                                    "FROM Mov_Revisioni R " &
+                                    "INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID " &
+                                    "INNER JOIN Mov_RevisioniUtente UR ON R.RevisioneID = UR.RevisioneID " &
+                                    "WHERE UR.NomeUtente = @NomeUtente OR R.Supervisore = @NomeUtente " &
+                                    "ORDER BY V.Titolo, R.DataRevisione ASC;"
 
             Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@NomeUtente", nomeUtente)
+                cmd.Parameters.Add("@NomeUtente", SqlDbType.NVarChar, 256).Value = nomeUtente
                 conn.Open()
                 Using reader As SqlDataReader = cmd.ExecuteReader()
                     dt.Load(reader)
@@ -65,7 +65,7 @@ ORDER BY V.Titolo, R.DataRevisione ASC;"
 
         For Each row As DataRow In dt.Rows
             Dim revisioneID As Integer = CInt(row("RevisioneID"))
-            row("NumeroRevisione") = $"Revisione_{revisioneID:000}"
+            row("NumeroRevisione") = $"Lavorazione_{revisioneID:0000}"
         Next
 
         dgvRevisioni.DataSource = dt
@@ -89,11 +89,6 @@ ORDER BY V.Titolo, R.DataRevisione ASC;"
 
             Dim row = dgvRevisioni.SelectedRows(0)
             Dim revisioneID = CInt(row.Cells("RevisioneID").Value)
-
-            If Not RevisioneCancellabile(revisioneID) Then
-                MDIMessageBox.Show($"La Revisione {revisioneID} non può essere cancellata perché esistono altre revisioni per questo video.", Me.MdiParent, MessageBoxButtons.OK, "Operazione non consentita")
-                Exit Sub
-            End If
 
             If Not ModuloAutorizzazioni.UtenteAutorizzato("SceltaVideo", "delete", SessioneUtente.NomeUtenteCorrente) Then
                 MDIMessageBox.Show("Non hai i permessi per cancellare questa revisione.", Me.MdiParent, MessageBoxButtons.OK, "Accesso negato")
@@ -122,10 +117,10 @@ ORDER BY V.Titolo, R.DataRevisione ASC;"
             conn.Open()
 
             Dim queryInfo As String = "
-SELECT V.Titolo
-FROM Mov_Revisioni R
-INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
-WHERE R.RevisioneID = @RevisioneID"
+                                        SELECT V.Titolo
+                                        FROM Mov_Revisioni R
+                                        INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
+                                        WHERE R.RevisioneID = @RevisioneID"
             Using cmd As New SqlCommand(queryInfo, conn)
                 cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
                 Using reader = cmd.ExecuteReader()
@@ -403,65 +398,6 @@ WHERE R.RevisioneID = @RevisioneID"
         End Try
     End Sub
 
-    Private Function RevisioneCancellabile(revisioneID As Integer) As Boolean
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-
-            Dim videoID As Integer = 0
-            Dim queryInfo As String = "
-SELECT V.VideoID
-FROM Mov_Revisioni R
-INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
-WHERE R.RevisioneID = @RevisioneID"
-            Using cmd As New SqlCommand(queryInfo, conn)
-                cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
-                Using reader = cmd.ExecuteReader()
-                    If reader.Read() Then
-                        videoID = CInt(reader("VideoID"))
-                    Else
-                        Return False
-                    End If
-                End Using
-            End Using
-
-            Dim querySucc = "
-SELECT COUNT(*)
-FROM Mov_Revisioni
-WHERE VideoID = @VideoID AND RevisioneID > @RevisioneID"
-            Using cmdSucc As New SqlCommand(querySucc, conn)
-                cmdSucc.Parameters.AddWithValue("@VideoID", videoID)
-                cmdSucc.Parameters.AddWithValue("@RevisioneID", revisioneID)
-                Dim countSucc = CInt(cmdSucc.ExecuteScalar())
-                If countSucc > 0 Then Return False
-            End Using
-
-            Return True
-        End Using
-    End Function
-
-    Private Function OttieniPercorsoCartellaRevisione(revisioneID As Integer) As String
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query As String = "
-SELECT V.Titolo, R.RevisioneID
-FROM Mov_Revisioni R
-INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID
-WHERE R.RevisioneID = @RevisioneID"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
-                Using reader = cmd.ExecuteReader()
-                    If reader.Read() Then
-                        Dim titolo = reader("Titolo").ToString().Trim()
-                        Dim numero = CInt(reader("RevisioneID"))
-                        Dim base = GetPercorsoFramesCached()
-                        Return Path.Combine(base, titolo, $"Revisione_{numero:000}")
-                    End If
-                End Using
-            End Using
-        End Using
-        Return String.Empty
-    End Function
-
     ' Lettura parametro da Sys_Parametri
     Private Function GetSysParametro(descrizione As String) As String
         Try
@@ -556,28 +492,6 @@ WHERE R.RevisioneID = @RevisioneID"
         Return _cachedPercorsoTemp
     End Function
 
-    ' Forza refresh della cache (se necessario)
-    Private Sub RefreshPercorsoFramesCache()
-        SyncLock _cacheLock
-            _cachedPercorsoFramesLoaded = False
-            _cachedPercorsoFrames = Nothing
-        End SyncLock
-    End Sub
-
-    Private Function CalcolaNumeroRevisionexxxxx(revisioneID As Integer) As Integer
-        Using conn As New SqlConnection(ConnString)
-            conn.Open()
-            Dim query As String = "
-SELECT ROW_NUMBER() OVER (PARTITION BY VideoID ORDER BY DataRevisione ASC) - 1 AS Numero
-FROM Mov_Revisioni
-WHERE RevisioneID = @RevisioneID"
-            Using cmd As New SqlCommand(query, conn)
-                cmd.Parameters.AddWithValue("@RevisioneID", revisioneID)
-                Return CInt(cmd.ExecuteScalar())
-            End Using
-        End Using
-    End Function
-
     Private Sub dgvRevisioni_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvRevisioni.CellDoubleClick
         Cursor.Current = Cursors.WaitCursor
         Application.DoEvents()
@@ -624,8 +538,8 @@ WHERE RevisioneID = @RevisioneID"
         Me.Close()
     End Sub
 
-    Private Sub txtFiltro_TextChanged(sender As Object, e As EventArgs) Handles txtFiltro.TextChanged
-        Dim filtro As String = txtFiltro.Text.Trim().ToLower()
+    Private Sub txtFiltro_TextChanged(sender As Object, e As EventArgs) Handles txtFiltroLavorazione.TextChanged
+        Dim filtro = txtFiltroLavorazione.Text.Trim.ToLower
         Dim dv As DataView = Nothing
 
         If TypeOf dgvRevisioni.DataSource Is DataTable Then
@@ -636,8 +550,7 @@ WHERE RevisioneID = @RevisioneID"
             Exit Sub
         End If
 
-        dv.RowFilter = $"TitoloVideo LIKE '%{filtro}%' OR Stato LIKE '%{filtro}%' OR Note LIKE '%{filtro}%'"
+        dv.RowFilter = $"NumeroRevisione LIKE '%{filtro}%' OR Stato LIKE '%{filtro}%' OR Note LIKE '%{filtro}%' OR Autore LIKE '%{filtro}%' OR TitoloVideo LIKE '%{filtro}%'"
         dgvRevisioni.DataSource = dv
     End Sub
-
 End Class
