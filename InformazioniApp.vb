@@ -1,9 +1,10 @@
 ﻿Public Class InformazioniApp
     Private Sub InformazioniApp_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
         Me.Text = "Informazioni sull'app"
         Me.MaximizeBox = False
         Me.MinimizeBox = False
-        Me.StartPosition = FormStartPosition.CenterParent
+        'Me.StartPosition = FormStartPosition.CenterParent
 
         GestioneStatoForm.CaricaStato(Me)
 
@@ -43,7 +44,12 @@
         }
 
         AddHandler linkContatto.LinkClicked, Sub(s, args)
-                                                 Process.Start("mailto:francesco.altieri@medinet.it")
+                                                 Try
+                                                     Dim psi As New ProcessStartInfo() With {.FileName = "mailto:francesco.altieri@medinet.it", .UseShellExecute = True}
+                                                     Process.Start(psi)
+                                                 Catch ex As Exception
+                                                     MessageBox.Show("Impossibile aprire il client di posta: " & ex.Message)
+                                                 End Try
                                              End Sub
 
         ' Aggiunta controlli al form
@@ -52,6 +58,7 @@
         Me.Controls.Add(lblAutore)
         Me.Controls.Add(txtDescrizione)
         Me.Controls.Add(linkContatto)
+
     End Sub
 
     Private Sub InformazioniApp_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing

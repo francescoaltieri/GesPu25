@@ -25,6 +25,7 @@ Partial Class SceltaVideo
         dgvRevisioni = New DataGridView()
         txtFiltroLavorazione = New TextBox()
         Label1 = New Label()
+        ChkDaApprovare = New CheckBox()
         CType(dgvRevisioni, ComponentModel.ISupportInitialize).BeginInit()
         SuspendLayout()
         ' 
@@ -57,11 +58,22 @@ Partial Class SceltaVideo
         Label1.TabIndex = 2
         Label1.Text = "Cerca:"
         ' 
+        ' ChkDaApprovare
+        ' 
+        ChkDaApprovare.AutoSize = True
+        ChkDaApprovare.Location = New Point(552, 12)
+        ChkDaApprovare.Name = "ChkDaApprovare"
+        ChkDaApprovare.Size = New Size(121, 19)
+        ChkDaApprovare.TabIndex = 3
+        ChkDaApprovare.Text = "Solo da approvare"
+        ChkDaApprovare.UseVisualStyleBackColor = True
+        ' 
         ' SceltaVideo
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(939, 480)
+        Controls.Add(ChkDaApprovare)
         Controls.Add(Label1)
         Controls.Add(txtFiltroLavorazione)
         Controls.Add(dgvRevisioni)
@@ -76,4 +88,5 @@ Partial Class SceltaVideo
     Friend WithEvents dgvRevisioni As DataGridView
     Friend WithEvents txtFiltroLavorazione As TextBox
     Friend WithEvents Label1 As Label
+    Friend WithEvents ChkDaApprovare As CheckBox
 End Class

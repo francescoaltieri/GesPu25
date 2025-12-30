@@ -1,7 +1,9 @@
 ﻿Imports System.IO
+Imports System.Net.Security
 Imports System.Runtime.InteropServices
 Imports System.Text
 Imports System.Text.RegularExpressions
+Imports System.Threading.Tasks.Dataflow
 Imports AxWMPLib
 Imports Microsoft.Data.SqlClient
 Imports PdfSharp
@@ -65,7 +67,6 @@ Public Class DynamicDataForm
     ' Cache per i campi join: chiave = NomeTabella + "|" + NomeCampo
     Private campiJoinCache As Dictionary(Of String, DataRow) = Nothing
     Private campiJoinCacheLoadedForTable As String = String.Empty
-
 
     Public Sub New(campi As List(Of CampoDatabase), nomeTabella As String)
         Me.Name = nomeTabella
@@ -761,7 +762,7 @@ Public Class DynamicDataForm
                 joinModificabile = Convert.ToBoolean(joinRow("AbilitaModifica"))
             End If
 
-            Dim isBloccato As Boolean = campo.IsIdentity OrElse campo.IsChiave OrElse (isJoin AndAlso Not joinModificabile)
+            Dim isBloccato As Boolean = campo.IsIdentity OrElse (campo.IsChiave And ModalitaCorrente <> "inserimento") OrElse (isJoin AndAlso Not joinModificabile)
 
             If TypeOf ctrl Is FlowLayoutPanel Then
                 Dim flow = CType(ctrl, FlowLayoutPanel)
@@ -778,6 +779,7 @@ Public Class DynamicDataForm
             Else
                 ctrl.Enabled = Not isBloccato AndAlso abilita
             End If
+
         Next
     End Sub
 
@@ -836,12 +838,12 @@ Public Class DynamicDataForm
     Private Sub InserisciDati(sender As Object, e As EventArgs)
 
         isModifica = False
+        ModalitaCorrente = "inserimento"
+        lblModalita.Text = "Inserimento in corso..."
+
         PulisciCampi()
         AbilitaCampi(True)
         ResetLabelDescrizioni()
-
-        ModalitaCorrente = "inserimento"
-        lblModalita.Text = "Inserimento in corso..."
         UpdateButtonsByModalita()
 
         For Each campo In campiDefiniti
@@ -906,93 +908,6 @@ Public Class DynamicDataForm
         Return Nothing
     End Function
 
-
-    Private Function PrelevaValoreJoin(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As Object
-
-        If joinRow Is Nothing Then
-            MDIMessageBox.Show("PrelevaValoreJoin: joinRow è Nothing", Me.MdiParent, MessageBoxButtons.OK)
-            Return Nothing
-        End If
-
-        If chiaviFiglia Is Nothing OrElse chiaviFiglia.Count = 0 Then
-            MDIMessageBox.Show("PrelevaValoreJoin: chiaviFiglia è Nothing o vuoto", Me.MdiParent, MessageBoxButtons.OK)
-            Return Nothing
-        End If
-
-        Dim tabellaPadre As String = ""
-        Dim campoDaPrelevare As String = ""
-
-        Try
-            tabellaPadre = Convert.ToString(joinRow("TabellaPadre"))
-            campoDaPrelevare = Convert.ToString(joinRow("CampoDaPrelevare"))
-        Catch ex As Exception
-            MDIMessageBox.Show($"PrelevaValoreJoin: mancata lettura colonne joinRow: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
-            Return Nothing
-        End Try
-
-        If String.IsNullOrWhiteSpace(tabellaPadre) OrElse String.IsNullOrWhiteSpace(campoDaPrelevare) Then
-            MDIMessageBox.Show("PrelevaValoreJoin: tabellaPadre o campoDaPrelevare vuoti", Me.MdiParent, MessageBoxButtons.OK)
-            Return Nothing
-        End If
-
-        Dim identPattern As String = "^[\w\.]+$"
-        If Not Regex.IsMatch(tabellaPadre, identPattern) OrElse Not Regex.IsMatch(campoDaPrelevare, "^[\w]+$") Then
-            MDIMessageBox.Show($"PrelevaValoreJoin: nome tabella o campo non valido: {tabellaPadre}.{campoDaPrelevare}", Me.MdiParent, MessageBoxButtons.OK)
-            Return Nothing
-        End If
-
-        Dim condizioni As New List(Of String)()
-        Dim parametri As New Dictionary(Of String, Object)()
-
-        For i = 1 To 3
-            Dim nomeColonna = $"ChiavePadre{i}"
-            If joinRow.Table.Columns.Contains(nomeColonna) Then
-                Dim chiavePadre = Convert.ToString(joinRow(nomeColonna))
-                If Not String.IsNullOrWhiteSpace(chiavePadre) AndAlso chiaviFiglia.ContainsKey($"ChiaveFiglia{i}") Then
-                    If Not Regex.IsMatch(chiavePadre, "^[\w]+$") Then
-                        MDIMessageBox.Show($"PrelevaValoreJoin: nome colonna padre non valido: {chiavePadre}", Me.MdiParent, MessageBoxButtons.OK)
-                        Continue For
-                    End If
-
-                    Dim paramName = $"@param{i}"
-                    condizioni.Add($"{chiavePadre} = {paramName}")
-                    parametri.Add(paramName, chiaviFiglia($"ChiaveFiglia{i}"))
-                End If
-            End If
-        Next
-
-        If condizioni.Count = 0 Then
-            MDIMessageBox.Show("PrelevaValoreJoin: nessuna condizione costruita, restituisco Nothing", Me.MdiParent, MessageBoxButtons.OK)
-            Return Nothing
-        End If
-
-        Dim query As String = $"SELECT {campoDaPrelevare} FROM [{tabellaPadre}] WHERE {String.Join(" AND ", condizioni)}"
-
-        Try
-            Using conn As New SqlConnection(ConnString)
-                Using cmd As New SqlCommand(query, conn)
-                    cmd.CommandTimeout = 30
-                    For Each kvp In parametri
-                        Dim val = If(kvp.Value, DBNull.Value)
-                        cmd.Parameters.AddWithValue(kvp.Key, val)
-                    Next
-
-                    conn.Open()
-                    Dim result = cmd.ExecuteScalar()
-                    Return If(result Is DBNull.Value, Nothing, result)
-                End Using
-            End Using
-
-        Catch ex As SqlException
-            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore SQL recuperando join da {tabellaPadre}: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
-            Return Nothing
-        Catch ex As Exception
-            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore imprevisto recuperando join: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
-            Return Nothing
-        End Try
-    End Function
-
-
     Private Sub ModificaDati(sender As Object, e As EventArgs)
 
         If dgvDati.SelectedRows.Count = 0 Then
@@ -1022,7 +937,6 @@ Public Class DynamicDataForm
 
             Dim joinRow = RecuperaJoinPerCampoCached(Me.Name, campo.Nome)
             If joinRow IsNot Nothing Then
-                ' Costruisco dizionario chiavi figlia (se presenti nella definizione join)
                 Dim chiaviFiglia As New Dictionary(Of String, Object)
                 For i = 1 To 3
                     Dim chiaveNome = $"ChiaveFiglia{i}"
@@ -1046,7 +960,6 @@ Public Class DynamicDataForm
                     Try
                         CType(ctrl, ComboBox).SelectedValue = valoreJoin
                     Catch
-                        ' fallback silenzioso
                         CType(ctrl, ComboBox).SelectedIndex = -1
                     End Try
 
@@ -1108,8 +1021,10 @@ Public Class DynamicDataForm
 
             If isModifica Then
                 Await SalvaModificaAsync()
+                CaricaDatiNeiControlli(dgvDati.SelectedRows(0))
             Else
                 Await SalvaInserimentoAsync()
+                ResetLabelDescrizioni()
             End If
 
             Dim dt As DataTable = Nothing
@@ -1247,49 +1162,80 @@ Public Class DynamicDataForm
     End Sub
 
     Private Function EstraiValoreDaControllo(ctrl As Control) As Object
-        If ctrl Is Nothing Then Return Nothing
+        If ctrl Is Nothing Then Return DBNull.Value
 
-        If TypeOf ctrl Is TextBox Then
-            Return CType(ctrl, TextBox).Text
-        ElseIf TypeOf ctrl Is ComboBox Then
-            Return CType(ctrl, ComboBox).SelectedValue
-        ElseIf TypeOf ctrl Is FlowLayoutPanel Then
-            Dim innerTxt = ctrl.Controls.OfType(Of TextBox)().FirstOrDefault()
-            If innerTxt IsNot Nothing Then Return innerTxt.Text
-        End If
         Try
-            Return ctrl.Text
-        Catch
-            Return Nothing
+            If TypeOf ctrl Is TextBox Then
+                Dim s = CType(ctrl, TextBox).Text
+                Return If(String.IsNullOrEmpty(s), DBNull.Value, CType(s, Object))
+            ElseIf TypeOf ctrl Is ComboBox Then
+                Dim cb = CType(ctrl, ComboBox)
+                Dim sv = cb.SelectedValue
+                If sv IsNot Nothing AndAlso Not Convert.IsDBNull(sv) Then Return sv
+                Dim txt = cb.Text
+                Return If(String.IsNullOrEmpty(txt), DBNull.Value, CType(txt, Object))
+            ElseIf TypeOf ctrl Is FlowLayoutPanel Then
+                Dim innerTxt = ctrl.Controls.OfType(Of TextBox)().FirstOrDefault()
+                If innerTxt IsNot Nothing Then
+                    Dim s = innerTxt.Text
+                    Return If(String.IsNullOrEmpty(s), DBNull.Value, CType(s, Object))
+                End If
+            End If
+
+            Dim fallback = ctrl.Text
+            Return If(String.IsNullOrEmpty(fallback), DBNull.Value, CType(fallback, Object))
+        Catch ex As Exception
+            Return DBNull.Value
         End Try
     End Function
 
     Private Sub AggiornaControlloConValoreJoin(ctrl As Control, valoreJoin As Object)
         If ctrl Is Nothing Then Return
 
-        If TypeOf ctrl Is TextBox Then
-            CType(ctrl, TextBox).Text = If(valoreJoin Is Nothing, String.Empty, valoreJoin.ToString())
-        ElseIf TypeOf ctrl Is ComboBox Then
-            Try
-                CType(ctrl, ComboBox).SelectedValue = valoreJoin
-            Catch
-                CType(ctrl, ComboBox).SelectedIndex = -1
-            End Try
-        ElseIf TypeOf ctrl Is FlowLayoutPanel Then
-            Dim flow = CType(ctrl, FlowLayoutPanel)
-            Dim innerTxt = flow.Controls.OfType(Of TextBox)().FirstOrDefault()
-            If innerTxt IsNot Nothing Then innerTxt.Text = If(valoreJoin Is Nothing, String.Empty, valoreJoin.ToString())
-            ' Aggiorna label descrizione se necessario (puoi riutilizzare la logica esistente)
+        Dim action As Action = Sub()
+                                   Try
+                                       If TypeOf ctrl Is TextBox Then
+                                           CType(ctrl, TextBox).Text = If(valoreJoin Is Nothing OrElse Convert.IsDBNull(valoreJoin), String.Empty, valoreJoin.ToString())
+                                       ElseIf TypeOf ctrl Is ComboBox Then
+                                           Dim cb = CType(ctrl, ComboBox)
+                                           Try
+                                               cb.SelectedValue = If(valoreJoin Is Nothing OrElse Convert.IsDBNull(valoreJoin), Nothing, valoreJoin)
+                                           Catch
+                                               cb.SelectedIndex = -1
+                                           End Try
+                                       ElseIf TypeOf ctrl Is FlowLayoutPanel Then
+                                           Dim flow = CType(ctrl, FlowLayoutPanel)
+                                           Dim innerTxt = flow.Controls.OfType(Of TextBox)().FirstOrDefault()
+                                           If innerTxt IsNot Nothing Then innerTxt.Text = If(valoreJoin Is Nothing OrElse Convert.IsDBNull(valoreJoin), String.Empty, valoreJoin.ToString())
+                                       Else
+                                           Try
+                                               ctrl.Text = If(valoreJoin Is Nothing OrElse Convert.IsDBNull(valoreJoin), String.Empty, valoreJoin.ToString())
+                                           Catch
+                                           End Try
+                                       End If
+
+                                       ' Forza la scrittura dei binding (se presenti)
+                                       If ctrl.DataBindings IsNot Nothing AndAlso ctrl.DataBindings.Count > 0 Then
+                                           For Each b As Binding In ctrl.DataBindings
+                                               Try
+                                                   b.WriteValue()
+                                               Catch
+                                               End Try
+                                           Next
+                                       End If
+                                   Catch
+                                   End Try
+                               End Sub
+
+        If ctrl.InvokeRequired Then
+            ctrl.Invoke(New MethodInvoker(Sub() action()))
         Else
-            Try
-                ctrl.Text = If(valoreJoin Is Nothing, String.Empty, valoreJoin.ToString())
-            Catch
-            End Try
+            action()
         End If
     End Sub
 
     Private Sub RicalcolaCampiJoinPrimaSalvataggio()
-        ' Assicurati che la cache sia caricata
+        ' Carica la cache dei campi join per questa tabella una sola volta
         CaricaCampiJoinCachePerTabella(Me.Name)
 
         For Each campo In campiDefiniti
@@ -1446,8 +1392,7 @@ Public Class DynamicDataForm
         ' Assicurati di avere i campi definiti
         campiDefiniti = RecuperaCampiDa(Me.Name)
 
-        ' Carica cache join e ricalcola i campi join prima di costruire i valori da inserire
-        CaricaCampiJoinCachePerTabella(Me.Name)
+        ' Ricalcola i campi join (aggiorna i controlli se necessario)
         RicalcolaCampiJoinPrimaSalvataggio()
 
         Dim campiCalcolati = RecuperaCampiCalcolati()
@@ -1455,18 +1400,42 @@ Public Class DynamicDataForm
         Dim tipiValore = campiCalcolati.ToDictionary(Function(kvp) kvp.Key, Function(kvp) kvp.Value.TipoValore)
         Dim valoriCalcolati = CalcolaValoriCampiCalcolati(formule, tipiValore)
 
-        Dim colonne = campiDefiniti.Where(Function(c) Not c.IsIdentity).Select(Function(c) c.Nome).ToList()
+        ' Costruisci colonne come in SalvaModifica (escludi identity)
+        Dim colonne As New List(Of String)
+        For Each c In campiDefiniti
+            If Not c.IsIdentity Then
+                colonne.Add(c.Nome)
+            End If
+        Next
         If colonne.Count = 0 Then Return
 
+        ' Determina colonne valide (escludi password vuote come in SalvaModifica)
+        Dim colonneValid As New List(Of String)
+        For Each campo In campiDefiniti
+            If campo.IsChiave OrElse campo.IsIdentity Then Continue For
+            Dim input = If(campoInputs.ContainsKey(campo.Nome), campoInputs(campo.Nome), Nothing)
+            Dim isPassword = campo.Nome.ToLower().Contains("password")
+            If isPassword AndAlso TypeOf input Is TextBox AndAlso String.IsNullOrWhiteSpace(CType(input, TextBox).Text) Then
+                Continue For
+            End If
+            colonneValid.Add(campo.Nome)
+        Next
+        If colonneValid.Count = 0 Then Return
+
+        ' Prepara dizionario valoriInput come in SalvaModifica
         Dim valoriInput As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
-        For Each nomeCampo In colonne
+        For Each nomeCampo In colonneValid
             Dim valore As Object = Nothing
             If valoriCalcolati.ContainsKey(nomeCampo) Then
                 valore = valoriCalcolati(nomeCampo)
             Else
                 Try
-                    valore = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
-                Catch ex As Exception
+                    If campoInputs.ContainsKey(nomeCampo) Then
+                        valore = EstraiValoreDaControllo(campoInputs(nomeCampo))
+                    Else
+                        valore = DBNull.Value
+                    End If
+                Catch
                     valore = DBNull.Value
                 End Try
             End If
@@ -1474,33 +1443,109 @@ Public Class DynamicDataForm
             valoriInput(nomeCampo) = valore
         Next
 
+        Try
+            Dim convalide = RecuperaConvalideDaSys(Me.Name)
+            If convalide IsNot Nothing AndAlso convalide.Count > 0 Then
+                For Each campo In campiDefiniti
+                    If campo Is Nothing OrElse String.IsNullOrWhiteSpace(campo.Nome) Then Continue For
+                    If convalide.ContainsKey(campo.Nome) Then
+                        Try
+                            ApplicaConvalidaAlCampo(campo, convalide(campo.Nome))
+                        Catch ex As Exception
+                            MDIMessageBox.Show($"RiapplicaConvalide: errore su campo {campo.Nome}: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
+                        End Try
+                    End If
+                Next
+            End If
+        Catch ex As Exception
+            MDIMessageBox.Show($"RiapplicaConvalide: errore generale: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
+        End Try
+
         Dim errorList As New List(Of String)
 
-        ' --- Prepara cache join e lookup prima della transazione ---
+        ' Cache join è caricata?
         CaricaCampiJoinCachePerTabella(Me.Name)
 
         Dim joinDefs As New Dictionary(Of String, DataRow)(StringComparer.OrdinalIgnoreCase)
         Dim joinLookupCache As New Dictionary(Of String, DataTable)(StringComparer.OrdinalIgnoreCase)
         Dim joinResultCache As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
 
-        For Each nomeCampo In colonne
+        For Each nomeCampo In colonneValid
             Try
                 Dim jr = RecuperaJoinPerCampoCached(Me.Name, nomeCampo)
                 If jr IsNot Nothing Then
                     joinDefs(nomeCampo) = jr
-                    ' Se la definizione join contiene il nome di una tabella di lookup, caricala in cache
                     If jr.Table.Columns.Contains("TabellaElenco") Then
-                        Dim tabName = jr("TabellaElenco").ToString()
+                        Dim tabName = Convert.ToString(jr("TabellaElenco"))
                         If Not String.IsNullOrWhiteSpace(tabName) AndAlso Not joinLookupCache.ContainsKey(tabName) Then
                             Dim dtRef = RecuperaTabellaCached(tabName)
-                            If dtRef IsNot Nothing Then
-                                joinLookupCache(tabName) = dtRef
-                            End If
+                            If dtRef IsNot Nothing Then joinLookupCache(tabName) = dtRef
                         End If
                     End If
                 End If
-            Catch
+            Catch ex As Exception
                 ' non bloccare l'inserimento per errori di lookup join
+                'errorList.Add($"Errore caricamento joinDefs per {nomeCampo}: {ex.Message}")
+            End Try
+        Next
+
+        ' Risolvi i join e sovrascrivi i valori in valoriInput quando disponibili
+        For Each nomeCampo In colonneValid
+            Try
+                If Not joinDefs.ContainsKey(nomeCampo) Then Continue For
+                Dim jr = joinDefs(nomeCampo)
+                Dim chiaviFiglia As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
+
+                ' Costruisci le chiavi figlie e logga i valori trovati
+                Dim anyKeyAdded As Boolean = False
+                For i As Integer = 1 To 3
+                    Dim chiaveNome = $"ChiaveFiglia{i}"
+                    If jr.Table.Columns.Contains(chiaveNome) Then
+                        Dim nomeCampoFiglio = Convert.ToString(jr(chiaveNome))
+                        If Not String.IsNullOrWhiteSpace(nomeCampoFiglio) Then
+                            Dim valFiglio As Object = DBNull.Value
+                            If campoInputs.ContainsKey(nomeCampoFiglio) Then
+                                valFiglio = EstraiValoreDaControllo(campoInputs(nomeCampoFiglio))
+                            ElseIf valoriInput.ContainsKey(nomeCampoFiglio) Then
+                                valFiglio = valoriInput(nomeCampoFiglio)
+                            ElseIf dgvDati.SelectedRows.Count > 0 AndAlso dgvDati.Columns.Contains(nomeCampoFiglio) Then
+                                valFiglio = dgvDati.SelectedRows(0).Cells(nomeCampoFiglio).Value
+                            End If
+
+                            'Debug.WriteLine($"[JOIN BUILD] CampoJoin='{nomeCampo}' ChiaveFiglia='{chiaveNome}' CampoFiglio='{nomeCampoFiglio}' ValoreEstratto='{If(valFiglio Is Nothing, "<NULL>", Convert.ToString(valFiglio))}'")
+
+                            ' Aggiungi la chiave figlia anche se è DBNull.Value: serve per costruire filtro coerente
+                            chiaviFiglia.Add(chiaveNome, If(valFiglio Is Nothing, DBNull.Value, valFiglio))
+                            anyKeyAdded = True
+                        End If
+                    End If
+                Next
+
+                If Not anyKeyAdded Then
+                    Continue For
+                End If
+
+                ' Prova la lookup cached con fallback al DB
+                Dim valoreJoin As Object = Nothing
+                Try
+                    valoreJoin = PrelevaValoreJoinCached(jr, chiaviFiglia, joinLookupCache, joinResultCache)
+                Catch ex As Exception
+                    Try
+                        valoreJoin = PrelevaValoreJoin(jr, chiaviFiglia)
+                    Catch ex2 As Exception
+                        valoreJoin = Nothing
+                    End Try
+                End Try
+
+                ' Assegna anche se valoreJoin è DBNull.Value 
+                If valoreJoin IsNot Nothing OrElse (valoreJoin Is DBNull.Value) Then
+                    valoriInput(nomeCampo) = If(valoreJoin Is Nothing, DBNull.Value, valoreJoin)
+                Else
+
+                End If
+
+            Catch ex As Exception
+
             End Try
         Next
 
@@ -1509,125 +1554,23 @@ Public Class DynamicDataForm
 
             Using tx = conn.BeginTransaction()
                 Try
-                    If cachedInsertCommand Is Nothing OrElse cachedInsertColumns Is Nothing OrElse Not Enumerable.SequenceEqual(cachedInsertColumns, colonne, StringComparer.OrdinalIgnoreCase) Then
+                    If cachedInsertCommand Is Nothing OrElse cachedInsertColumns Is Nothing OrElse Not Enumerable.SequenceEqual(cachedInsertColumns, colonneValid, StringComparer.OrdinalIgnoreCase) Then
                         If cachedInsertCommand IsNot Nothing Then cachedInsertCommand.Dispose()
-                        cachedInsertCommand = BuildPreparedInsertCommand(conn, tx, Me.Name, colonne)
-                        cachedInsertColumns = New List(Of String)(colonne)
+                        cachedInsertCommand = BuildPreparedInsertCommand(conn, tx, Me.Name, colonneValid)
+                        cachedInsertColumns = New List(Of String)(colonneValid)
                     Else
                         cachedInsertCommand.Connection = conn
                         cachedInsertCommand.Transaction = tx
                     End If
 
-                    ' --- gestisci @intervallo ---
-                    Dim intervalHandled As Boolean = False
-                    For Each nomeCampo In colonne
-                        Dim valore As Object = Nothing
-
-                        ' 1) Se è un campo calcolato, prendi il valore calcolato
-                        If valoriCalcolati.ContainsKey(nomeCampo) Then
-                            valore = valoriCalcolati(nomeCampo)
-                        Else
-                            ' 2) Prova a estrarre il valore dal controllo (se esiste)
-                            Try
-                                If campoInputs.ContainsKey(nomeCampo) Then
-                                    valore = EstraiValoreDaControllo(nomeCampo, campoInputs(nomeCampo))
-                                Else
-                                    valore = DBNull.Value
-                                End If
-                            Catch ex As Exception
-                                valore = DBNull.Value
-                            End Try
-                        End If
-
-                        ' 3) Se il campo ha una definizione di JOIN, risolvi il valore join leggendo le chiavi figlie dai controlli
-                        Try
-                            Dim joinRow As DataRow = Nothing
-                            If joinDefs.ContainsKey(nomeCampo) Then
-                                joinRow = joinDefs(nomeCampo)
-                            End If
-
-                            If joinRow IsNot Nothing Then
-                                Dim chiaviFiglia As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
-                                For i As Integer = 1 To 3
-                                    Dim chiaveNome = $"ChiaveFiglia{i}"
-                                    If joinRow.Table.Columns.Contains(chiaveNome) Then
-                                        Dim nomeCampoFiglio = joinRow(chiaveNome).ToString()
-                                        If Not String.IsNullOrWhiteSpace(nomeCampoFiglio) Then
-                                            Dim valFiglio As Object = DBNull.Value
-                                            If campoInputs.ContainsKey(nomeCampoFiglio) Then
-                                                Dim ctrlFiglio = campoInputs(nomeCampoFiglio)
-                                                If ctrlFiglio IsNot Nothing Then
-                                                    If TypeOf ctrlFiglio Is TextBox Then
-                                                        valFiglio = CType(ctrlFiglio, TextBox).Text
-                                                    ElseIf TypeOf ctrlFiglio Is ComboBox Then
-                                                        valFiglio = CType(ctrlFiglio, ComboBox).SelectedValue
-                                                    ElseIf TypeOf ctrlFiglio Is FlowLayoutPanel Then
-                                                        Dim flow = CType(ctrlFiglio, FlowLayoutPanel)
-                                                        Dim innerTxt = flow.Controls.OfType(Of TextBox)().FirstOrDefault()
-                                                        If innerTxt IsNot Nothing Then
-                                                            valFiglio = innerTxt.Text
-                                                        Else
-                                                            Try
-                                                                valFiglio = ctrlFiglio.Text
-                                                            Catch
-                                                                valFiglio = DBNull.Value
-                                                            End Try
-                                                        End If
-                                                    Else
-                                                        Try
-                                                            valFiglio = ctrlFiglio.Text
-                                                        Catch
-                                                            valFiglio = DBNull.Value
-                                                        End Try
-                                                    End If
-                                                End If
-                                            ElseIf valoriInput.ContainsKey(nomeCampoFiglio) Then
-                                                valFiglio = valoriInput(nomeCampoFiglio)
-                                            Else
-                                                valFiglio = DBNull.Value
-                                            End If
-
-                                            If valFiglio Is Nothing OrElse String.IsNullOrEmpty(Convert.ToString(valFiglio)) Then
-                                                chiaviFiglia.Add(chiaveNome, DBNull.Value)
-                                            Else
-                                                chiaviFiglia.Add(chiaveNome, valFiglio)
-                                            End If
-                                        End If
-                                    End If
-                                Next
-
-                                ' usa la versione cached/memorized (se disponibile)
-                                Dim valoreJoin As Object = Nothing
-                                Try
-                                    ' Se hai PrelevaValoreJoinCached che usa joinLookupCache/joinResultCache, chiamala
-                                    valoreJoin = PrelevaValoreJoinCached(joinRow, chiaviFiglia, joinLookupCache, joinResultCache)
-                                Catch
-                                    ' fallback alla versione non-cached se necessario
-                                    valoreJoin = PrelevaValoreJoin(joinRow, chiaviFiglia)
-                                End Try
-
-                                If valoreJoin IsNot Nothing Then
-                                    valore = valoreJoin
-                                End If
-                            End If
-                        Catch ex As Exception
-                            errorList.Add($"Errore join campo {nomeCampo}: {ex.Message}")
-                        End Try
-
-                        If valore Is Nothing Then valore = DBNull.Value
-                        valoriInput(nomeCampo) = valore
+                    ' Imposta parametri e esegui insert
+                    For Each nomeCampo In colonneValid
+                        Dim param = cachedInsertCommand.Parameters("@" & nomeCampo)
+                        Dim v = If(valoriInput.ContainsKey(nomeCampo), valoriInput(nomeCampo), DBNull.Value)
+                        param.Value = If(v Is Nothing, DBNull.Value, v)
                     Next
 
-                    ' Se nessun intervallo, esegui un singolo insert normale
-                    If Not intervalHandled Then
-                        For Each nomeCampo In colonne
-                            Dim param = cachedInsertCommand.Parameters("@" & nomeCampo)
-                            Dim v = valoriInput(nomeCampo)
-                            param.Value = If(v Is Nothing, DBNull.Value, v)
-                        Next
-                        Await cachedInsertCommand.ExecuteNonQueryAsync()
-                    End If
-
+                    Await cachedInsertCommand.ExecuteNonQueryAsync()
                     tx.Commit()
                 Catch ex As Exception
                     Try
@@ -1642,9 +1585,7 @@ Public Class DynamicDataForm
         If errorList.Count > 0 Then
             Dim msg = String.Join(Environment.NewLine, errorList)
             If Me.InvokeRequired Then
-                Me.BeginInvoke(Sub()
-                                   MDIMessageBox.Show(msg, Me.MdiParent, MessageBoxButtons.OK)
-                               End Sub)
+                Me.BeginInvoke(Sub() MDIMessageBox.Show(msg, Me.MdiParent, MessageBoxButtons.OK))
             Else
                 MDIMessageBox.Show(msg, Me.MdiParent, MessageBoxButtons.OK)
             End If
@@ -1653,85 +1594,13 @@ Public Class DynamicDataForm
         swTotal.Stop()
     End Function
 
-
-    Private Function BuildJoinCacheKey(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As String
-        Dim sb As New System.Text.StringBuilder()
-        ' usa un identificatore stabile per la definizione join (es. TabellaJoin o concatenazione colonne)
-        If joinRow.Table.Columns.Contains("IdJoin") Then
-            sb.Append(joinRow("IdJoin").ToString())
-        ElseIf joinRow.Table.Columns.Contains("TabellaElenco") Then
-            sb.Append(joinRow("TabellaElenco").ToString())
-        Else
-            ' fallback: usa nome campo e hash della definizione
-            sb.Append(joinRow.Table.TableName & "_" & joinRow.ItemArray.GetHashCode().ToString())
-        End If
-        ' aggiungi le chiavi figlia in ordine
-        For i As Integer = 1 To 3
-            Dim k = $"ChiaveFiglia{i}"
-            If chiaviFiglia.ContainsKey(k) Then
-                Dim v = chiaviFiglia(k)
-                sb.Append("|" & If(v Is Nothing OrElse Convert.IsDBNull(v), "<NULL>", v.ToString()))
-            Else
-                sb.Append("|<MISSING>")
-            End If
-        Next
-        Return sb.ToString()
-    End Function
-
-    Private Function PrelevaValoreJoinCached(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object), lookupCache As Dictionary(Of String, DataTable), resultCache As Dictionary(Of String, Object)) As Object
-        Dim cacheKey = BuildJoinCacheKey(joinRow, chiaviFiglia)
-        If resultCache.ContainsKey(cacheKey) Then
-            Return resultCache(cacheKey)
-        End If
-
-        ' Se possibile, prova a risolvere usando lookupCache (evita chiamate DB in PrelevaValoreJoin)
-        Try
-            If joinRow.Table.Columns.Contains("TabellaElenco") Then
-                Dim tabName = joinRow("TabellaElenco").ToString()
-                Dim chiaveCol = If(joinRow.Table.Columns.Contains("ChiaveElenco"), joinRow("ChiaveElenco").ToString(), String.Empty)
-                Dim campoVis = If(joinRow.Table.Columns.Contains("CampoVisuale"), joinRow("CampoVisuale").ToString(), String.Empty)
-                If Not String.IsNullOrWhiteSpace(tabName) AndAlso lookupCache.ContainsKey(tabName) AndAlso Not String.IsNullOrWhiteSpace(chiaveCol) Then
-                    Dim dtRef = lookupCache(tabName)
-                    ' costruisci filtro usando la prima chiave figlia non nulla (adatta se join usa più chiavi)
-                    Dim filtroParts As New List(Of String)
-                    For i As Integer = 1 To 3
-                        Dim k = $"ChiaveFiglia{i}"
-                        If chiaviFiglia.ContainsKey(k) Then
-                            Dim v = chiaviFiglia(k)
-                            If v IsNot Nothing AndAlso Not Convert.IsDBNull(v) Then
-                                filtroParts.Add($"{chiaveCol} = '{v.ToString().Replace("'", "''")}'")
-                            End If
-                        End If
-                    Next
-                    If filtroParts.Count > 0 Then
-                        Dim rows = dtRef.Select(String.Join(" AND ", filtroParts.ToArray()))
-                        If rows.Length > 0 Then
-                            Dim val = rows(0)(chiaveCol)
-                            resultCache(cacheKey) = val
-                            Return val
-                        End If
-                    End If
-                End If
-            End If
-        Catch
-            ' fallback alla PrelevaValoreJoin originale
-        End Try
-
-        ' fallback: chiama la funzione esistente (potrebbe fare query)
-        Dim valore = PrelevaValoreJoin(joinRow, chiaviFiglia)
-        resultCache(cacheKey) = valore
-        Return valore
-    End Function
-
-
     Private Async Function SalvaModificaAsync() As Task
         Dim swTotal As New Stopwatch()
         swTotal.Start()
 
         campiDefiniti = RecuperaCampiDa(Me.Name)
 
-        ' Carica cache join e ricalcola i campi join prima di costruire i valori da salvare
-        CaricaCampiJoinCachePerTabella(Me.Name)
+        ' Ricalcola i campi join prima di costruire i valori da salvare
         RicalcolaCampiJoinPrimaSalvataggio()
 
         Try
@@ -1836,6 +1705,199 @@ Public Class DynamicDataForm
         swTotal.Stop()
     End Function
 
+    Private Function BuildJoinCacheKey(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As String
+        Dim sb As New System.Text.StringBuilder()
+        ' usa un identificatore stabile per la definizione join (es. TabellaJoin o concatenazione colonne)
+        If joinRow.Table.Columns.Contains("IdJoin") Then
+            sb.Append(joinRow("IdJoin").ToString())
+        ElseIf joinRow.Table.Columns.Contains("TabellaElenco") Then
+            sb.Append(joinRow("TabellaElenco").ToString())
+        Else
+            ' fallback: usa nome campo e hash della definizione
+            sb.Append(joinRow.Table.TableName & "_" & joinRow.ItemArray.GetHashCode().ToString())
+        End If
+        ' aggiungi le chiavi figlia in ordine
+        For i As Integer = 1 To 3
+            Dim k = $"ChiaveFiglia{i}"
+            If chiaviFiglia.ContainsKey(k) Then
+                Dim v = chiaviFiglia(k)
+                sb.Append("|" & If(v Is Nothing OrElse Convert.IsDBNull(v), "<NULL>", v.ToString()))
+            Else
+                sb.Append("|<MISSING>")
+            End If
+        Next
+        Return sb.ToString()
+    End Function
+
+    Private Function PrelevaValoreJoinCached(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object), lookupCache As Dictionary(Of String, DataTable), resultCache As Dictionary(Of String, Object)) As Object
+        Dim cacheKey = BuildJoinCacheKey(joinRow, chiaviFiglia)
+        If resultCache.ContainsKey(cacheKey) Then
+            Return resultCache(cacheKey)
+        End If
+
+        ' Prova a risolvere usando lookupCache (evita chiamate DB in PrelevaValoreJoin)
+        Try
+            If joinRow.Table.Columns.Contains("TabellaElenco") Then
+                Dim tabName = Convert.ToString(joinRow("TabellaElenco"))
+                Dim chiaveElencoCol = If(joinRow.Table.Columns.Contains("ChiaveElenco"), Convert.ToString(joinRow("ChiaveElenco")), String.Empty)
+                Dim campoVisuale = If(joinRow.Table.Columns.Contains("CampoVisuale"), Convert.ToString(joinRow("CampoVisuale")), String.Empty)
+                Dim campoDaPrelevare = If(joinRow.Table.Columns.Contains("CampoDaPrelevare"), Convert.ToString(joinRow("CampoDaPrelevare")), String.Empty)
+
+                If Not String.IsNullOrWhiteSpace(tabName) AndAlso lookupCache.ContainsKey(tabName) Then
+                    Dim dtRef = lookupCache(tabName)
+
+                    ' Costruisci filtro usando le colonne ChiavePadreN (non la stessa chiaveElenco)
+                    Dim filtroParts As New List(Of String)
+                    For i As Integer = 1 To 3
+                        Dim chiavePadreCol = $"ChiavePadre{i}"
+                        Dim chiaveFigliaKey = $"ChiaveFiglia{i}"
+                        If joinRow.Table.Columns.Contains(chiavePadreCol) AndAlso chiaviFiglia.ContainsKey(chiaveFigliaKey) Then
+                            Dim colPadreName = Convert.ToString(joinRow(chiavePadreCol))
+                            Dim v = chiaviFiglia(chiaveFigliaKey)
+                            If Not String.IsNullOrWhiteSpace(colPadreName) AndAlso v IsNot Nothing AndAlso Not Convert.IsDBNull(v) Then
+                                Dim escaped = v.ToString().Replace("'", "''")
+                                filtroParts.Add($"[{colPadreName}] = '{escaped}'")
+                            End If
+                        End If
+                    Next
+
+                    If filtroParts.Count > 0 Then
+                        Dim filtro = String.Join(" AND ", filtroParts.ToArray())
+                        Dim rows() As DataRow = Nothing
+                        Try
+                            rows = dtRef.Select(filtro)
+                        Catch ex As Exception
+                            Debug.WriteLine($"[JOIN CACHE] Errore Select su DataTable '{tabName}' con filtro '{filtro}': {ex.ToString()}")
+                            rows = New DataRow() {}
+                        End Try
+
+                        If rows IsNot Nothing AndAlso rows.Length > 0 Then
+                            ' Determina quale colonna restituire: preferisci CampoDaPrelevare, poi CampoVisuale, poi ChiaveElenco
+                            Dim colToReturn As String = Nothing
+                            If Not String.IsNullOrWhiteSpace(campoDaPrelevare) Then
+                                colToReturn = campoDaPrelevare
+                            ElseIf Not String.IsNullOrWhiteSpace(campoVisuale) Then
+                                colToReturn = campoVisuale
+                            ElseIf Not String.IsNullOrWhiteSpace(chiaveElencoCol) Then
+                                colToReturn = chiaveElencoCol
+                            End If
+
+                            If Not String.IsNullOrWhiteSpace(colToReturn) AndAlso rows(0).Table.Columns.Contains(colToReturn) Then
+                                Dim val = rows(0)(colToReturn)
+                                resultCache(cacheKey) = val
+                                Return val
+                            Else
+                                Debug.WriteLine($"[JOIN CACHE] Colonna da restituire '{colToReturn}' non trovata in tabella '{tabName}'.")
+                            End If
+                        Else
+                            Debug.WriteLine($"[JOIN CACHE] Nessuna riga trovata in '{tabName}' per filtro: {filtro}")
+                        End If
+                    Else
+                        Debug.WriteLine("[JOIN CACHE] Nessuna chiave figlia valida per costruire il filtro.")
+                    End If
+                End If
+            End If
+        Catch ex As Exception
+            'Debug.WriteLine($"[JOIN CACHE] Errore durante lookupCache: {ex.ToString()}")
+            ' fallback al metodo originale
+        End Try
+
+        ' Fallback: chiama la funzione esistente (potrebbe fare query)
+        Try
+            Dim valore = PrelevaValoreJoin(joinRow, chiaviFiglia)
+            resultCache(cacheKey) = valore
+            Return valore
+        Catch ex As Exception
+            'Debug.WriteLine($"[JOIN CACHE] Errore fallback PrelevaValoreJoin: {ex.ToString()}")
+            resultCache(cacheKey) = Nothing
+            Return Nothing
+        End Try
+    End Function
+
+    Private Function PrelevaValoreJoin(joinRow As DataRow, chiaviFiglia As Dictionary(Of String, Object)) As Object
+
+        If joinRow Is Nothing Then
+            MDIMessageBox.Show("PrelevaValoreJoin: joinRow è Nothing", Me.MdiParent, MessageBoxButtons.OK)
+            Return Nothing
+        End If
+
+        If chiaviFiglia Is Nothing OrElse chiaviFiglia.Count = 0 Then
+            MDIMessageBox.Show("PrelevaValoreJoin: chiaviFiglia è Nothing o vuoto", Me.MdiParent, MessageBoxButtons.OK)
+            Return Nothing
+        End If
+
+        Dim tabellaPadre As String = ""
+        Dim campoDaPrelevare As String = ""
+
+        Try
+            tabellaPadre = Convert.ToString(joinRow("TabellaPadre"))
+            campoDaPrelevare = Convert.ToString(joinRow("CampoDaPrelevare"))
+        Catch ex As Exception
+            MDIMessageBox.Show($"PrelevaValoreJoin: mancata lettura colonne joinRow: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)
+            Return Nothing
+        End Try
+
+        If String.IsNullOrWhiteSpace(tabellaPadre) OrElse String.IsNullOrWhiteSpace(campoDaPrelevare) Then
+            MDIMessageBox.Show("PrelevaValoreJoin: tabellaPadre o campoDaPrelevare vuoti", Me.MdiParent, MessageBoxButtons.OK)
+            Return Nothing
+        End If
+
+        Dim identPattern As String = "^[\w\.]+$"
+        If Not Regex.IsMatch(tabellaPadre, identPattern) OrElse Not Regex.IsMatch(campoDaPrelevare, "^[\w]+$") Then
+            MDIMessageBox.Show($"PrelevaValoreJoin: nome tabella o campo non valido: {tabellaPadre}.{campoDaPrelevare}", Me.MdiParent, MessageBoxButtons.OK)
+            Return Nothing
+        End If
+
+        Dim condizioni As New List(Of String)()
+        Dim parametri As New Dictionary(Of String, Object)()
+
+        For i = 1 To 3
+            Dim nomeColonna = $"ChiavePadre{i}"
+            If joinRow.Table.Columns.Contains(nomeColonna) Then
+                Dim chiavePadre = Convert.ToString(joinRow(nomeColonna))
+                If Not String.IsNullOrWhiteSpace(chiavePadre) AndAlso chiaviFiglia.ContainsKey($"ChiaveFiglia{i}") Then
+                    If Not Regex.IsMatch(chiavePadre, "^[\w]+$") Then
+                        MDIMessageBox.Show($"PrelevaValoreJoin: nome colonna padre non valido: {chiavePadre}", Me.MdiParent, MessageBoxButtons.OK)
+                        Continue For
+                    End If
+
+                    Dim paramName = $"@param{i}"
+                    condizioni.Add($"{chiavePadre} = {paramName}")
+                    parametri.Add(paramName, chiaviFiglia($"ChiaveFiglia{i}"))
+                End If
+            End If
+        Next
+
+        If condizioni.Count = 0 Then
+            MDIMessageBox.Show("PrelevaValoreJoin: nessuna condizione costruita, restituisco Nothing", Me.MdiParent, MessageBoxButtons.OK)
+            Return Nothing
+        End If
+
+        Dim query As String = $"SELECT {campoDaPrelevare} FROM [{tabellaPadre}] WHERE {String.Join(" AND ", condizioni)}"
+
+        Try
+            Using conn As New SqlConnection(ConnString)
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.CommandTimeout = 30
+                    For Each kvp In parametri
+                        Dim val = If(kvp.Value, DBNull.Value)
+                        cmd.Parameters.AddWithValue(kvp.Key, val)
+                    Next
+
+                    conn.Open()
+                    Dim result = cmd.ExecuteScalar()
+                    Return If(result Is DBNull.Value, Nothing, result)
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore SQL recuperando join da {tabellaPadre}: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
+            Return Nothing
+        Catch ex As Exception
+            Me.BeginInvoke(New MethodInvoker(Sub() MDIMessageBox.Show($"Errore imprevisto recuperando join: {ex.Message}", Me.MdiParent, MessageBoxButtons.OK)))
+            Return Nothing
+        End Try
+    End Function
 
     Private Function RecuperaCampiCalcolatiDettaglio() As Dictionary(Of String, (Formula As String, TipoValore As String, SuSeStesso As Boolean))
         Dim diz As New Dictionary(Of String, (String, String, Boolean))(StringComparer.OrdinalIgnoreCase)
@@ -2199,9 +2261,7 @@ Public Class DynamicDataForm
             Not String.IsNullOrEmpty(campo.CampoVisuale) Then
 
             Dim dt = RecuperaTabellaCached(campo.TabellaElenco)
-
             Dim fieldHeight As Integer = 23
-
             Dim txt = New TextBox With {
                                             .Width = 100,
                                             .Height = fieldHeight,
@@ -2241,6 +2301,7 @@ Public Class DynamicDataForm
 
             AddHandler txt.Enter, Sub()
                                       lblDescrizione.Text = ""
+                                      txt.BackColor = SystemColors.Window
                                   End Sub
 
             If campo.AbilitaZoom Then
@@ -2254,12 +2315,12 @@ Public Class DynamicDataForm
                                       End Sub
 
             Dim pannello = New FlowLayoutPanel With {
-        .AutoSize = True,
-        .FlowDirection = FlowDirection.LeftToRight,
-        .WrapContents = False,
-        .Height = fieldHeight + 6,
-        .Margin = New Padding(0),
-        .Padding = New Padding(0)
+                .AutoSize = True,
+                .FlowDirection = FlowDirection.LeftToRight,
+                .WrapContents = False,
+                .Height = fieldHeight + 6,
+                .Margin = New Padding(0),
+                .Padding = New Padding(0)
     }
 
             txt.Anchor = AnchorStyles.Left
@@ -2273,7 +2334,6 @@ Public Class DynamicDataForm
             Return pannello
         End If
 
-
         If campo.TipoConvalida = "I" Then
             AddHandler ctrl.Validated, Sub(sender, e)
                                            ValidazioneIntervallo(campo, CType(sender, Control))
@@ -2282,7 +2342,6 @@ Public Class DynamicDataForm
 
         Return ctrl
     End Function
-
 
     Private Function RecuperaInfoCampoPath(nomeCampo As String) As (IsFile As Boolean, BottoneVisualizza As Boolean)
         Try
@@ -2326,7 +2385,6 @@ Public Class DynamicDataForm
 
         Return (True, False)
     End Function
-
 
     Private Function RecuperaTabellaCached(nomeTabella As String) As DataTable
         If String.IsNullOrWhiteSpace(nomeTabella) Then Return New DataTable()
@@ -2449,7 +2507,7 @@ Public Class DynamicDataForm
                 End Using
             End Using
         Catch ex As Exception
-            inputControl.BackColor = Color.LightPink
+            ApplicaFeedbackVisivo(inputControl, false)
             Me.BeginInvoke(Sub() MDIMessageBox.Show("Errore durante la convalida: " & ex.Message, Me.MdiParent, MessageBoxButtons.OK))
         End Try
     End Sub

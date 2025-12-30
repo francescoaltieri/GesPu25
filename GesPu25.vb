@@ -51,10 +51,21 @@ Public Class GesPu25
     End Sub
 
     Private Sub ToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles ToolStripMenuItem1.Click
+        ' Cerca se il form è già aperto come MDI child
+        For Each f As Form In Me.MdiChildren
+            If TypeOf f Is InformazioniApp Then
+                f.BringToFront()
+                f.Focus()
+                Return
+            End If
+        Next
+
+        ' Se non esiste, lo crea
         Dim infoForm As New InformazioniApp()
         infoForm.MdiParent = Me
         infoForm.Show()
     End Sub
+
 
     Private Sub ImportaDaExcelToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ImportaDaExcelToolStripMenuItem.Click
         Dim ImportForm As New ImportaExcel()
@@ -284,9 +295,6 @@ Public Class GesPu25
         ApriModuloConPermessi("Tab_Utenti", Me)
     End Sub
 
-    Private Sub FileTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles FileTemplateToolStripMenuItem.Click
-        ApriModuloConPermessi("Sys_template", Me)
-    End Sub
     Private Sub FornitoriToolStripMenuItem2_Click(sender As Object, e As EventArgs) Handles FornitoriToolStripMenuItem2.Click
         ApriModuloConPermessi("Tab_Fornitori", Me)
     End Sub
@@ -341,7 +349,7 @@ Public Class GesPu25
     Private Sub OggettiLavorazioneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OggettiLavorazioneToolStripMenuItem.Click
         ApriModuloConPermessi("Tab_OggettiLavorazione", Me)
     End Sub
-    Private Sub ComunicazioniToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ComunicazioniToolStripMenuItem.Click
+    Private Sub ComunicazioniToolStripMenuItem_Click(sender As Object, e As EventArgs)
         ApriModuloConPermessi("Tab_Comunicazioni", Me)
     End Sub
 
@@ -417,6 +425,14 @@ Public Class GesPu25
 
     Private Sub GestioneNotificheToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles GestioneNotificheToolStripMenuItem.Click
         ApriNotifiche(True)
+    End Sub
+
+    Private Sub TipiFileToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles TipiFileToolStripMenuItem.Click
+        ApriModuloConPermessi("Tab_TipiOggettoLavorazione", Me)
+    End Sub
+
+    Private Sub TipiFileImgVideoToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles TipiFileImgVideoToolStripMenuItem.Click
+        ApriModuloConPermessi("Tab_TipiFile", Me)
     End Sub
 
 End Class

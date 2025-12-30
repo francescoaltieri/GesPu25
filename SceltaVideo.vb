@@ -33,22 +33,29 @@ Public Class SceltaVideo
         Dim dt As New DataTable()
 
         Using conn As New SqlConnection(ConnString)
+            ' Query base
             Dim query As String =
-                                    "SELECT " &
-                                    "    R.RevisioneID, " &
-                                    "    R.DataRevisione, " &
-                                    "    V.VideoID, " &
-                                    "    V.Titolo AS TitoloVideo, " &
-                                    "    R.Autore, " &
-                                    "    R.NumRetake, " &
-                                    "    R.Stato, " &
-                                    "    R.Approvato, " &
-                                    "    R.Note " &
-                                    "FROM Mov_Revisioni R " &
-                                    "INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID " &
-                                    "INNER JOIN Mov_RevisioniUtente UR ON R.RevisioneID = UR.RevisioneID " &
-                                    "WHERE UR.NomeUtente = @NomeUtente OR R.Supervisore = @NomeUtente " &
-                                    "ORDER BY V.Titolo, R.DataRevisione ASC;"
+            "SELECT " &
+            "    R.RevisioneID, " &
+            "    R.DataRevisione, " &
+            "    V.VideoID, " &
+            "    V.Titolo AS TitoloVideo, " &
+            "    R.Autore, " &
+            "    R.NumRetake, " &
+            "    R.Stato, " &
+            "    R.Approvato, " &
+            "    R.Note " &
+            "FROM Mov_Revisioni R " &
+            "INNER JOIN Mov_ConsegneScene V ON R.VideoID = V.VideoID " &
+            "INNER JOIN Mov_RevisioniUtente UR ON R.RevisioneID = UR.RevisioneID " &
+            "WHERE (UR.NomeUtente = @NomeUtente OR R.Supervisore = @NomeUtente) "
+
+            ' Se il checkbox esiste e è selezionato, aggiungo il filtro "da approvare"
+            If ChkDaApprovare IsNot Nothing AndAlso ChkDaApprovare.Checked Then
+                query &= "AND (R.Approvato = 0 OR R.Approvato IS NULL) "
+            End If
+
+            query &= "ORDER BY V.Titolo, R.DataRevisione ASC;"
 
             Using cmd As New SqlCommand(query, conn)
                 cmd.Parameters.Add("@NomeUtente", SqlDbType.NVarChar, 256).Value = nomeUtente
@@ -82,6 +89,7 @@ Public Class SceltaVideo
         Cursor.Current = Cursors.Default
         Application.DoEvents()
     End Sub
+
 
     Private Sub dgvRevisioni_KeyDown(sender As Object, e As KeyEventArgs) Handles dgvRevisioni.KeyDown
         If e.KeyCode = Keys.Delete Then
@@ -552,5 +560,15 @@ Public Class SceltaVideo
 
         dv.RowFilter = $"NumeroRevisione LIKE '%{filtro}%' OR Stato LIKE '%{filtro}%' OR Note LIKE '%{filtro}%' OR Autore LIKE '%{filtro}%' OR TitoloVideo LIKE '%{filtro}%'"
         dgvRevisioni.DataSource = dv
+    End Sub
+
+    Private Sub ChkDaApprovare_CheckedChanged(sender As Object, e As EventArgs) Handles ChkDaApprovare.CheckedChanged
+        Try
+            Cursor.Current = Cursors.WaitCursor
+            Application.DoEvents()
+            CaricaRevisioni()
+        Finally
+            Cursor.Current = Cursors.Default
+        End Try
     End Sub
 End Class

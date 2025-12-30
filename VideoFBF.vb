@@ -22,6 +22,9 @@ Public Class VideoFBF
     Private aggiornamentoInCorso As Boolean = False
     Private hasUnsavedChanges As Boolean = False
 
+    Private lastChosenAppPath As String = String.Empty
+    Private tempFilesToDelete As New List(Of String)
+
     Public Property Parametri As RevisioneParametri
 
     Private currentTool As ToolType = ToolType.None
@@ -2239,7 +2242,7 @@ Public Class VideoFBF
             lastPoint = ConvertMouseToImagePoint(e.Location)
             editor.SaveState()
         Catch ex As Exception
-            LogDebug("OverlayRubber_MouseDown EX: " & ex.Message)
+
         End Try
     End Sub
 
@@ -2267,7 +2270,7 @@ Public Class VideoFBF
                 Return
             End If
         Catch ex As Exception
-            LogDebug("OverlayRubber_MouseMove EX: " & ex.Message)
+
         End Try
     End Sub
 
@@ -2310,7 +2313,7 @@ Public Class VideoFBF
                 overlayRubber.Invalidate()
             End If
         Catch ex As Exception
-            LogDebug("OverlayRubber_MouseUp EX: " & ex.Message)
+
         End Try
     End Sub
 
@@ -2370,7 +2373,7 @@ Public Class VideoFBF
     Private Sub InitOverlayRubber()
         Try
             If picFrame Is Nothing Then
-                LogDebug("InitOverlayRubber: picFrame = Nothing")
+
                 Return
             End If
             If overlayRubber IsNot Nothing Then Return
@@ -2397,7 +2400,7 @@ Public Class VideoFBF
                                             If overlayRubber IsNot Nothing Then overlayRubber.Invalidate()
                                         End Sub
         Catch ex As Exception
-            LogDebug("InitOverlayRubber ERROR: " & ex.Message)
+
         End Try
     End Sub
 
@@ -2423,7 +2426,7 @@ Public Class VideoFBF
                 End Select
             End Using
         Catch ex As Exception
-            LogDebug("OverlayRubber_Paint ERROR: " & ex.Message)
+
         End Try
     End Sub
 
@@ -2582,57 +2585,52 @@ Public Class VideoFBF
         Return New Rectangle(x, y, w, h)
     End Function
 
-    Private Sub LogDebug(msg As String)
-        Try
-            Dim logPath = IO.Path.Combine(IO.Path.GetTempPath(), "VideoFBF_debug.log")
-            IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {msg}{Environment.NewLine}")
-        Catch : End Try
-    End Sub
-
     Private Sub BtnApriEditorEsterno_Click(sender As Object, e As EventArgs) Handles BtnApriEditorEsterno.Click
         Try
-            ' Ottieni la bitmap dell'overlay (sostituisci con la tua sorgente)
             Dim overlayBmp As Bitmap = GetOverlayBitmap()
             If overlayBmp Is Nothing Then
-                LogDebug("Nessuna overlay disponibile da aprire.")
                 Return
             End If
 
-            ' Salva su file temporaneo e apri con l'app predefinita
             Dim tempPath As String = SaveBitmapToTempPng(overlayBmp)
             If String.IsNullOrEmpty(tempPath) Then
-                LogDebug("Errore nel salvataggio del file temporaneo.")
                 Return
             End If
 
+            ' 1) Cerca automaticamente Gimp
+            Dim jimpPath As String = FindJimp()
+
+            If Not String.IsNullOrEmpty(jimpPath) Then
+                ' Gimp trovato → apri con Gimp
+                OpenFileWithSpecificApp(tempPath, jimpPath)
+                lastChosenAppPath = jimpPath
+                Return
+            End If
+
+            ' 2) Se l’utente non sceglie nulla → apri con app predefinita
             OpenFileWithDefaultApp(tempPath)
+
         Catch ex As Exception
-            LogDebug(ex.Message)
+
         End Try
     End Sub
 
-    ' Recupera la bitmap dell'overlay: adatta questa funzione alla tua struttura
     Private Function GetOverlayBitmap() As Bitmap
-        ' Esempio: se hai editor.OverlayBitmap o editor.DrawingBitmap
-        ' Return CType(editor.OverlayBitmap?.Clone(), Bitmap)
         If editor Is Nothing OrElse editor.DrawingBitmap Is Nothing Then Return Nothing
-        ' Se hai una bitmap separata per l'overlay, restituiscila; altrimenti usa una copia del drawing
         Return CType(editor.DrawingBitmap.Clone(), Bitmap)
     End Function
 
-    ' Salva la bitmap in un file PNG temporaneo e restituisce il percorso
     Private Function SaveBitmapToTempPng(bmp As Bitmap) As String
         Try
             Dim tempFile As String = IO.Path.Combine(IO.Path.GetTempPath(), "overlay_" & Guid.NewGuid().ToString("N") & ".png")
             bmp.Save(tempFile, Imaging.ImageFormat.Png)
+            tempFilesToDelete.Add(tempFile)
             Return tempFile
         Catch ex As Exception
-            LogDebug("SaveBitmapToTempPng EX: " & ex.Message)
             Return String.Empty
         End Try
     End Function
 
-    ' Apre il file con l'applicazione predefinita del sistema (UseShellExecute = True)
     Private Sub OpenFileWithDefaultApp(filePath As String)
         Try
             Dim psi As New ProcessStartInfo()
@@ -2640,29 +2638,62 @@ Public Class VideoFBF
             psi.UseShellExecute = True
             Process.Start(psi)
         Catch ex As Exception
-            LogDebug("OpenFileWithDefaultApp EX: " & ex.Message)
         End Try
     End Sub
 
-    ' Opzionale: prova ad aprire con un'app specifica (es. mspaint o gimp) se presente
     Private Sub OpenFileWithSpecificApp(filePath As String, appPath As String)
         Try
-            If String.IsNullOrEmpty(appPath) OrElse Not IO.File.Exists(appPath) Then
-                ' fallback: apri con app predefinita
-                OpenFileWithDefaultApp(filePath)
-                Return
-            End If
-
             Dim psi As New ProcessStartInfo()
             psi.FileName = appPath
             psi.Arguments = """" & filePath & """"
             psi.UseShellExecute = True
             Process.Start(psi)
         Catch ex As Exception
-            LogDebug("OpenFileWithSpecificApp EX: " & ex.Message)
         End Try
     End Sub
 
+    Private Function FindJimp() As String
+        Try
+            ' 1) Prova a leggere il percorso di GIMP3 dalla tabella Sys_Parametri
+            Dim percorsoFromDb As String = OttieniPercorso("PercorsoGimp3")
+            If Not String.IsNullOrEmpty(percorsoFromDb) AndAlso IO.File.Exists(percorsoFromDb) Then
+                Return percorsoFromDb
+            End If
+
+            ' 2) Percorsi noti (fallback)
+            Dim possiblePaths As String() = {
+            "C:\Program Files\GIMP\bin\gimp-3.exe",
+            "C:\Program Files (x86)\GIMP\bin\gimp-3.exe",
+            "C:\Program Files\GIMP\bin\gimp.exe",
+            "C:\Program Files (x86)\GIMP\bin\gimp.exe"
+        }
+
+            For Each p In possiblePaths
+                If IO.File.Exists(p) Then Return p
+            Next
+
+            ' 3) Ricerca più approfondita in Program Files per eseguibili comuni (gimp-3.exe, gimp.exe, Jimp.exe)
+            Try
+                Dim pf As String = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
+                Dim patterns As String() = {"gimp-3.exe", "gimp.exe", "Jimp.exe"}
+                For Each pat In patterns
+                    Dim matches = IO.Directory.GetFiles(pf, pat, IO.SearchOption.AllDirectories)
+                    If matches IsNot Nothing AndAlso matches.Length > 0 Then
+                        Return matches(0)
+                    End If
+                Next
+            Catch ex As Exception
+                ' ignora errori di accesso alle cartelle ma loggali
+
+            End Try
+
+        Catch ex As Exception
+
+        End Try
+
+        ' Se non trovato → ritorna stringa vuota
+        Return String.Empty
+    End Function
 
 
     ' --- DTO ListView Note ---

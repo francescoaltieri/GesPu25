@@ -491,7 +491,6 @@ Partial Class VideoFBF
         BtnApriEditorEsterno.TabIndex = 39
         BtnApriEditorEsterno.Text = "Editor Esterno"
         BtnApriEditorEsterno.UseVisualStyleBackColor = True
-        BtnApriEditorEsterno.Visible = False
         ' 
         ' VideoFBF
         ' 
