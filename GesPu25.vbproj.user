@@ -40,6 +40,9 @@
     <Compile Update="PermessiUtenteForm.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="SysNuovoDatabase.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="VideoFBF.vb">
       <SubType>Form</SubType>
     </Compile>

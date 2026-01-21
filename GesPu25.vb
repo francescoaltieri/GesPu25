@@ -171,7 +171,6 @@ Public Class GesPu25
         Application.DoEvents()
     End Sub
 
-
     Public Sub ApriModulo2ConPermessi(nomeTabella As String, pForm As Form)
 
         Cursor.Current = Cursors.WaitCursor
@@ -433,6 +432,11 @@ Public Class GesPu25
 
     Private Sub TipiFileImgVideoToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles TipiFileImgVideoToolStripMenuItem.Click
         ApriModuloConPermessi("Tab_TipiFile", Me)
+    End Sub
+
+    Private Sub GeneraNuovoDatabaseToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles GeneraNuovoDatabaseToolStripMenuItem.Click
+        Dim modulo As New SysNuovoDatabase()
+        ApriModulo2ConPermessi("Acquisici da PDF", modulo)
     End Sub
 
 End Class

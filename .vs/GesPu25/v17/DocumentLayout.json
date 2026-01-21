@@ -1,7 +1,28 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\costantivariabilipubbliche.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:costantivariabilipubbliche.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:gespu25.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\sysnuovodatabase.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:sysnuovodatabase.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|c:\\users\\administrator\\documents\\github\\gespu25\\sysnuovodatabase.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form",
+      "RelativeMoniker": "D:0:0:{DF631D3E-E667-41E9-89B3-43FF94D72846}|GesPu25.vbproj|solutionrelative:sysnuovodatabase.vb||{2C015C70-C72C-11D0-88C3-00A0C9110049}|Form"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,11 +30,74 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "GesPu25.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
+              "RelativeDocumentMoniker": "GesPu25.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
+              "RelativeToolTip": "GesPu25.vb",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2026-01-21T11:42:02.321Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "GesPu25.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb",
+              "RelativeDocumentMoniker": "GesPu25.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\GesPu25.vb [Progettazione]",
+              "RelativeToolTip": "GesPu25.vb [Progettazione]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2026-01-21T11:41:51.477Z",
+              "EditorCaption": " [Progettazione]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "CostantiVariabiliPubbliche.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\CostantiVariabiliPubbliche.vb",
+              "RelativeDocumentMoniker": "CostantiVariabiliPubbliche.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\CostantiVariabiliPubbliche.vb",
+              "RelativeToolTip": "CostantiVariabiliPubbliche.vb",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAqwBcAAAATAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2026-01-21T10:37:48.745Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "SysNuovoDatabase.vb",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\SysNuovoDatabase.vb",
+              "RelativeDocumentMoniker": "SysNuovoDatabase.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\SysNuovoDatabase.vb",
+              "RelativeToolTip": "SysNuovoDatabase.vb",
+              "ViewState": "AgIAACIAAAAAAAAAAAAgwGAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2026-01-20T15:47:31.978Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "SysNuovoDatabase.vb [Progettazione]",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\SysNuovoDatabase.vb",
+              "RelativeDocumentMoniker": "SysNuovoDatabase.vb",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\GesPu25\\SysNuovoDatabase.vb [Progettazione]",
+              "RelativeToolTip": "SysNuovoDatabase.vb [Progettazione]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003361|",
+              "WhenOpened": "2026-01-20T15:47:24.14Z",
+              "EditorCaption": " [Progettazione]"
             }
           ]
         }

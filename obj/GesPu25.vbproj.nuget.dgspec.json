@@ -79,6 +79,10 @@
               "target": "Package",
               "version": "[7.0.0-preview2.25289.6, )"
             },
+            "Microsoft.SqlServer.SqlManagementObjects": {
+              "target": "Package",
+              "version": "[180.10.0, )"
+            },
             "PDFsharp": {
               "target": "Package",
               "version": "[6.2.2, )"

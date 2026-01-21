@@ -1,4 +1,5 @@
-﻿Imports System.Diagnostics
+﻿Imports System.ComponentModel
+Imports System.Diagnostics
 Imports System.IO
 Imports System.Threading.Tasks
 Imports DocumentFormat.OpenXml.Vml.Office
@@ -2489,11 +2490,6 @@ Public Class VideoFBF
             g.FillPolygon(brush, pts)
         End Using
 
-        ' Disegna un contorno
-        'Using outline As New Pen(Color.FromArgb(180, Color.Black), Math.Max(1, penW / 2))
-        'outline.LineJoin = Drawing2D.LineJoin.Round
-        'g.DrawPolygon(outline, pts)
-        'End Using
     End Sub
 
     ' Anteprima freccia in overlay (pStart/pEnd in coordinate picturebox)
@@ -2533,7 +2529,6 @@ Public Class VideoFBF
             DrawArrow(g, pStart, pEnd, solidPen, SoloPunta:=True, tipOffset:=CSng(Math.Max(6.0, pen.Width * 4.0)))
         End Using
     End Sub
-
 
     Private Function ConvertMouseToImagePoint(mousePt As Point) As Point
         If picFrame Is Nothing OrElse picFrame.Image Is Nothing Then Return mousePt
@@ -2694,7 +2689,6 @@ Public Class VideoFBF
         ' Se non trovato → ritorna stringa vuota
         Return String.Empty
     End Function
-
 
     ' --- DTO ListView Note ---
     Public Class NotaFrameInfo
