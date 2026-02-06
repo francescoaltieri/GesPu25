@@ -152,14 +152,16 @@ Public Class AssegnaSceneForm
         Me.Controls.Add(scrollPanel)
 
         tblContainer = New FlowLayoutPanel() With {
-            .FlowDirection = FlowDirection.LeftToRight,
-            .WrapContents = True,
-            .AutoSize = False,
-            .Dock = DockStyle.Top,
-            .Padding = New Padding(marginPx),
-            .BackColor = Color.White
-        }
+    .FlowDirection = FlowDirection.LeftToRight,
+    .WrapContents = True,
+    .AutoSize = True,
+    .AutoSizeMode = AutoSizeMode.GrowAndShrink,
+    .Dock = DockStyle.Top,
+    .Padding = New Padding(marginPx),
+    .BackColor = Color.White
+}
         scrollPanel.Controls.Add(tblContainer)
+
 
         ' Overlay senza ProgressBar: aggiunto come figlio di scrollPanel
         overlay = New Panel() With {

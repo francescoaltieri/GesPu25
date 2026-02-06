@@ -1412,7 +1412,7 @@ Public Class DynamicDataForm
         ' Determina colonne valide (escludi password vuote come in SalvaModifica)
         Dim colonneValid As New List(Of String)
         For Each campo In campiDefiniti
-            If campo.IsChiave OrElse campo.IsIdentity Then Continue For
+            If campo.IsIdentity Then Continue For
             Dim input = If(campoInputs.ContainsKey(campo.Nome), campoInputs(campo.Nome), Nothing)
             Dim isPassword = campo.Nome.ToLower().Contains("password")
             If isPassword AndAlso TypeOf input Is TextBox AndAlso String.IsNullOrWhiteSpace(CType(input, TextBox).Text) Then
@@ -1422,7 +1422,7 @@ Public Class DynamicDataForm
         Next
         If colonneValid.Count = 0 Then Return
 
-        ' Prepara dizionario valoriInput come in SalvaModifica
+        ' Prepara dizionario valoriInput 
         Dim valoriInput As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
         For Each nomeCampo In colonneValid
             Dim valore As Object = Nothing
@@ -1485,7 +1485,6 @@ Public Class DynamicDataForm
                 End If
             Catch ex As Exception
                 ' non bloccare l'inserimento per errori di lookup join
-                'errorList.Add($"Errore caricamento joinDefs per {nomeCampo}: {ex.Message}")
             End Try
         Next
 
@@ -1496,7 +1495,7 @@ Public Class DynamicDataForm
                 Dim jr = joinDefs(nomeCampo)
                 Dim chiaviFiglia As New Dictionary(Of String, Object)(StringComparer.OrdinalIgnoreCase)
 
-                ' Costruisci le chiavi figlie e logga i valori trovati
+                ' Costruisce le chiavi figlie 
                 Dim anyKeyAdded As Boolean = False
                 For i As Integer = 1 To 3
                     Dim chiaveNome = $"ChiaveFiglia{i}"
@@ -1512,9 +1511,7 @@ Public Class DynamicDataForm
                                 valFiglio = dgvDati.SelectedRows(0).Cells(nomeCampoFiglio).Value
                             End If
 
-                            'Debug.WriteLine($"[JOIN BUILD] CampoJoin='{nomeCampo}' ChiaveFiglia='{chiaveNome}' CampoFiglio='{nomeCampoFiglio}' ValoreEstratto='{If(valFiglio Is Nothing, "<NULL>", Convert.ToString(valFiglio))}'")
-
-                            ' Aggiungi la chiave figlia anche se è DBNull.Value: serve per costruire filtro coerente
+                            ' filtro coerente
                             chiaviFiglia.Add(chiaveNome, If(valFiglio Is Nothing, DBNull.Value, valFiglio))
                             anyKeyAdded = True
                         End If
@@ -1540,14 +1537,76 @@ Public Class DynamicDataForm
                 ' Assegna anche se valoreJoin è DBNull.Value 
                 If valoreJoin IsNot Nothing OrElse (valoreJoin Is DBNull.Value) Then
                     valoriInput(nomeCampo) = If(valoreJoin Is Nothing, DBNull.Value, valoreJoin)
-                Else
-
                 End If
 
             Catch ex As Exception
-
+                ' ignore per non bloccare inserimento
             End Try
         Next
+
+        ' --- Rileva campo con pattern di intervallo del tipo <da>0004<a>0015
+        Dim intervalRegex As New System.Text.RegularExpressions.Regex("<da>(\d+)<a>(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+        Dim variableFieldName As String = Nothing
+        Dim variableOriginalValue As String = Nothing
+        Dim generatedValues As List(Of String) = Nothing
+
+        For Each kvp In valoriInput
+            Dim nomeCampo = kvp.Key
+            Dim valObj = kvp.Value
+            If valObj Is Nothing OrElse Convert.IsDBNull(valObj) Then Continue For
+            Dim s = Convert.ToString(valObj)
+            If String.IsNullOrWhiteSpace(s) Then Continue For
+            Dim m = intervalRegex.Match(s)
+            If m.Success Then
+                If variableFieldName IsNot Nothing Then
+                    ' più di un campo con pattern: non supportato in questa implementazione
+                    errorList.Add("Più campi con pattern <da>...<a>... rilevati. Al momento è supportato un solo campo variabile per inserimento batch.")
+                    Exit For
+                End If
+                variableFieldName = nomeCampo
+                variableOriginalValue = s
+
+                ' estrai start/end
+                Dim startStr = m.Groups(1).Value
+                Dim endStr = m.Groups(2).Value
+                Dim padLen As Integer = Math.Max(startStr.TrimStart("+"c, "-"c).Length, endStr.TrimStart("+"c, "-"c).Length)
+
+                Dim startVal As Long
+                Dim endVal As Long
+                If Not Int64.TryParse(startStr, startVal) OrElse Not Int64.TryParse(endStr, endVal) Then
+                    errorList.Add($"Pattern intervallo non valido nel campo {nomeCampo}.")
+                    Exit For
+                End If
+
+                ' costruisci template rimuovendo la porzione <da>...<a>...
+                Dim baseTemplate As String = intervalRegex.Replace(s, "{0}")
+
+                ' genera lista valori (step = 1, supporto sia start<end che start>end)
+                generatedValues = New List(Of String)
+                If startVal <= endVal Then
+                    For cur As Long = startVal To endVal
+                        Dim formatted = If(padLen > 0, cur.ToString("D" & padLen), cur.ToString())
+                        generatedValues.Add(String.Format(baseTemplate, formatted))
+                    Next
+                Else
+                    For cur As Long = startVal To endVal Step -1
+                        Dim formatted = If(padLen > 0, cur.ToString("D" & padLen), cur.ToString())
+                        generatedValues.Add(String.Format(baseTemplate, formatted))
+                    Next
+                End If
+            End If
+        Next
+
+        ' Se abbiamo errori di rilevamento, mostriamoli e usciamo
+        If errorList.Count > 0 Then
+            Dim msg = String.Join(Environment.NewLine, errorList)
+            If Me.InvokeRequired Then
+                Me.BeginInvoke(Sub() MDIMessageBox.Show(msg, Me.MdiParent, MessageBoxButtons.OK))
+            Else
+                MDIMessageBox.Show(msg, Me.MdiParent, MessageBoxButtons.OK)
+            End If
+            Return
+        End If
 
         Using conn As New SqlConnection(ConnString)
             Await conn.OpenAsync()
@@ -1563,14 +1622,32 @@ Public Class DynamicDataForm
                         cachedInsertCommand.Transaction = tx
                     End If
 
-                    ' Imposta parametri e esegui insert
-                    For Each nomeCampo In colonneValid
-                        Dim param = cachedInsertCommand.Parameters("@" & nomeCampo)
-                        Dim v = If(valoriInput.ContainsKey(nomeCampo), valoriInput(nomeCampo), DBNull.Value)
-                        param.Value = If(v Is Nothing, DBNull.Value, v)
-                    Next
+                    ' Se non c'è campo variabile, esegui un singolo insert come prima
+                    If String.IsNullOrWhiteSpace(variableFieldName) OrElse generatedValues Is Nothing OrElse generatedValues.Count = 0 Then
+                        For Each nomeCampo In colonneValid
+                            Dim param = cachedInsertCommand.Parameters("@" & nomeCampo)
+                            Dim v = If(valoriInput.ContainsKey(nomeCampo), valoriInput(nomeCampo), DBNull.Value)
+                            param.Value = If(v Is Nothing, DBNull.Value, v)
+                        Next
 
-                    Await cachedInsertCommand.ExecuteNonQueryAsync()
+                        Await cachedInsertCommand.ExecuteNonQueryAsync()
+                    Else
+                        ' Campo variabile: esegui un insert per ogni valore generato
+                        For Each generatedVal In generatedValues
+                            For Each nomeCampo In colonneValid
+                                Dim param = cachedInsertCommand.Parameters("@" & nomeCampo)
+                                Dim v As Object = If(valoriInput.ContainsKey(nomeCampo), valoriInput(nomeCampo), DBNull.Value)
+                                If String.Equals(nomeCampo, variableFieldName, StringComparison.OrdinalIgnoreCase) Then
+                                    ' sovrascrivo il valore del campo variabile con il valore generato
+                                    param.Value = If(generatedVal Is Nothing, DBNull.Value, generatedVal)
+                                Else
+                                    param.Value = If(v Is Nothing, DBNull.Value, v)
+                                End If
+                            Next
+                            Await cachedInsertCommand.ExecuteNonQueryAsync()
+                        Next
+                    End If
+
                     tx.Commit()
                 Catch ex As Exception
                     Try
@@ -1593,6 +1670,7 @@ Public Class DynamicDataForm
 
         swTotal.Stop()
     End Function
+
 
     Private Async Function SalvaModificaAsync() As Task
         Dim swTotal As New Stopwatch()
@@ -4530,6 +4608,31 @@ Public Class DynamicDataForm
         Return (startVal, endVal, stepVal, padLen)
     End Function
 
+    Private Function ParsePrefixedRange(expr As String) As (prefix As String, startVal As Long, endVal As Long, padLen As Integer)?
+        If String.IsNullOrWhiteSpace(expr) Then Return Nothing
+
+        ' Pattern: QUALSIASI_TESTO<da>0004<a>0015
+        Dim rx As New Regex("^(?<pref>.*)<da>(?<start>\d+)<a>(?<end>\d+)$", RegexOptions.IgnoreCase)
+
+        Dim m = rx.Match(expr.Trim())
+        If Not m.Success Then Return Nothing
+
+        Dim pref = m.Groups("pref").Value
+        Dim sStr = m.Groups("start").Value
+        Dim eStr = m.Groups("end").Value
+
+        Dim startVal As Long
+        Dim endVal As Long
+
+        If Not Int64.TryParse(sStr, startVal) Then Return Nothing
+        If Not Int64.TryParse(eStr, endVal) Then Return Nothing
+
+        Dim padLen As Integer = Math.Max(sStr.Length, eStr.Length)
+
+        Return (pref, startVal, endVal, padLen)
+    End Function
+
+
     Private Function GetColumnSqlDbType(conn As SqlConnection, tableName As String, columnName As String) As SqlDbType
         Dim schemaName As String = "dbo"
         Dim tn = tableName
@@ -4577,17 +4680,37 @@ Public Class DynamicDataForm
         End If
 
         Dim rawValue = Convert.ToString(rawValueObj)
-        Dim parsed = ParseInterval(rawValue)
-        If parsed Is Nothing Then
-            ' Non è un intervallo: salva un singolo record
-            SaveSingleRecord(originalFields, connString, tableName)
-            Return
+
+        ' 1) Provo prima il nuovo pattern con prefisso: SC_005_<da>0004<a>0015
+        Dim prefixed = ParsePrefixedRange(rawValue)
+        Dim usePrefixed As Boolean = prefixed.HasValue
+
+        Dim startVal As Long
+        Dim endVal As Long
+        Dim stepVal As Long = 1 ' default
+        Dim padLen As Integer
+        Dim prefix As String = String.Empty
+
+        If usePrefixed Then
+            prefix = prefixed.Value.prefix
+            startVal = prefixed.Value.startVal
+            endVal = prefixed.Value.endVal
+            padLen = prefixed.Value.padLen
+        Else
+            ' fallback: vecchia sintassi @intervallo(...)
+            Dim parsed = ParseInterval(rawValue)
+            If parsed Is Nothing Then
+                ' Non è un intervallo: salva un singolo record
+                SaveSingleRecord(originalFields, connString, tableName)
+                Return
+            End If
+
+            startVal = parsed.Value.startVal
+            endVal = parsed.Value.endVal
+            stepVal = parsed.Value.stepVal
+            padLen = parsed.Value.padLen
         End If
 
-        Dim startVal = parsed.Value.startVal
-        Dim endVal = parsed.Value.endVal
-        Dim stepVal = parsed.Value.stepVal
-        Dim padLen = parsed.Value.padLen
 
         ' Calcola iterazioni e protezione
         Dim maxIterations As Integer = 10000
@@ -4637,7 +4760,17 @@ Public Class DynamicDataForm
                         Dim current = startVal
                         For i As Long = 1 To iterations
                             ' formatta il valore con padding
-                            Dim formattedStr As String = If(padLen > 0, current.ToString("D" & padLen), current.ToString())
+                            Dim formattedCore As String = If(padLen > 0, current.ToString("D" & padLen), current.ToString())
+                            Dim formattedStr As String
+
+                            If usePrefixed Then
+                                ' Nuovo comportamento: SC_005_0004 ... SC_005_0015
+                                formattedStr = prefix & formattedCore
+                            Else
+                                ' Vecchio comportamento numerico puro
+                                formattedStr = formattedCore
+                            End If
+
                             ' imposta parametro con tipo corretto
                             Dim p = cmd.Parameters("@" & fieldName)
                             If fieldSqlType = SqlDbType.Int OrElse fieldSqlType = SqlDbType.BigInt OrElse fieldSqlType = SqlDbType.SmallInt OrElse fieldSqlType = SqlDbType.TinyInt Then
@@ -4703,9 +4836,6 @@ Public Class DynamicDataForm
             End Using
         End Using
     End Sub
-
-
-
 
 End Class
 

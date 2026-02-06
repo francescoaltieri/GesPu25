@@ -51,6 +51,7 @@ Partial Class GesPu25
         GestioneUtentiToolStripMenuItem = New ToolStripMenuItem()
         GestioneNotificheToolStripMenuItem = New ToolStripMenuItem()
         ImportaDaExcelToolStripMenuItem = New ToolStripMenuItem()
+        GeneraNuovoDatabaseToolStripMenuItem = New ToolStripMenuItem()
         ParametriToolStripMenuItem = New ToolStripMenuItem()
         ParametriToolStripMenuItem1 = New ToolStripMenuItem()
         ToolStripMenuItem3 = New ToolStripSeparator()
@@ -84,7 +85,6 @@ Partial Class GesPu25
         StatusStrip1 = New StatusStrip()
         toolStripUser = New ToolStripStatusLabel()
         toolStripDataOra = New ToolStripStatusLabel()
-        GeneraNuovoDatabaseToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         StatusStrip1.SuspendLayout()
         SuspendLayout()
@@ -267,6 +267,12 @@ Partial Class GesPu25
         ImportaDaExcelToolStripMenuItem.Name = "ImportaDaExcelToolStripMenuItem"
         ImportaDaExcelToolStripMenuItem.Size = New Size(201, 22)
         ImportaDaExcelToolStripMenuItem.Text = "Importa da Excel"
+        ' 
+        ' GeneraNuovoDatabaseToolStripMenuItem
+        ' 
+        GeneraNuovoDatabaseToolStripMenuItem.Name = "GeneraNuovoDatabaseToolStripMenuItem"
+        GeneraNuovoDatabaseToolStripMenuItem.Size = New Size(201, 22)
+        GeneraNuovoDatabaseToolStripMenuItem.Text = "Genera Nuovo Database"
         ' 
         ' ParametriToolStripMenuItem
         ' 
@@ -478,12 +484,6 @@ Partial Class GesPu25
         toolStripDataOra.ForeColor = SystemColors.Highlight
         toolStripDataOra.Name = "toolStripDataOra"
         toolStripDataOra.Size = New Size(4, 17)
-        ' 
-        ' GeneraNuovoDatabaseToolStripMenuItem
-        ' 
-        GeneraNuovoDatabaseToolStripMenuItem.Name = "GeneraNuovoDatabaseToolStripMenuItem"
-        GeneraNuovoDatabaseToolStripMenuItem.Size = New Size(201, 22)
-        GeneraNuovoDatabaseToolStripMenuItem.Text = "Genera Nuovo Database"
         ' 
         ' GesPu25
         ' 

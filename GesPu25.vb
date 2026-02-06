@@ -68,11 +68,10 @@ Public Class GesPu25
 
 
     Private Sub ImportaDaExcelToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ImportaDaExcelToolStripMenuItem.Click
-        Dim ImportForm As New ImportaExcel()
-
-        ImportForm.MdiParent = Me
-
-        ImportForm.Show()
+        Dim modulo As New ImportaExcel()
+        ApriModulo2ConPermessi("Importa da Excel", modulo)
+        'ImportForm.MdiParent = Me
+        'ImportForm.Show()
     End Sub
 
     Public Sub ApriModuloConPermessi(nomeTabella As String, mdiParent As Form, Optional pFiltroIniziale As String = "")
@@ -138,7 +137,6 @@ Public Class GesPu25
             End If
         Next
 
-        ' Non è aperto: crealo, imposta il filtro e mostra
         Dim campi = RecuperaCampiDa(nomeTabella)
         Dim nuovoForm As New DynamicDataForm(campi, nomeTabella)
         nuovoForm.Text = $"Modulo: {nomeTabella}"
@@ -152,19 +150,18 @@ Public Class GesPu25
                     nuovoForm.Tag = pFiltroIniziale
                 End If
             Catch
-                ' fallback silenzioso
+                ' non fa niente
             End Try
         End If
 
         nuovoForm.MdiParent = mdiParent
         nuovoForm.Show()
 
-        ' opzionale: forzare la ricarica immediata se il form espone il metodo
         Try
             Dim mi = nuovoForm.GetType().GetMethod("RicaricaDati", Reflection.BindingFlags.Instance Or Reflection.BindingFlags.Public Or Reflection.BindingFlags.NonPublic)
             If mi IsNot Nothing Then mi.Invoke(nuovoForm, Nothing)
         Catch
-            ' ignorare errori non critici
+            ' non fa niente
         End Try
 
         Cursor.Current = Cursors.Default
@@ -177,7 +174,7 @@ Public Class GesPu25
         Application.DoEvents()
 
         Dim permessi = SessioneUtente.Autorizzazioni.GetPermessi(nomeTabella)
-        Dim isAdmin = IsUtenteAdmin(SessioneUtente.NomeUtenteCorrente) ' ← uso della funzione helper
+        Dim isAdmin = IsUtenteAdmin(SessioneUtente.NomeUtenteCorrente)
 
         If Not permessi.CanView AndAlso Not isAdmin Then
             MDIMessageBox.Show($"Accesso negato al modulo {nomeTabella}.", MdiParent, MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -438,5 +435,7 @@ Public Class GesPu25
         Dim modulo As New SysNuovoDatabase()
         ApriModulo2ConPermessi("Acquisici da PDF", modulo)
     End Sub
-
+    Private Sub ComunicazioniToolStripMenuItem_Click_1(sender As Object, e As EventArgs) Handles ComunicazioniToolStripMenuItem.Click
+        ApriModuloConPermessi("Tab_Comunicazioni", Me)
+    End Sub
 End Class

@@ -222,7 +222,7 @@ Public Class PDF2Storyboard
             Return
         End If
 
-        ' Crea il form come MDI child (non usare Using / ShowDialog)
+        ' Crea il form come MDI child 
         Dim frm As New AssegnaSceneForm(storyboardId, storyboardDesc, outDir)
         frm.MdiParent = GesPu25
         frm.TopLevel = False
